@@ -16,6 +16,13 @@
  *   every typed record entry-generic, so every entry's field descriptors are read by the
  *   interpreter that serves the records no fast shape covers.
  *
+ * - **loc mode is exact**: each of those three decodes again with the document's language
+ *   (`decode_tape`'s loc mode, what `parse_<lang>(source, {locations: true})` runs) reads back
+ *   the tree `JSON.parse` makes of the same parse's `loc`-bearing wire (`tsv parse --locations`),
+ *   key order included — `loc` after `end`, `name_loc` after `name`, Svelte's `character`
+ *   positions — through the hot shapes' twins, the entry-generic loc reader `X`, and the
+ *   interpreter alike.
+ *
  * Every document also carries its **direct** tape — the one its wire writer writes itself,
  * its strings true-offset refs, which the Rust half has already graded against the wire (it
  * prints back to it, and the transcoder canonicalizes it to the transcoded tape). This half
@@ -83,6 +90,8 @@ interface TapeRecord {
 	language: 'svelte' | 'typescript' | 'css';
 	source: string;
 	span: unknown;
+	/** The same parse's `loc`-bearing wire. */
+	loc: unknown;
 	tape: string;
 	/** The document's direct tape (base64), from its wire writer itself. */
 	direct?: string;
@@ -146,12 +155,22 @@ export function tape_difference(a: Uint8Array, b: Uint8Array): string | null {
 	return `byte ${i} (word ${at / 4}): ${word(a, at)} vs ${word(b, at)}, lengths ${a.length} vs ${b.length}`;
 }
 
-/** Grades one document; the failures it finds, none when it passes. */
+/** A document's `loc`-bearing wire and its language, what loc mode must decode its tape to. */
+export interface LocWire {
+	tree: unknown;
+	language: 'svelte' | 'typescript' | 'css';
+}
+
+/**
+ * Grades one document; the failures it finds, none when it passes. With `loc`, every decoder
+ * path is graded in loc mode too, against the `loc`-bearing wire.
+ */
 export function grade_document(
 	tree: unknown,
 	source: string,
 	transcoded: Uint8Array,
-	schema: TapeSchema
+	schema: TapeSchema,
+	loc?: LocWire
 ): string[] {
 	const failures: string[] = [];
 	let encoded: Uint8Array;
@@ -162,24 +181,48 @@ export function grade_document(
 	}
 	const producers = tape_difference(encoded, transcoded);
 	if (producers !== null) failures.push(`encoder vs transcoder at ${producers}`);
+	const generic = encode_tape(tree, source, schema, { no_fast_shapes: true }).bytes;
 	const decoders: Array<[string, () => unknown]> = [
 		['decode_tape', () => decode_tape(encoded, source)],
 		['decode_tape_iterative', () => decode_tape_iterative(encoded, source)],
-		[
-			'decode_tape over entry-generic records',
-			() => decode_tape(encode_tape(tree, source, schema, { no_fast_shapes: true }).bytes, source)
-		]
+		['decode_tape over entry-generic records', () => decode_tape(generic, source)]
 	];
+	failures.push(...grade_decoders(decoders, tree, ''));
+	if (loc !== undefined) {
+		const language = loc.language;
+		failures.push(
+			...grade_decoders(
+				[
+					['decode_tape', () => decode_tape(encoded, source, language)],
+					['decode_tape_iterative', () => decode_tape_iterative(encoded, source, language)],
+					['decode_tape over entry-generic records', () => decode_tape(generic, source, language)]
+				],
+				loc.tree,
+				'loc mode: '
+			)
+		);
+	}
+	return failures;
+}
+
+/** Each decode's failures against `want`: a throw, or the first difference, key order included. */
+function grade_decoders(
+	decoders: ReadonlyArray<[string, () => unknown]>,
+	want: unknown,
+	prefix: string
+): string[] {
+	const failures: string[] = [];
+	const against = prefix === '' ? 'JSON.parse' : 'the loc wire';
 	for (const [name, decode] of decoders) {
 		let decoded: unknown;
 		try {
 			decoded = decode();
 		} catch (error) {
-			failures.push(`${name} threw: ${(error as Error).message}`);
+			failures.push(`${prefix}${name} threw: ${(error as Error).message}`);
 			continue;
 		}
-		const d = wire_difference(decoded, tree);
-		if (d !== null) failures.push(`${name} vs JSON.parse at ${d}`);
+		const d = wire_difference(decoded, want);
+		if (d !== null) failures.push(`${prefix}${name} vs ${against} at ${d}`);
 	}
 	return failures;
 }
@@ -187,26 +230,37 @@ export function grade_document(
 /**
  * Grades one direct tape (a writer's own, its refs true-offset — `docs/tape_format.md` §String
  * refs): both decoder paths read back the tree `JSON.parse` makes of the wire, key order
- * included. Byte equality with the transcoder's tape is not asked: the refs a direct writer
- * makes are any slice whose text equals the value.
+ * included — and with `loc`, in loc mode, the `loc`-bearing wire's. Byte equality with the
+ * transcoder's tape is not asked: the refs a direct writer makes are any slice whose text
+ * equals the value.
  * @returns the failures it finds, none when it passes
  */
-export function grade_direct_tape(tree: unknown, source: string, direct: Uint8Array): string[] {
-	const failures: string[] = [];
-	const decoders: Array<[string, () => unknown]> = [
-		['decode_tape', () => decode_tape(direct, source)],
-		['decode_tape_iterative', () => decode_tape_iterative(direct, source)]
-	];
-	for (const [name, decode] of decoders) {
-		let decoded: unknown;
-		try {
-			decoded = decode();
-		} catch (error) {
-			failures.push(`direct tape: ${name} threw: ${(error as Error).message}`);
-			continue;
-		}
-		const d = wire_difference(decoded, tree);
-		if (d !== null) failures.push(`direct tape: ${name} vs JSON.parse at ${d}`);
+export function grade_direct_tape(
+	tree: unknown,
+	source: string,
+	direct: Uint8Array,
+	loc?: LocWire
+): string[] {
+	const failures = grade_decoders(
+		[
+			['decode_tape', () => decode_tape(direct, source)],
+			['decode_tape_iterative', () => decode_tape_iterative(direct, source)]
+		],
+		tree,
+		''
+	).map((f) => `direct tape: ${f}`);
+	if (loc !== undefined) {
+		const language = loc.language;
+		failures.push(
+			...grade_decoders(
+				[
+					['decode_tape', () => decode_tape(direct, source, language)],
+					['decode_tape_iterative', () => decode_tape_iterative(direct, source, language)]
+				],
+				loc.tree,
+				'loc mode: '
+			).map((f) => `direct tape: ${f}`)
+		);
 	}
 	return failures;
 }
@@ -285,16 +339,18 @@ export async function run_check_tape(
 		stats.generic += encoded.stats.generic;
 		stats.escape += encoded.stats.escape;
 		if (update) continue;
+		const loc: LocWire = { tree: record.loc, language: record.language };
 		const problems = grade_document(
 			record.span,
 			source,
 			Buffer.from(record.tape, 'base64'),
-			schema
+			schema,
+			loc
 		);
 		if (record.direct !== undefined) {
 			direct[record.language]++;
 			problems.push(
-				...grade_direct_tape(record.span, source, Buffer.from(record.direct, 'base64'))
+				...grade_direct_tape(record.span, source, Buffer.from(record.direct, 'base64'), loc)
 			);
 		}
 		if (problems.length > 0)

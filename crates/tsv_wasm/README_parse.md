@@ -61,7 +61,7 @@ For the span-only AST as a JSON string — to write it to disk or the wire — `
 
 Every parser takes an optional acorn-style options object:
 
-- `locations` (default `false`) — add per-node `loc` (line/column), as acorn's `locations: true` does, and Svelte's `name_loc`. Computed in JS after the parse ([below](#reconstructing-linecolumn)).
+- `locations` (default `false`) — add per-node `loc` (line/column), as acorn's `locations: true` does, and Svelte's `name_loc`. Built in JS as the tree is decoded, in the key order `tsv parse --locations` writes — `loc` right after `end`, `name_loc` right after `name` — so `JSON.stringify` of the tree is that command's output ([below](#reconstructing-linecolumn)).
 - `sourceType` (TypeScript only; omitted means `'module'`) — the parse goal. At `'script'`, `await` is an ordinary identifier, `import`/`export`/`import.meta` and a top-level `for await` are syntax errors, and the code is sloppy unless a `"use strict"` prologue makes it strict; a module is always strict. `parse_svelte` and `parse_css` throw on a set `sourceType`.
 
 A supported key set to `undefined` reads as its default — `sourceType: undefined` included on Svelte and CSS — so one options bag forwards to every object parser. Argument errors are thrown `TypeError`s:
@@ -72,7 +72,7 @@ A supported key set to `undefined` reads as its default — `sourceType: undefin
 
 ### Reconstructing line/column
 
-`{locations: true}` runs `reconstruct_locations`, a pure-JS helper the package also exports for a tree you already hold:
+For a tree you already hold, `reconstruct_locations` — a pure-JS helper the package also exports — adds the same `loc` that `{locations: true}` builds:
 
 ```typescript
 import {parse_typescript, reconstruct_locations} from '@fuzdev/tsv-parse-wasm';
@@ -80,7 +80,7 @@ import {parse_typescript, reconstruct_locations} from '@fuzdev/tsv-parse-wasm';
 const src = 'const x = 1;\n';
 const located = parse_typescript(src, {locations: true});
 // on success every node carries loc: {start: {line, column}, end: {line, column}}
-// the same, in two steps:
+// the same data, in two steps (the helper appends its keys last):
 const parsed = parse_typescript(src);
 if (parsed.ok) {
 	const same = reconstruct_locations(parsed.ast, src);

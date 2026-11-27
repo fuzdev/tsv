@@ -93,10 +93,11 @@ export declare function create_locator(source: string, options: LocatorOptions):
  * numeric `start`/`end`, derived from those offsets + `source` — plus the Svelte
  * `name_loc`. Mutates `ast` in place and returns it. The result deep-equals the Rust
  * emitter's loc-bearing wire of the same parse (`tsv parse --locations`), in every
- * language — and is what a parse with `{locations: true}` returns. The walk checks no
- * offset: it trusts `ast` to be a parse of `source`. `ast` must be acyclic — the parse's own
- * tree, or a structured clone of it: a tree given back-pointers (a `parent` on each node)
- * never finishes.
+ * language — and deep-equals what a parse with `{locations: true}` returns (the walk appends
+ * its keys last, so the two stringify differently). The walk checks no offset: it trusts
+ * `ast` to be a parse of `source`. `ast` must be acyclic — the parse's own tree, or a
+ * structured clone of it: a tree given back-pointers (a `parent` on each node) never
+ * finishes.
  *
  * @throws TypeError when `source` is not a string, `options` is not an object or carries a
  *   key other than `language`, `options.language` is omitted and `ast` is not a parse's

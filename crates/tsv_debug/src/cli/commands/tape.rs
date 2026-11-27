@@ -4,9 +4,10 @@
 //! The Rust half of `npm run check:tape` (`scripts/check_tape.ts`): one process that parses every
 //! fixture document `loc_wires` grades, writes its span-only wire, transcodes the wire to a tape
 //! (`crate::transcoder::Transcoder`), and streams one NDJSON record per document to stdout —
-//! `{"path", "language", "source", "span", "tape", "direct"?}`, the wire embedded verbatim, the
-//! tapes in base64 — so the JS half can encode the same wire with the offline encoder, compare
-//! the two tapes byte for byte, and decode them. `direct` is the document's tape as its wire
+//! `{"path", "language", "source", "span", "loc", "tape", "direct"?}`, the two wires embedded
+//! verbatim (`loc` the same parse's `loc`-bearing wire, what the decoder's loc mode must read the
+//! tape back to), the tapes in base64 — so the JS half can encode the same wire with the offline
+//! encoder, compare the two tapes byte for byte, and decode them both ways. `direct` is the document's tape as its wire
 //! writer writes it itself (`tsv_debug::tape::grade_css_direct_tape` and its TypeScript and
 //! Svelte twins, which grade it against the wire first: a failure there fails the run), for
 //! the JS half to decode too.
@@ -22,8 +23,9 @@
 //! `"script"` / `"module"`, TypeScript only; `repeat` a count of timed transcodes), answered
 //! by exactly one line on stdout, flushed before the next request is read:
 //!
-//! - `{"span": <wire>, "tape": "<base64>", "direct"?: "<base64>", "transcode_ns"?}` — the
-//!   span-only wire and its tape, its source's direct tape (as above), and
+//! - `{"span": <wire>, "loc": <wire>, "tape": "<base64>", "direct"?: "<base64>",
+//!   "transcode_ns"?}` — the span-only wire, the same parse's `loc`-bearing wire, its tape, its
+//!   source's direct tape (as above), and
 //!   with `repeat` the fastest of that many transcodes of the wire on a warm transcoder, in
 //!   nanoseconds;
 //! - `{"error": "<message>"}` — tsv rejected the source, the transcoder refused the wire, or a
@@ -124,6 +126,8 @@ impl TapeCommand {
             line.extend_from_slice(json_string(&doc.source).as_bytes());
             line.extend_from_slice(b",\"span\":");
             line.extend_from_slice(&doc.span);
+            line.extend_from_slice(b",\"loc\":");
+            line.extend_from_slice(&doc.loc);
             line.extend_from_slice(b",\"tape\":\"");
             line.extend_from_slice(tape.as_bytes());
             if let Some(direct) = direct {
@@ -173,9 +177,9 @@ struct TapeRequest {
     repeat: Option<u32>,
 }
 
-/// One request's product: the span-only wire, its tape, a direct tape (base64
-/// both), and the timed transcode's nanoseconds.
-type Produced = (Vec<u8>, String, Option<String>, Option<u128>);
+/// One request's product: the span-only wire, the `loc`-bearing wire, its tape, a direct tape
+/// (base64 both), and the timed transcode's nanoseconds.
+type Produced = (Vec<u8>, Vec<u8>, String, Option<String>, Option<u128>);
 
 /// The reply line for one request — `Err` only for a request no binding would accept.
 fn answer(request: &TapeRequest) -> Result<Vec<u8>, String> {
@@ -192,19 +196,28 @@ fn answer(request: &TapeRequest) -> Result<Vec<u8>, String> {
     }
     let source = request.source.as_str();
     let produced = super::catch_request_panic(|| -> Result<Produced, String> {
-        let span = match language {
+        let (span, loc) = match language {
             "svelte" => {
                 let ast = tsv_svelte::__private::parse(source).map_err(|e| format!("{e:#}"))?;
-                tsv_svelte::__private::convert_ast_json_bytes(&ast, source)
+                (
+                    tsv_svelte::__private::convert_ast_json_bytes(&ast, source),
+                    tsv_svelte::__private::convert_ast_json_bytes_with_locations(&ast, source),
+                )
             }
             "css" => {
                 let ast = tsv_css::__private::parse(source).map_err(|e| format!("{e:#}"))?;
-                tsv_css::__private::convert_ast_json_bytes(&ast, source)
+                (
+                    tsv_css::__private::convert_ast_json_bytes(&ast, source),
+                    tsv_css::__private::convert_ast_json_bytes_with_locations(&ast, source),
+                )
             }
             _ => {
                 let ast = tsv_ts::__private::parse_with_goal(source, goal)
                     .map_err(|e| format!("{e:#}"))?;
-                tsv_ts::__private::convert_ast_json_bytes(&ast, source)
+                (
+                    tsv_ts::__private::convert_ast_json_bytes(&ast, source),
+                    tsv_ts::__private::convert_ast_json_bytes_with_locations(&ast, source),
+                )
             }
         };
         let mut transcoder = Transcoder::new();
@@ -251,13 +264,15 @@ fn answer(request: &TapeRequest) -> Result<Vec<u8>, String> {
             Some(graded) => Some(base64(&graded.map_err(|e| format!("direct: {e}"))?)),
             None => None,
         };
-        Ok((span, tape, direct, fastest))
+        Ok((span, loc, tape, direct, fastest))
     });
     Ok(match produced {
-        Ok(Ok((span, tape, direct, fastest))) => {
-            let mut reply = Vec::with_capacity(span.len() + tape.len() + 48);
+        Ok(Ok((span, loc, tape, direct, fastest))) => {
+            let mut reply = Vec::with_capacity(span.len() + loc.len() + tape.len() + 56);
             reply.extend_from_slice(b"{\"span\":");
             reply.extend_from_slice(&span);
+            reply.extend_from_slice(b",\"loc\":");
+            reply.extend_from_slice(&loc);
             reply.extend_from_slice(b",\"tape\":\"");
             reply.extend_from_slice(tape.as_bytes());
             reply.push(b'"');

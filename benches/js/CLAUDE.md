@@ -1069,7 +1069,7 @@ N-API under Node/Bun) and `tsv-wasm` are each package's default call, made throu
 facade (`lib/tsv_api.ts`): the span-only parse (on the tape route) in the
 `parse/*` groups, the format in the `format/*` groups. So a row is identified by `group` + `name`,
 never `name` alone. A variant is named for what it adds — `+locations` for the option
-(`{locations: true}`: the default parse plus `loc` rebuilt in JS; perf surface only), `-internal`
+(`{locations: true}`: the default parse's tape decoded with `loc` built in; perf surface only), `-internal`
 for the bench-only parse that hands JS nothing. Third-party rows read the same way: the package's
 name for its default call, a suffix for an option (`rsvelte-parse-skip-expr-loc`).
 

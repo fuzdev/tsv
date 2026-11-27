@@ -7,7 +7,7 @@
  * time what `{locations: true}` adds over it — and nothing in a timed sweep can tell
  * that wire from a loc-bearing one: both are a successful parse returning an AST, so an
  * artifact still emitting `loc` is timed as usual and published as the span-only default,
- * with a reconstruction running over a tree that already had `loc`. A stale binding
+ * with a `{locations: true}` decode over a wire that already had `loc`. A stale binding
  * whose parse still emits `loc` does exactly this.
  *
  * The artifact-freshness guard refuses such a build by default

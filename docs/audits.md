@@ -39,8 +39,8 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Wire-type drift](#wire-type-drift-check-checkast-types) | `check:ast-types` | the shipped `tsv_ast.d.ts`, generated from the AST schema table, not typing what the wire-JSON writers emit or the canonical parser's committed wire — plus a wire type the table has no entry for | `npm run check` |
 | [Package declarations](#package-declaration-check-typecheckpackages) | `typecheck:packages` | a staged package's published `.d.ts` failing a consumer's strict compile — a lib the consumer did not ask for (TS2550), a name star-export ambiguation drops (TS2308), a type a package must not export, a README example that does not compile | `scripts/publish.ts` Step 6 (all four packages); on demand (needs `npm run bench:install`, so NOT in `npm run check`) |
 | [Loc cross-grade](#loc-cross-grade-checkloc) | `check:loc` | tsv's loc wire and the shipped `locations.js` reconstruction of its span-only wire disagreeing on any fixture input — the two implementations of the one `loc` definition drifting apart | `npm run check` |
-| [Tape gate](#tape-gate-checktape) | `check:tape` | the offline JS tape encoder and the Rust transcoder (the oracle) writing different bytes for one fixture wire, a wire writer's own tape (what the bindings ship) not printing back to its wire, or the shipped tape decoder — its fast path, or its iterative interpreter alone — reading back a tree that is not `JSON.parse`'s of the wire, key order included | `npm run check` |
-| [Tape corpus](#tape-corpus-leg-tapecorpus) | `tape:corpus` | the same, over real code | `npm run conformance` (release) |
+| [Tape gate](#tape-gate-checktape) | `check:tape` | the offline JS tape encoder and the Rust transcoder (the oracle) writing different bytes for one fixture wire, a wire writer's own tape (what the bindings ship) not printing back to its wire, or the shipped tape decoder — its fast path, or its iterative interpreter alone — reading back a tree that is not `JSON.parse`'s of the wire, key order included — or, in loc mode (`{locations: true}`), not that of the same parse's `loc`-bearing wire | `npm run check` |
+| [Tape corpus](#tape-corpus-leg-tapecorpus) | `tape:corpus` | the same, over real code, and a stale decoder hot-shape list | `npm run conformance` (release) |
 | [Pin agreement](#canonical-pin-agreement-audit-pinsaudit) | `pins:audit` | the five canonical-oracle pin sites disagreeing — including the lockfile, which alone pins the oracle's own transitive deps | `npm run check` |
 | [Checkout alignment](#checkout-alignment-audit-pinsauditcheckouts) | `pins:audit:checkouts` | a present `../svelte` / `../acorn-typescript` clone that is not the pinned version, or whose version file can't be read; checkout drift (warn — HEAD, or the `../corpora` snapshot's `collections/` tree id) | `npm run conformance` (preflight) |
 | [Authoring independence](#authoring-independence-audit-authoringaudit) | `authoring:audit` | two render-equivalent authorings settling on two fixed points; non-idempotency | `npm run check`; `audit:corpus` (real code) |
@@ -1503,6 +1503,15 @@ back byte for byte, and the transcoder canonicalizes that printback to the trans
 failure fails the run), and both decoder paths read it back
 to `JSON.parse`'s tree.
 
+**Loc mode** (`{locations: true}`, tape_format.md §Decoding) is graded the same way, against the
+same parse's `loc`-bearing wire (`tsv parse --locations`, which the `tsv_debug tape` stream
+carries beside the span-only one): every decode above — the fast path through the hot shapes'
+twins and the entry-generic loc reader, the interpreter alone, the entry-generic re-encode, and
+both paths over the direct tape — run again with the document's language must read back that
+wire's tree, key order included (`loc` after `end`, `name_loc` after `name`, Svelte's
+`character` positions). It is the one gate holding the decoder's loc mode to the Rust writer;
+`check:loc` holds the public reconstruction to it, by deep equality (that module appends its
+keys last).
 **How.** One `tsv_debug tape` process (`cli/commands/tape.rs`) streams each document's source,
 wire and transcoded tape as NDJSON, split on LF alone. It reports the records whose presence
 mask is off the fast-shape list; that is no failure (the entry-generic record carries any mask),
@@ -1543,8 +1552,15 @@ panic, a transcoder refusal, a byte difference between the producers, a decoded 
 error but one: a TypeScript file tsv rejects at the module goal yet parses at the script goal (a
 sloppy script) has no wire at the parse's goal and is counted, not graded (its verdict is
 `corpus:compare:parse`'s). Every file's direct tape is graded as `check:tape` grades it, a
-Rust-side failure answering `direct: …`; a run whose direct tapes number fewer than its graded
-files of any language fails. No pinned count: it grades a property of every file it reaches. A
+Rust-side failure answering `direct: …`, and every decode in loc mode too, against the same
+parse's `loc`-bearing wire; a run whose direct tapes number fewer than its graded
+files of any language fails. No pinned count: it grades a property of every file it reaches —
+but one committed list it re-derives: the decoder's hot-shape list (`tsv_tape_hot.json`), cut
+from a census of the `own` collections' records, whose cut must hold the committed list's
+shapes per language — compared as sets, since the decoder reads the list as one, so a rank
+change inside a cut passes and only a shape crossing it fails, named per language
+(`npm run tape-hot:update` rewrites the list, then regenerates the decoder). A stale list is
+no decoding error, but it would twin shapes the corpus no longer favors, silently. A
 `npm run conformance` leg.
 
 ## Package-Declaration Check (`typecheck:packages`)

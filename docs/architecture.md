@@ -198,9 +198,11 @@ per-node `loc`, plus Svelte's `name_loc` — leaving only `start`/`end` offsets.
 binding ships it (`tsv_ffi`, `tsv_napi`, `tsv_wasm`), and it is `tsv parse`'s default;
 the `loc`-bearing form ships through no binding — it is `tsv parse --locations`'s,
 `tsv_debug`'s, and the oracle comparison's. Line/column is a pure function of offset
-plus source, so the packages derive it consumer-side: every package that parses carries
-a pure-JS `reconstruct_locations` helper, run by its
-`parse_*(source, {locations: true})`.
+plus source, so the packages derive it consumer-side: `parse_*(source, {locations: true})`
+decodes the span-only tape into the `loc`-bearing tree (the decoder's loc mode,
+docs/tape_format.md §Decoding), and every package that parses carries a pure-JS
+`reconstruct_locations` helper for a tree held apart from its parse — both over one
+statement of the rules (`crates/tsv_wasm/npm/locations_core.js`).
 
 Each writer is a faithful emission of the acorn / `parseCss` quirk catalog; the fixture
 suite gates the span-only wire against the canonical parser's `expected.json` (its

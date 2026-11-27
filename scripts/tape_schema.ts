@@ -26,6 +26,9 @@ import type { AstSchema, AstSchemaEntry, AstSchemaField } from './ast_schema.ts'
 /** The fast-shape list's path, from the checkout root. */
 export const TAPE_SHAPES_PATH = 'crates/tsv_wasm/types/tsv_tape_shapes.json';
 
+/** The hot-shape list's path, from the checkout root (`TapeHotFile`). */
+export const TAPE_HOT_PATH = 'crates/tsv_wasm/types/tsv_tape_hot.json';
+
 /**
  * The tape format's version, the header's second word. Bumped by hand when the format's rules
  * change (an encoding, the header, the string-ref rule); a regenerated table or shape list moves
@@ -116,6 +119,14 @@ export interface TapeEntry {
 	fields: ReadonlyArray<TapeField>;
 	/** How many fields carry a mask bit. */
 	bits: number;
+	/**
+	 * Whether the `loc` wire gives its records a `loc` — right after `end`, where the table's
+	 * `presence: locations` field sits (every entry with required offset `start` and `end`).
+	 * Not part of the tape (nor of `SHAPES_HASH`): the tape decoder's loc mode reads it.
+	 */
+	loc: boolean;
+	/** Whether the `loc` wire gives its records a Svelte `name_loc`, right after `name`. */
+	name_loc: boolean;
 }
 
 /** One fast shape: an id (from `1`), its entry and mask. */
@@ -218,6 +229,8 @@ interface Draft {
 	type: string | null;
 	interface: string | undefined;
 	fields: Array<TapeField & { entry_interface?: string }>;
+	loc: boolean;
+	name_loc: boolean;
 }
 
 /**
@@ -238,6 +251,21 @@ export function derive_tape_entries(schema: AstSchema): TapeEntries | { errors: 
 			const name = entry_identity(item);
 			const fields: Draft['fields'] = [];
 			let bit = 0;
+			let loc = false;
+			let name_loc = false;
+			item.fields.forEach((field, at) => {
+				if (field.presence !== 'locations') return;
+				// the loc wire's own fields: where the tape decoder's loc mode builds each
+				const before = item.fields[at - 1]?.key;
+				if (field.key === 'loc' && before === 'end') loc = true;
+				else if (field.key === 'name_loc' && before === 'name') name_loc = true;
+				else {
+					errors.push(
+						`${name}.${field.key}: a loc-wire field the tape decoder cannot build ` +
+							'(only `loc` right after `end` and `name_loc` right after `name`)'
+					);
+				}
+			});
 			for (const field of item.fields) {
 				const enc = field_encoding(field);
 				if (enc === null) {
@@ -268,7 +296,25 @@ export function derive_tape_entries(schema: AstSchema): TapeEntries | { errors: 
 			fields.forEach((f, at) => {
 				if (f.enc === Enc.own && (s === -1 || e === -1 || s > at || e > at)) f.enc = Enc.ref;
 			});
-			drafts.push({ name, type: item.type ?? null, interface: item.interface, fields });
+			// the loc wire's rule: every object with numeric `start` and `end` carries a `loc` —
+			// so an entry has one exactly when both are required offsets
+			if (loc !== (s !== -1 && e !== -1)) {
+				errors.push(
+					`${name}: ${loc ? 'a `loc` without' : 'no `loc` despite'} required offset \`start\` and \`end\``
+				);
+			}
+			const named = fields.find((f) => f.key === 'name');
+			if (name_loc && (named === undefined || named.bit !== -1 || s === -1 || e === -1)) {
+				errors.push(`${name}: a \`name_loc\` without a required \`name\`, \`start\` and \`end\``);
+			}
+			drafts.push({
+				name,
+				type: item.type ?? null,
+				interface: item.interface,
+				fields,
+				loc,
+				name_loc
+			});
 		}
 	}
 	const canonical = (d: Draft): string =>
@@ -283,6 +329,11 @@ export function derive_tape_entries(schema: AstSchema): TapeEntries | { errors: 
 		const key = canonical(d);
 		const hit = by_canonical.get(key);
 		if (hit !== undefined) {
+			// the loc flags ride no tape byte, so twins that fold must agree on them
+			const kept = unique[hit]!;
+			if (kept.loc !== d.loc || kept.name_loc !== d.name_loc) {
+				errors.push(`${d.name}: folds into ${kept.name} but differs in its loc-wire fields`);
+			}
 			draft_id.push(hit);
 			continue;
 		}
@@ -302,6 +353,8 @@ export function derive_tape_entries(schema: AstSchema): TapeEntries | { errors: 
 		name: d.name,
 		type: d.type,
 		bits: d.fields.filter((f) => f.bit !== -1).length,
+		loc: d.loc,
+		name_loc: d.name_loc,
 		fields: d.fields.map(({ entry_interface, ...f }) => {
 			if (entry_interface === undefined) return f;
 			const target = by_interface.get(entry_interface);
@@ -474,4 +527,155 @@ export function parse_tape_shapes(text: string): TapeShapesFile | { errors: stri
 				Array.isArray(s) && s.length === 2 && typeof s[0] === 'string' && typeof s[1] === 'number'
 		);
 	return ok ? (r as TapeShapesFile) : { errors: ['not {note: string[], shapes: [name, mask][]}'] };
+}
+
+/** The languages a hot-shape list ranks, each over its own documents. */
+export const TAPE_HOT_LANGUAGES = ['typescript', 'svelte', 'css'] as const;
+
+/** A language a hot-shape list ranks. */
+export type TapeHotLanguage = (typeof TAPE_HOT_LANGUAGES)[number];
+
+/**
+ * How many of each language's hottest fast shapes get a `loc` twin in the decoder — the cut
+ * `tape-hot:update` makes of each ranking. Chosen by measurement: past it a twin buys the
+ * `{locations: true}` parse too little to pay for its bytes, which every `./parse` import loads.
+ */
+export const TAPE_HOT_TWINS: Readonly<Record<TapeHotLanguage, number>> = {
+	typescript: 100,
+	svelte: 100,
+	css: 25
+};
+
+/**
+ * The committed hot-shape list: per language, its hottest fast shapes (entry name and mask),
+ * hottest first. The decoder's loc mode builds `loc` into these through a generated twin of each
+ * one's fast function and reads every other record through its entry-generic loc reader, so the
+ * list sizes the decoder, never what it decodes.
+ */
+export interface TapeHotFile {
+	note: string[];
+	typescript: Array<[entry: string, mask: number]>;
+	svelte: Array<[entry: string, mask: number]>;
+	css: Array<[entry: string, mask: number]>;
+}
+
+/**
+ * The hot-shape list a census yields: per language, its fast shapes by how many records of its
+ * documents took each (a tie by shape id), the first `TAPE_HOT_TWINS[language]` kept.
+ */
+export function hot_file_from_counts(
+	schema: TapeSchema,
+	counts: Readonly<Record<TapeHotLanguage, ReadonlyMap<number, number>>>
+): TapeHotFile {
+	const file: TapeHotFile = {
+		note: [
+			"GENERATED by npm run tape-hot:update: per language, the fast shapes the author's own",
+			'corpus collections (held off the perf bench) decode most often, hottest first — the',
+			"shapes the tape decoder's loc mode builds through a twin. Never edited by hand."
+		],
+		typescript: [],
+		svelte: [],
+		css: []
+	};
+	for (const language of TAPE_HOT_LANGUAGES) {
+		const ranked = [...counts[language]]
+			.filter(([, count]) => count > 0)
+			.sort((a, b) => b[1] - a[1] || a[0] - b[0])
+			.slice(0, TAPE_HOT_TWINS[language]);
+		for (const [id] of ranked) {
+			const shape = schema.shapes[id - 1]!;
+			file[language].push([schema.entries[shape.entry]!.name, shape.mask]);
+		}
+	}
+	return file;
+}
+
+/** The hot-shape list's canonical text: one shape per line. */
+export function layout_tape_hot(file: TapeHotFile): string {
+	const lines = ['{', '\t"note": ['];
+	file.note.forEach((line, i) =>
+		lines.push(`\t\t${JSON.stringify(line)}${i < file.note.length - 1 ? ',' : ''}`)
+	);
+	lines.push('\t],');
+	TAPE_HOT_LANGUAGES.forEach((language, l) => {
+		lines.push(`\t${JSON.stringify(language)}: [`);
+		const list = file[language];
+		list.forEach(([name, mask], i) =>
+			lines.push(`\t\t[${JSON.stringify(name)}, ${mask}]${i < list.length - 1 ? ',' : ''}`)
+		);
+		lines.push(`\t]${l < TAPE_HOT_LANGUAGES.length - 1 ? ',' : ''}`);
+	});
+	lines.push('}');
+	return `${lines.join('\n')}\n`;
+}
+
+/**
+ * Where two hot-shape lists cut differently: per language, the shapes that entered `census`'s
+ * cut and the shapes that left it, one line each — empty when every language keeps the same SET.
+ * Rank order inside a cut is not compared: the decoder reads the list as a set
+ * (`generate_tape_decoder` takes the union of the three), so a swap within a cut changes no byte
+ * of it; a shape crossing one language's cut fails here even where the union keeps it.
+ */
+export function tape_hot_cut_changes(committed: TapeHotFile, census: TapeHotFile): string[] {
+	const changes: string[] = [];
+	const keys = (list: ReadonlyArray<readonly [string, number]>): Set<string> =>
+		new Set(list.map(([name, mask]) => `${name} mask ${mask}`));
+	for (const language of TAPE_HOT_LANGUAGES) {
+		const before = keys(committed[language]);
+		const after = keys(census[language]);
+		const entered = [...after].filter((key) => !before.has(key)).sort();
+		const left = [...before].filter((key) => !after.has(key)).sort();
+		if (entered.length > 0) changes.push(`${language}: entered the cut: ${entered.join(', ')}`);
+		if (left.length > 0) changes.push(`${language}: left the cut: ${left.join(', ')}`);
+	}
+	return changes;
+}
+
+/** Reads the hot-shape list's text, or what is wrong with it. */
+export function parse_tape_hot(text: string): TapeHotFile | { errors: string[] } {
+	let raw: unknown;
+	try {
+		raw = JSON.parse(text);
+	} catch (error) {
+		return { errors: [`not JSON: ${(error as Error).message}`] };
+	}
+	const r = raw as Partial<TapeHotFile> | null;
+	const pairs = (list: unknown): boolean =>
+		Array.isArray(list) &&
+		list.every(
+			(s) =>
+				Array.isArray(s) && s.length === 2 && typeof s[0] === 'string' && typeof s[1] === 'number'
+		);
+	const ok =
+		typeof r === 'object' &&
+		r !== null &&
+		Array.isArray(r.note) &&
+		r.note.every((line) => typeof line === 'string') &&
+		TAPE_HOT_LANGUAGES.every((language) => pairs(r[language]));
+	return ok
+		? (r as TapeHotFile)
+		: { errors: ['not {note: string[], typescript | svelte | css: [name, mask][]}'] };
+}
+
+/**
+ * The fast shape ids a hot-shape list names, over every language — or what it names that is no
+ * fast shape of `schema` (a list older than the table or the shape list: `tape-hot:update`).
+ */
+export function hot_shape_ids(
+	schema: TapeSchema,
+	file: TapeHotFile
+): Set<number> | { errors: string[] } {
+	const by_name = new Map(schema.entries.map((e) => [e.name, e.id]));
+	const ids = new Set<number>();
+	const errors: string[] = [];
+	for (const language of TAPE_HOT_LANGUAGES) {
+		for (const [name, mask] of file[language]) {
+			const entry = by_name.get(name);
+			const id = entry === undefined ? undefined : schema.shape_ids.get(shape_key(entry, mask));
+			if (id === undefined)
+				errors.push(`hot list: ${language} names ${name} mask ${mask}, no fast shape`);
+			else ids.add(id);
+		}
+	}
+	return errors.length > 0 ? { errors } : ids;
 }

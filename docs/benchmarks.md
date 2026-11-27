@@ -514,11 +514,11 @@ Things the published numbers measure that aren't quite what they look like.
   `decorators`/`optional`/`typeAnnotation` where tsv omits them, so its tree is the
   larger). Measured with `loc` stripped, tsv's JSON wire is _smaller_ than oxc's and
   `JSON.parse`s _faster_, and the two Rust parse+serialize sides are at parity. The
-  per-node `loc` the acorn / Svelte drop-in shape carries is a view tsv computes on request (`{locations: true}`,
-  reconstructed in JS) rather than a wire it ships — measured on the loc-bearing Rust
-  emitter: 46–48% of TS wire bytes and ~61% of its `JSON.parse` time, three nested
-  objects per node — and the `+locations` rows below price it. Three further
-  non-obvious points:
+  per-node `loc` the acorn / Svelte drop-in shape carries is a view tsv computes on
+  request (`{locations: true}`, built in JS as the tape is decoded) rather than a wire
+  it ships — measured on the loc-bearing Rust emitter: 46–48% of TS wire bytes and ~61%
+  of its `JSON.parse` time, three nested objects per node — and the `+locations` rows
+  below price it. Three further non-obvious points:
   - **The WASI binding (`oxc-parser-wasm`) does _not_ wrap**, so `.program` is
     the raw unparsed JSON _string_ — `lib/oxc_wasm.ts` runs it through the native
     package's own deserializer (`src-js/wrap.js` `jsonParseAst`) so the row
@@ -570,19 +570,18 @@ Things the published numbers measure that aren't quite what they look like.
     the absence is recorded in `unavailable` rather than read as a missing row).
 - **The `+locations` rows price `{locations: true}`, and they are not opponents of
   tsv's own rows.** `tsv+locations` and its wasm sibling call the published
-  `parse_<lang>(source, {locations: true})`: the default row's parse (the tape's
-  decode included), then the facade's own call of the shipped `reconstruct_locations`
-  (`crates/tsv_wasm/npm/locations.js`, the source every parse-capable package bundles)
-  over that tree, the line-table build inside the timed region. The facade names the
-  export's language to the helper
-  (`create_locator` refuses a missing one; the line rule and the Svelte stamping both
-  key on it), every language has the pair, and they are perf-only: their
+  `parse_<lang>(source, {locations: true})`: the default row's parse, its tape decoded in
+  the decoder's loc mode (`crates/tsv_wasm/npm/tape_decode.js`, building each `loc` as it
+  builds the record, over the rules `locations_core.js` states), the line-table build inside
+  the timed region. The facade names the export's language to the decoder (the line rule and
+  the Svelte stamping both key on it), every language has the pair, and they are perf-only: their
   parse is the default row's, so a coverage table would learn nothing from them. Read them
   against `tsv` / `tsv-wasm`: the report's
   `{locations: true}` cost note computes that ratio from the run's own rows. The
-  reconstructed tree is the tree `tsv parse --locations` writes, in every language:
-  tsv's Rust writer and `locations.js` implement one `loc` definition, held equal over
-  the fixture tree by `npm run check:loc`. On TypeScript that is acorn's AST exactly,
+  located tree is the tree `tsv parse --locations` writes, in every language and key
+  order: tsv's Rust writer and the decoder's loc mode implement one `loc` definition, held
+  equal over the fixture tree by `npm run check:tape` (and the reconstruction by
+  `npm run check:loc`). On TypeScript that is acorn's AST exactly,
   so `+locations` against the canonical parser is the payload-matched canonical read
   (a curated line under the TypeScript and Svelte parse groups); on Svelte it is a
   superset of Svelte's own `loc` (every positioned object carries one, where Svelte's wire

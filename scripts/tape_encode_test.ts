@@ -1,7 +1,9 @@
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Worker } from 'node:worker_threads';
-import { assert, test } from 'vitest';
+import { assert, onTestFinished, test } from 'vitest';
 
 import { decode_tape, decode_tape_iterative } from '../crates/tsv_wasm/npm/tape_decode.js';
 import { parse_ast_schema } from './ast_schema.ts';
@@ -230,6 +232,32 @@ function in_worker<T>(code: string, data: unknown, stack_mb: number): Promise<T>
 	});
 }
 
+/**
+ * The decoder's module text with one line added — a counter of the decodes whose fast pass threw
+ * a `RangeError` and fell back — written to a temporary file (its own import made absolute) for a
+ * worker to import, so a test asserts the fast pass overflowed rather than inferring it from a
+ * probe recursion. Not a `data:` URL: Node decodes one recursively, past a small worker stack.
+ * @returns the file's URL
+ */
+function counting_decoder(): string {
+	const text = readFileSync(root('crates/tsv_wasm/npm/tape_decode.js'), 'utf8');
+	const core = new URL('../crates/tsv_wasm/npm/locations_core.js', import.meta.url).href;
+	const fallback = '\ttree = slow();'; // the catch's, not the interpreter's `const tree`
+	const import_core = "from './locations_core.js'";
+	assert.ok(
+		text.split(fallback).length === 2 && text.split(import_core).length === 2,
+		'the decoder has one fallback and one core import to instrument'
+	);
+	const counted = text
+		.replace(import_core, `from '${core}'`)
+		.replace(fallback, `globalThis.fallbacks = (globalThis.fallbacks ?? 0) + 1; ${fallback}`);
+	const dir = mkdtempSync(join(tmpdir(), 'tape-decode-'));
+	onTestFinished(() => rmSync(dir, { recursive: true, force: true }));
+	const path = join(dir, 'tape_decode.js');
+	writeFileSync(path, counted);
+	return pathToFileURL(path).href;
+}
+
 /** The deepest wire the parsers accept: a left-deep chain of the spine limit's binary operators. */
 const DEPTH = 5520;
 
@@ -294,21 +322,40 @@ const { workerData, parentPort } = require('node:worker_threads');
 		return true;
 	};
 	const tape = new Uint8Array(workerData.tape);
+	const fallbacks = () => globalThis.fallbacks ?? 0;
 	const slow = decode_tape_iterative(tape, workerData.source);
 	const decoded = decode_tape(tape, workerData.source);
+	const fast_overflows = fallbacks() === 1;
 	const again = decode_tape(tape, workerData.source);
 	const next = decode_tape(new Uint8Array(workerData.small), 'a');
+	// loc mode overflows the same way: the slow path builds the same \`loc\`, in the same place
+	const slow_loc = decode_tape_iterative(tape, workerData.source, 'typescript');
+	const before_loc = fallbacks();
+	const decoded_loc = decode_tape(tape, workerData.source, 'typescript');
+	const loc_fast_overflows = fallbacks() === before_loc + 1;
+	const again_loc = decode_tape(tape, workerData.source, 'typescript');
+	const next_after_loc = decode_tape(new Uint8Array(workerData.small), 'a');
+	const deep = slow_loc.body[0].expression.left.left;
 	parentPort.postMessage({
 		overflows,
+		fast_overflows,
+		loc_fast_overflows,
 		chain: slow.body[0].expression.left.left.operator === '+',
 		equal: same(decoded, slow),
 		again: same(again, slow),
-		next: JSON.stringify(next) === workerData.small_expected
+		next: JSON.stringify(next) === workerData.small_expected,
+		loc_chain:
+			Object.keys(deep).slice(0, 4).join() === 'type,start,end,loc' &&
+			deep.loc.end.column === deep.end &&
+			deep.right.loc.start.column === deep.right.start,
+		loc_equal: same(decoded_loc, slow_loc),
+		loc_again: same(again_loc, slow_loc),
+		next_after_loc: JSON.stringify(next_after_loc) === workerData.small_expected
 	});
 })();
 `;
 
-test('a tree too deep for the recursive pass decodes by the slow path, and the next decode is exact', async () => {
+test('a tree too deep for the recursive pass decodes by the slow path, loc mode too, and the next decode is exact', async () => {
 	const at = (path: string): string => new URL(path, import.meta.url).href;
 	const built = await in_worker<{
 		tape: Uint8Array;
@@ -334,8 +381,177 @@ test('a tree too deep for the recursive pass decodes by the slow path, and the n
 	);
 	const outcome = await in_worker<Record<string, boolean>>(
 		DECODE,
-		{ ...built, decoder: at('../crates/tsv_wasm/npm/tape_decode.js'), depth: 2 * DEPTH },
+		{ ...built, decoder: counting_decoder(), depth: 2 * DEPTH },
 		0.5
 	);
-	assert.deepEqual(outcome, { overflows: true, chain: true, equal: true, again: true, next: true });
+	assert.deepEqual(outcome, {
+		overflows: true,
+		fast_overflows: true,
+		loc_fast_overflows: true,
+		chain: true,
+		equal: true,
+		again: true,
+		next: true,
+		loc_chain: true,
+		loc_equal: true,
+		loc_again: true,
+		next_after_loc: true
+	});
+}, 60_000);
+
+/**
+ * A Svelte document that reaches every loc-mode rule the decoder applies once the tree is whole —
+ * a shorthand attribute, an in-tag comment, a snippet, a const tag, an each and an await block —
+ * with the const's init a chain at the spine limit, built (offsets and all) as the parser writes
+ * it and encoded on a large stack.
+ */
+const BUILD_SVELTE = `
+const { workerData, parentPort } = require('node:worker_threads');
+(async () => {
+	const { encode_tape } = await import(workerData.encoder);
+	const { build_tape_schema } = await import(workerData.tape_schema);
+	const { parse_ast_schema } = await import(workerData.ast_schema);
+	const schema = build_tape_schema(parse_ast_schema(workerData.table), workerData.shapes);
+	const head = '<div {x} /* c */>{#snippet s(a)}{@const y = ';
+	const chain = Array(workerData.depth + 1).fill('a').join('+');
+	const tail = '}{/snippet}{#each xs as z}{z}{/each}{#await p then v}{v}{/await}</div>';
+	const source = head + chain + tail;
+	// every offset past the chain's first \`a\` moves by what the rest of the chain adds
+	const p = head.length;
+	const at = (n) => (n > p ? n + chain.length - 1 : n);
+	const id = (start, name) => ({
+		type: 'Identifier', start: at(start), end: at(start) + name.length, name
+	});
+	const tag = (start, end, name) => ({
+		type: 'ExpressionTag', start: at(start), end: at(end), expression: id(start + 1, name)
+	});
+	let init = { type: 'Identifier', start: p, end: p + 1, name: 'a' };
+	for (let k = 1; k <= workerData.depth; k++) {
+		const right = { type: 'Identifier', start: p + 2 * k, end: p + 2 * k + 1, name: 'a' };
+		init = { type: 'BinaryExpression', start: p, end: right.end, left: init, operator: '+', right };
+	}
+	const declarator = { type: 'VariableDeclarator', start: 40, end: at(45), id: id(40, 'y'), init };
+	const declaration = {
+		type: 'VariableDeclaration', start: 34, end: at(45), declarations: [declarator], kind: 'const'
+	};
+	const snippet = {
+		type: 'SnippetBlock', start: 17, end: at(56), expression: id(27, 's'),
+		parameters: [id(29, 'a')],
+		body: { type: 'Fragment', nodes: [{ type: 'ConstTag', start: 32, end: at(46), declaration }] }
+	};
+	const each = {
+		type: 'EachBlock', start: at(56), end: at(81), expression: id(63, 'xs'),
+		body: { type: 'Fragment', nodes: [tag(71, 74, 'z')] }, context: id(69, 'z')
+	};
+	const wait = {
+		type: 'AwaitBlock', start: at(81), end: at(109), expression: id(89, 'p'), value: id(96, 'v'),
+		error: null, pending: null, then: { type: 'Fragment', nodes: [tag(98, 101, 'v')] }, catch: null
+	};
+	const element = {
+		type: 'RegularElement', start: 0, end: source.length, name: 'div',
+		attributes: [{
+			type: 'Attribute', start: 5, end: 8, name: 'x',
+			value: { type: 'ExpressionTag', start: 6, end: 7, expression: id(6, 'x') }
+		}],
+		fragment: { type: 'Fragment', nodes: [snippet, each, wait] }
+	};
+	const tree = {
+		css: null, js: [], start: 0, end: source.length, type: 'Root',
+		fragment: { type: 'Fragment', nodes: [element] }, options: null,
+		comments: [{ type: 'Block', value: ' c ', start: 9, end: 16 }]
+	};
+	const { bytes, stats } = encode_tape(tree, source, schema);
+	parentPort.postMessage({ tape: bytes, source, all_fast: stats.generic + stats.escape === 0 });
+})();
+`;
+
+/**
+ * Decodes the Svelte document in loc mode on a stack too small for the fast pass: the fallback
+ * must build what the interpreter alone builds, in its key order, and what `reconstruct_locations`
+ * adds to the span-only decode, in any key order.
+ */
+const DECODE_SVELTE = `
+const { workerData, parentPort } = require('node:worker_threads');
+(async () => {
+	const { decode_tape, decode_tape_iterative } = await import(workerData.decoder);
+	const { reconstruct_locations } = await import(workerData.locations);
+	// a comparison with no recursion, keys in order or as sets
+	const same = (a, b, ordered) => {
+		const stack = [[a, b]];
+		while (stack.length > 0) {
+			const [x, y] = stack.pop();
+			if (x === null || y === null || typeof x !== 'object' || typeof y !== 'object') {
+				if (!Object.is(x, y)) return false;
+				continue;
+			}
+			const kx = Object.keys(x);
+			const ky = Object.keys(y);
+			if (kx.length !== ky.length) return false;
+			const keys_differ = ordered
+				? kx.some((k, i) => k !== ky[i])
+				: kx.some((k) => !Object.hasOwn(y, k));
+			if (keys_differ) return false;
+			for (const k of kx) stack.push([x[k], y[k]]);
+		}
+		return true;
+	};
+	const tape = new Uint8Array(workerData.tape);
+	const source = workerData.source;
+	const slow_loc = decode_tape_iterative(tape, source, 'svelte');
+	const decoded_loc = decode_tape(tape, source, 'svelte');
+	const loc_fast_overflows = (globalThis.fallbacks ?? 0) === 1;
+	const again_loc = decode_tape(tape, source, 'svelte');
+	const reconstructed = reconstruct_locations(decode_tape_iterative(tape, source), source, {
+		language: 'svelte'
+	});
+	const element = decoded_loc.fragment.nodes[0];
+	const shorthand = element.attributes[0].value.expression;
+	const snippet = element.fragment.nodes[0];
+	parentPort.postMessage({
+		loc_fast_overflows,
+		loc_equal: same(decoded_loc, slow_loc, true),
+		loc_again: same(again_loc, slow_loc, true),
+		reconstructed: same(decoded_loc, reconstructed, false),
+		key_order:
+			Object.keys(element).join() === 'type,start,end,loc,name,name_loc,attributes,fragment',
+		stamped:
+			shorthand.loc.start.character === shorthand.start &&
+			snippet.expression.loc.start.character === snippet.expression.start &&
+			decoded_loc.comments[0].loc.start.character === decoded_loc.comments[0].start
+	});
+})();
+`;
+
+test('a Svelte tree too deep for the loc-mode fast pass decodes by the slow path with its stamps', async () => {
+	const at = (path: string): string => new URL(path, import.meta.url).href;
+	const built = await in_worker<{ tape: Uint8Array; source: string; all_fast: boolean }>(
+		BUILD_SVELTE,
+		{
+			encoder: at('./tape_encode.ts'),
+			tape_schema: at('./tape_schema.ts'),
+			ast_schema: at('./ast_schema.ts'),
+			table: readFileSync(root('crates/tsv_wasm/types/tsv_ast_schema.json'), 'utf8'),
+			shapes: JSON.parse(readFileSync(root('crates/tsv_wasm/types/tsv_tape_shapes.json'), 'utf8')),
+			depth: DEPTH
+		},
+		256
+	);
+	assert.ok(built.all_fast, 'the document is written in fast shapes, so the fast pass overflows');
+	const outcome = await in_worker<Record<string, boolean>>(
+		DECODE_SVELTE,
+		{
+			...built,
+			decoder: counting_decoder(),
+			locations: at('../crates/tsv_wasm/npm/locations.js')
+		},
+		0.5
+	);
+	assert.deepEqual(outcome, {
+		loc_fast_overflows: true,
+		loc_equal: true,
+		loc_again: true,
+		reconstructed: true,
+		key_order: true,
+		stamped: true
+	});
 }, 60_000);

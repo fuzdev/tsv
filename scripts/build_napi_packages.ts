@@ -5,9 +5,10 @@
  *   index.js + index.d.ts, the `./parse` entry parse.js + parse.d.ts, the addon.js both
  *   import, platform.js (triple detection) + the shared facade with its parse, strip and imports
  *   halves — `api.js` / `api_parse.js` / `api_strip.js` / `api_imports.js`, the `locations.js`
- *   helper, the tape route (`tape_engine.js` + the generated `tape_decode.js`), the declarations (`facade_format.d.ts`, `facade_parse.d.ts`,
- *   `facade_strip.d.ts`, `facade_imports.d.ts`, `facade_error.d.ts`, `locations.d.ts`,
- *   `tsv_ast.d.ts`), the table
+ *   helper and the `locations_core.js` it shares with the decoder, the tape route
+ *   (`tape_engine.js` + the generated `tape_decode.js`), the declarations
+ *   (`facade_format.d.ts`, `facade_parse.d.ts`, `facade_strip.d.ts`, `facade_imports.d.ts`,
+ *   `facade_error.d.ts`, `locations.d.ts`, `tsv_ast.d.ts`), the table
  *   `scripts/npm_facade.ts` names — + the shared `cli.js` + the `bin.js` dispatcher wired
  *   as the `tsv` bin + README + LICENSE + the third-party NOTICE + generated package.json
  *   with the exact-pinned platform `optionalDependencies`).

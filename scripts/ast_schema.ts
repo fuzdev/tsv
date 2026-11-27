@@ -28,7 +28,8 @@
  *
  * The tape's generated code rides the same check: the table and the tape's committed shape list
  * (`tsv_tape_shapes.json`, beside the table) generate the JS tape decoder and the Rust tape
- * tables (`tape_gen.ts`), so a table edit regenerates every reader of the wire.
+ * tables (`tape_gen.ts`), so a table edit regenerates every reader of the wire; the committed
+ * hot-shape list (`tsv_tape_hot.json`) picks the fast shapes the decoder's loc mode twins.
  *
  * Its reach: the checkout's `crates/tsv_wasm/types/`, `crates/tsv_wasm/npm/` and
  * `crates/tsv_lang/src/tape/`, read always and written under `--update` (`AstSchemaDeps`,
@@ -44,7 +45,14 @@ import {
 	TAPE_DECODER_PATH,
 	TAPE_RUST_TABLES_PATH
 } from './tape_gen.ts';
-import { build_tape_schema, parse_tape_shapes, TAPE_SHAPES_PATH } from './tape_schema.ts';
+import {
+	build_tape_schema,
+	hot_shape_ids,
+	parse_tape_hot,
+	parse_tape_shapes,
+	TAPE_HOT_PATH,
+	TAPE_SHAPES_PATH
+} from './tape_schema.ts';
 
 /** The table's path, from the checkout root. */
 export const AST_SCHEMA_PATH = 'crates/tsv_wasm/types/tsv_ast_schema.json';
@@ -498,7 +506,10 @@ export function layout_ast_schema(schema: AstSchema): string {
 
 /** What `run_ast_schema` reaches. */
 export interface AstSchemaDeps {
-	/** The checkout's `crates/tsv_wasm/types/`: the table, the `.d.ts` and the tape's shape list. */
+	/**
+	 * The checkout's `crates/tsv_wasm/types/`: the table, the `.d.ts` and the tape's shape and
+	 * hot-shape lists.
+	 */
 	types: FsDir;
 	/** The checkout's `crates/tsv_wasm/npm/`, holding the generated tape decoder. */
 	npm: FsDir;
@@ -509,6 +520,7 @@ export interface AstSchemaDeps {
 const TABLE_FILE = 'tsv_ast_schema.json';
 const TYPES_FILE = 'tsv_ast.d.ts';
 const SHAPES_FILE = 'tsv_tape_shapes.json';
+const HOT_FILE = 'tsv_tape_hot.json';
 const DECODER_FILE = 'tape_decode.js';
 const RUST_TABLES_FILE = 'shapes.rs';
 
@@ -540,10 +552,18 @@ export async function run_ast_schema(deps: AstSchemaDeps, update: boolean): Prom
 		for (const error of tape.errors) console.error(`  ${error}`);
 		return 1;
 	}
+	const hot_file = parse_tape_hot(await deps.types.read_text(HOT_FILE));
+	const hot = 'errors' in hot_file ? hot_file : hot_shape_ids(tape, hot_file);
+	if ('errors' in hot) {
+		console.error(`${TAPE_HOT_PATH} names no fast shapes of the tape schema:`);
+		for (const error of hot.errors) console.error(`  ${error}`);
+		console.error('  — run `npm run tape-hot:update` after a table or shape-list change');
+		return 1;
+	}
 	const outputs: Array<[dir: FsDir, file: string, path: string, wanted: string]> = [
 		[deps.types, TABLE_FILE, AST_SCHEMA_PATH, layout_ast_schema(schema)],
 		[deps.types, TYPES_FILE, AST_TYPES_PATH, types],
-		[deps.npm, DECODER_FILE, TAPE_DECODER_PATH, generate_tape_decoder(tape)],
+		[deps.npm, DECODER_FILE, TAPE_DECODER_PATH, generate_tape_decoder(tape, hot)],
 		[deps.tape, RUST_TABLES_FILE, TAPE_RUST_TABLES_PATH, generate_tape_rust(tape)]
 	];
 	let drifted = 0;

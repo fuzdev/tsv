@@ -9,7 +9,8 @@
  * The shared part — the options reader with the format family (`api.js`) and the parse-failure type
  * every family's results carry — rides every package; the format declarations ride the
  * format-capable ones; the parse half — the parse family, the tape decoder its `parse_<lang>`
- * reads, the `locations.js` helper it runs and the AST types its declarations name — rides the
+ * reads, the `locations.js` helper, the internal `locations_core.js` both of those build `loc`
+ * by, and the AST types its declarations name — rides the
  * parse-capable ones (the format-only package loads
  * none of it); and the strip half — the type strip and its declarations — and the imports half —
  * the import records and theirs — ride the two packages that carry them (`@fuzdev/tsv-wasm`,
@@ -52,14 +53,16 @@ const FACADE_SHARED_FILES: ReadonlyArray<FacadeFile> = [
 const FACADE_FORMAT_FILES: ReadonlyArray<FacadeFile> = [from_source_dir('facade_format.d.ts')];
 
 /** The facade's parse half — with its tape route (`tape_engine.js` over the generated decoder,
- * `tape_decode.js`, which the entries' `parse_<lang>` decodes through) and the generated AST
- * types `facade_parse.d.ts` and `locations.d.ts` import. */
+ * `tape_decode.js`, which the entries' `parse_<lang>` decodes through), the line rules the
+ * decoder and `locations.js` share (`locations_core.js`, internal: no entry exports it), and
+ * the generated AST types `facade_parse.d.ts` and `locations.d.ts` import. */
 const FACADE_PARSE_FILES: ReadonlyArray<FacadeFile> = [
 	from_source_dir('api_parse.js'),
 	from_source_dir('tape_engine.js'),
 	from_source_dir('tape_decode.js'),
 	from_source_dir('facade_parse.d.ts'),
 	from_source_dir('locations.js'),
+	from_source_dir('locations_core.js'),
 	from_source_dir('locations.d.ts'),
 	{ published: 'tsv_ast.d.ts', source: 'crates/tsv_wasm/types/tsv_ast.d.ts' }
 ];
@@ -112,7 +115,8 @@ export function facade_sources(families: FacadeFamilies): Array<string> {
 
 /**
  * The `./locations` subpath's exports-map entry: the reconstruction helper alone — pure JS
- * that imports nothing, so a consumer holding a tree reaches it without loading an engine.
+ * that imports nothing but its sibling `locations_core.js`, so a consumer holding a tree
+ * reaches it without loading an engine.
  * Every parse-capable package exports it.
  */
 export const LOCATIONS_EXPORT = {

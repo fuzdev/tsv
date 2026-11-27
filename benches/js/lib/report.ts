@@ -175,10 +175,11 @@ export function rows_missing_from_display_order(names: Iterable<string>): string
  *
  * - `drop_in` — the canonical parser's own AST shape with its own `loc`: the TypeScript
  *   and Svelte oracle rows, `rsvelte-parse` (Svelte's own wire), and on TypeScript the
- *   `+locations` rows — tsv's span-only wire with `loc` rebuilt in JS, what
+ *   `+locations` rows — tsv's parse with `loc` built in JS as its tape is decoded, what
  *   `{locations: true}` returns and the tree `tsv parse --locations` writes (one `loc`
  *   definition, implemented by the Rust writer and by
- *   `crates/tsv_wasm/npm/locations.js`), acorn-exact there.
+ *   `crates/tsv_wasm/npm/locations_core.js`, which the decoder and `locations.js` share),
+ *   acorn-exact there.
  * - `drop_in_superset` — the canonical shape with a `loc` on EVERY positioned object,
  *   a superset of the oracle's: the `+locations` rows on Svelte (where Svelte gives
  *   a `loc` only to acorn-parsed nodes, plus `name_loc`) and on CSS (where `parseCss`
@@ -215,7 +216,7 @@ function canonical_parse_tiers(): Record<string, Partial<Record<Language, Payloa
 	return tiers;
 }
 
-/** `loc` rebuilt in JS on every node — what `{locations: true}` returns. */
+/** `loc` built in JS on every node as the tape is decoded — what `{locations: true}` returns. */
 const LOCATIONS_TIERS: RowPayloadTier = {
 	typescript: 'drop_in',
 	svelte: 'drop_in_superset',
@@ -396,10 +397,10 @@ export function generate_summary_report(
 		//   ASTs oxc and yuku emit (yuku pads `decorators`/`typeAnnotation`/`optional`
 		//   exactly as oxc does, so the two opponents are payload-matched to each other
 		//   too). TS/JS only — neither parses svelte or css.
-		// - The canonical pairs: the `+locations` rows — the span-only wire plus `loc`
-		//   rebuilt in JS, what `{locations: true}` returns — against the canonical
+		// - The canonical pairs: the `+locations` rows — the parse with `loc` built in JS
+		//   as its tape is decoded, what `{locations: true}` returns — against the canonical
 		//   parser, whose AST carries `loc` (acorn under Svelte's `locations: true`
-		//   configuration). Exact on TypeScript; on Svelte the reconstruct is a superset
+		//   configuration). Exact on TypeScript; on Svelte that `loc` is a superset
 		//   (a `loc` on every positioned object, where Svelte gives one only to
 		//   acorn-parsed nodes), as its note says. No CSS line: `parseCss` emits no `loc`,
 		//   so on CSS the payload-matched canonical read is the default row's own bar.
@@ -1744,8 +1745,8 @@ export function generate_transfer_overhead_note(results: BenchmarkResult[]): str
 
 /**
  * tsv's two parse rows per binding, as `[binding, default, locations]`: the default
- * parse (the span-only wire every binding ships), and that parse plus `loc`
- * reconstructed over the whole tree in JS — what the packages' `{locations: true}` runs.
+ * parse (the span-only wire every binding ships), and the same parse with `loc` built in
+ * JS as its tape is decoded — the packages' `{locations: true}`.
  */
 const LOCATIONS_ROWS: ReadonlyArray<
 	readonly [binding: string, default_row: string, locations_row: string]
@@ -1756,8 +1757,8 @@ const LOCATIONS_ROWS: ReadonlyArray<
 
 /**
  * Consumer-side note, COMPUTED from this run's parse rows: per language and binding,
- * what `{locations: true}` costs over the default — the `+locations` row (the shipped
- * `reconstruct_locations`, line-table build included, over the span-only parse) against
+ * what `{locations: true}` costs over the default — the `+locations` row (the same
+ * parse with `loc` built in JS as its tape is decoded, line-table build included) against
  * the default row. Cost form like the JSON-overhead note (`locations_ns /
  * default_ns`, higher = more cost), since both rows are tsv's own and the question is what
  * the option adds.
@@ -1783,7 +1784,7 @@ export function generate_locations_note(all_group_results: GroupResults[]): stri
 		if (cells.length > 0) parts.push(`${language}: ${cells.join(', ')}`);
 	}
 	if (parts.length === 0) return null;
-	return `**What \`{locations: true}\` costs over the default** (each binding's \`+locations\` mean / its default row's mean, higher = more cost; \`+locations\` = the default span-only parse plus \`loc\` on every node rebuilt in JS by the shipped \`reconstruct_locations\`, line table included — exactly what the packages' \`{locations: true}\` runs): ${parts.join(' | ')}`;
+	return `**What \`{locations: true}\` costs over the default** (each binding's \`+locations\` mean / its default row's mean, higher = more cost; \`+locations\` = the default parse with \`loc\` on every node built in JS as its tape is decoded, line table included — the packages' \`{locations: true}\`): ${parts.join(' | ')}`;
 }
 
 /**

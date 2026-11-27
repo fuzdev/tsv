@@ -51,6 +51,7 @@
 		"check:loc": "npm run build:check && node scripts/roots/check_loc.ts",
 		"check:tape": "npm run build:check && node scripts/roots/check_tape.ts",
 		"tape-shapes:update": "npm run build:check && node scripts/roots/check_tape.ts --update-shapes && npm run ast-schema:update",
+		"tape-hot:update": "npm run build:check && node benches/js/roots/tape_corpus.ts --update-hot && npm run ast-schema:update",
 		"check:ast-schema": "node scripts/roots/ast_schema.ts",
 		"ast-schema:update": "node scripts/roots/ast_schema.ts --update",
 		"fixtures:init": "cargo run -p tsv_debug --quiet fixture_init",

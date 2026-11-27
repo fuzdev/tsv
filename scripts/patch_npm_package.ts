@@ -56,7 +56,8 @@
  * declarations (`facade_format.d.ts`); the parse-capable ones (`parse`, `all`) its
  * parse half — `api_parse.js` + `facade_parse.d.ts`, the tape route (`tape_engine.js` + the
  * generated `tape_decode.js`), the AST types they name (`tsv_ast.d.ts`), and the pure-JS
- * reconstruction helper (`locations.js` + `.d.ts`), whose functions it re-exports from the
+ * reconstruction helper (`locations.js` + `.d.ts`, over the internal `locations_core.js` the
+ * decoder shares), whose functions it re-exports from the
  * `./parse` entries and `parse.d.ts` and exposes as the `./locations` subpath. The file table, that subpath's entry and the type names are
  * `scripts/npm_facade.ts`'s, shared with the napi staging. The format-only package loads
  * neither `api_parse.js` nor the helper.
@@ -212,12 +213,13 @@ export async function run_patch_npm_package(
 	const stage_deps = stage_file_between(deps.checkout, pkg);
 
 	// The pure-JS line/column reconstruction helper (`npm/locations.js` + hand-written
-	// `locations.d.ts`), which `api_parse.js` runs for `{locations: true}` and the `./parse`
-	// entries also re-export. Rides the parse-capable packages only — the format-only package
-	// has no use for it. Needs no WASM init (pure computation over an already-parsed AST). A
-	// whole-module re-export (no init guard), shared by parse.js + parse_browser.js and
-	// parse.d.ts (where `export *` carries the helper's functions AND its types), so a new
-	// helper export reaches every entry, and `@fuzdev/tsv`'s, with no list to keep.
+	// `locations.d.ts`, over the internal `locations_core.js` the tape decoder builds
+	// `{locations: true}`'s `loc` by too), which the `./parse` entries re-export. Rides the
+	// parse-capable packages only — the format-only package has no use for it. Needs no WASM
+	// init (pure computation over an already-parsed AST). A whole-module re-export (no init
+	// guard), shared by parse.js + parse_browser.js and parse.d.ts (where `export *` carries
+	// the helper's functions AND its types), so a new helper export reaches every entry, and
+	// `@fuzdev/tsv`'s, with no list to keep.
 	const locations_reexport = has_parse_exports ? `export * from './locations.js';\n` : '';
 
 	// 1. Extract the public function exports from the generated JS.

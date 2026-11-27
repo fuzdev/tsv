@@ -177,8 +177,8 @@ wire indexes (a Svelte or CSS source less its leading BOM) — into `{ok: true, 
 `JSON.parse` makes of the span-only wire (whose `JSON.stringify` is that wire, byte for byte —
 what `npm/cli.js`'s `parse` prints), and passes any other value through for `read_failure`;
 a tape that does not decode throws `Error('internal error: the engine returned a tape that
-does not decode', {cause})`. `{locations: true}` is `reconstruct_locations` over the decoded
-object. The tape is the parse family's only route: no package publishes a JSON-wire export
+does not decode', {cause})`. `{locations: true}` decodes the same tape in the decoder's loc
+mode ([The Span-Only Wire](#the-span-only-wire-and-locations-true)). The tape is the parse family's only route: no package publishes a JSON-wire export
 (the native CLI, the C FFI and the Rust API keep the JSON wire), and the bench's tables pass the
 same route (`benches/js/lib/tsv_api.ts`).
 
@@ -194,7 +194,7 @@ API is as before and `./parse` is an alias a consumer can swap package names und
 imports `./parse` initializes from that entry (a second compile) rather than the handed module.
 
 **The format-only package loads no parse code.** `api.js` imports nothing;
-`api_parse.js` imports `api.js`'s reader and `locations.js`. `@fuzdev/tsv-format-wasm`
+`api_parse.js` imports `api.js`'s reader alone. `@fuzdev/tsv-format-wasm`
 ships `api.js` alone — neither `api_parse.js` nor `locations.js` (nor the tape route) is in
 its `files`, and its entries — the one-file layout, untouched by the split — import neither
 (`scripts/test_npm.ts` asserts both). The parse-only package ships `api.js` too
@@ -423,19 +423,24 @@ Every parse export emits **one wire, span-only**: the AST with `start`/`end` (UT
 code-unit offsets) on every node and no per-node `loc` (Svelte also no `name_loc`) —
 the same on every binding (`tsv_napi`, `tsv_ffi`). Line/column is a pure function of an
 offset plus the source, so `loc` is a **view**: `{locations: true}` on a `parse_<lang>`
-call runs the shipped reconstruction (below) over the tree it just parsed and returns
-the tree with `loc` on every node — acorn-exact for TypeScript. The `loc`-bearing JSON
-form is Rust-only (`JsonOptions::locations` in each language crate, behind the
-opt-in `locations` cargo feature no binding enables), reached by the native CLI's `tsv parse --locations`, `tsv_debug`, and the
-corpus tools. `npm/cli.js`'s `parse --locations` is reconstruct-then-stringify, so its
-trees deep-equal the native CLI's while their key order differs (the Rust writer puts
-`loc` after `end`, the reconstruction appends it last).
+call decodes the span-only tape in the decoder's **loc mode** (`tape_engine.js` hands the
+decoder the language; [../../docs/tape_format.md §Decoding](../../docs/tape_format.md#decoding)),
+which builds each record's `loc` as it builds the record — acorn-exact for TypeScript — into
+the tree `JSON.parse` makes of the Rust `loc` wire, key order included: `loc` right after
+`end`, a Svelte `name_loc` right after `name`, and Svelte's `character`-bearing positions
+re-stamped once the tree is whole. The rules are the reconstruction's (below), stated once in
+the internal `npm/locations_core.js` both modules import, so no second walk runs. The
+`loc`-bearing JSON form is Rust-only (`JsonOptions::locations` in each language crate, behind
+the opt-in `locations` cargo feature no binding enables), reached by the native CLI's
+`tsv parse --locations`, `tsv_debug`, and the corpus tools. `npm/cli.js`'s `parse --locations`
+stringifies the located tree, so it is the native CLI's `--locations` output byte for byte.
 
 ### Line/Column Reconstruction Helper (`npm/locations.js`)
 
-`npm/locations.js` (pure JS, zero deps, no WASM) is the reconstruction, shipped so callers
-don't reimplement the line rules — in every package that parses, native `@fuzdev/tsv`
-included, and run by the facade for `{locations: true}`: `reconstruct_locations(ast,
+`npm/locations.js` (pure JS, no deps, no WASM; it imports only the internal
+`npm/locations_core.js` it shares with the decoder) is the reconstruction, shipped so callers
+holding a tree apart from its parse don't reimplement the line rules — in every package that
+parses, native `@fuzdev/tsv` included: `reconstruct_locations(ast,
 source, options?)` (one-shot, adds `loc` to every object carrying `start`/`end`, **mutates in
 place**; `options.language` inferred from the root when omitted) and `create_locator(source,
 {language})` (amortized — builds the line table once and exposes `position_at(offset)` /
@@ -452,12 +457,14 @@ BOM-elided text for Svelte and CSS) or a `start` after `end`; `position_at` thro
 while `loc_of` still answers `null` for a value with no numeric `start`/`end` — the same
 objects the walk gives no `loc` — reads each offset once, and names a `start`/`end` getter that
 throws with a `TypeError` (its error the `cause`), as the option readers do. The whole-tree walk (`reconstruct`,
-`reconstruct_locations`) checks no node: it is the hot path `{locations: true}` runs, and it
+`reconstruct_locations`) checks no node: it is the hot path, and it
 trusts its tree to be a parse of the source — and acyclic, since it keeps no visited set (a
 tree given `parent` back-pointers never finishes; documented, not guarded). Argument errors
 (a non-string source, a non-object bag or unknown key — the bag read by its own enumerable
 keys alone, as `read_options` reads one — the language) are `TypeError`s; the source check restates `api.js`'s `read_source` rather than
-importing it, since this module imports nothing.
+importing it, since this module imports nothing but its sibling core. Its key order is its own:
+the walk appends `loc` (and `name_loc`) last on each object, so its tree deep-equals a
+`{locations: true}` tree without stringifying to the same bytes.
 
 **It is also its own entry point**, the `./locations` subpath of every package that ships
 it (`types: './locations.d.ts'`): a consumer holding a tree — from disk, another process, the
@@ -492,11 +499,14 @@ parse-only root re-exports that entry whole). Its agreement with the Rust writer
 two cadences: `npm run check:loc` (`scripts/check_loc.ts`) deep-equals the two over every
 fixture document in `npm run check`, and `corpus:compare:parse`'s loc arm requires it of
 every corpus file before grading tsv's `loc` against the canonical parser's. The package
-suites grade the wiring — `{locations: true}` is exactly this reconstruction of the default
-parse — and `scripts/test_napi_npm.ts` deep-equals `cli.js`'s `parse --locations` against
-the native binary's. The bench's `tsv+locations` /
-`tsv-wasm+locations` rows call `parse_<lang>(source, {locations: true})` through this
-facade over the perf corpus, timing what the option costs over the default.
+suites grade the wiring — `{locations: true}` deep-equals this reconstruction of the default
+parse, in the loc wire's key order (`scripts/loc_key_order.ts`) — and
+`scripts/test_napi_npm.ts` holds `cli.js`'s `parse --locations` byte-equal to the native
+binary's. The decoder's loc mode is graded against the Rust writer directly by
+`npm run check:tape` (every fixture document, by the fast path, the iterative interpreter and
+entry-generic records, key order included) and `npm run tape:corpus`. The bench's
+`tsv+locations` / `tsv-wasm+locations` rows call `parse_<lang>(source, {locations: true})`
+through this facade over the perf corpus, timing what the option costs over the default.
 
 ⚠️ **Two implementations of one definition are each other's drift check, not an oracle.**
 A definition that is itself wrong makes both halves wrong the same way, and the
@@ -832,7 +842,9 @@ exceed.
 - `types/tsv_ast_schema.json` — the AST schema table: every wire node type and named variant, its fields in wire order (§TS Type Maintenance)
 - `types/tsv_ast.d.ts` — TS types GENERATED from the table (`npm run ast-schema:update`), bundled into the parse-capable packages
 - `types/tsv_tape_shapes.json` — the tape's fast-shape list, GENERATED from the fixture wire (`npm run tape-shapes:update`)
-- `npm/tape_decode.js` — the tape decoder, GENERATED from the table and the shape list (`npm run ast-schema:update`; docs/tape_format.md); staged into every parse-capable package beside `npm/tape_engine.js`
+- `types/tsv_tape_hot.json` — the fast shapes the decoder's loc mode twins, GENERATED from a census of the author's own corpus collections (`npm run tape-hot:update`)
+- `npm/tape_decode.js` — the tape decoder, GENERATED from the table, the shape list and the hot-shape list (`npm run ast-schema:update`; docs/tape_format.md); staged into every parse-capable package beside `npm/tape_engine.js`
+- `npm/locations_core.js` — the line/column rules `locations.js` and the decoder's loc mode share (the indexed text, the line table and lookup, the Svelte `name_loc` span and the `character` stamps), internal: no entry exports it; staged wherever `locations.js` is (`scripts/npm_facade.ts`'s parse half)
 - `npm/tape_engine.js` — the tape route's adapter (`create_tape_parse`): an engine's raw `parse_tape_<lang>` exports decoded into `create_parse_api`'s `engine.parse` table (§The npm Facade); part of `scripts/npm_facade.ts`'s parse half
 - `npm/cli.js` — The `tsv` bin shipped in `@fuzdev/tsv-wasm` — mirrors `tsv_cli`'s contract (flags, exit codes, traversal); argv parsed by a transcription of argh's grammar, zero deps. Its `parse` command alone loads the parse family, by `await import('./parse.js')` (`load_parsers`), a file both packages ship, so a `format` or `strip` run loads no parse code.
   - **Pool.** Path mode fans onto `node:worker_threads` behind `--jobs`, spawning **itself** as the worker (`isMainThread` splits the two roles) and claiming work off one `Atomics` cursor. `WORKER_FILE_THRESHOLD` gates the **default** only — a JS pool costs tens of milliseconds to bring up against the native pool's ~50 µs thread spawn. Only on the WASM engine does a width of 1 stay on the main thread: over N-API it is a pool of one worker (`resolve_route`), since a native stack overflow on the main thread is a `SIGSEGV` no catch survives and only a pool worker carries the reserved stack. An explicit `--jobs N` bypasses the threshold at any file count and is held to the native CLI's `4 × logical` ceiling (`clamp_worker_count`, restated by hand, over the same logical count — the affinity mask capped by the cgroup CPU quota, which `cgroup_cpu_quota` transcribes from Rust std because Node's and Bun's `availableParallelism()` leave it out), giving the threshold something to be calibrated against.
@@ -844,7 +856,7 @@ exceed.
 - `npm/api.js` + `npm/facade_format.d.ts`, `npm/api_parse.js` + `npm/facade_parse.d.ts`, `npm/facade_error.d.ts` (the `TsvError` base shape and the `TsvParseError` every family's result carries) — The hand-written facade every package publishes through: the options reader, the failure readers and the format family, and the parse family with the `{locations: true}` sugar (see [The npm Facade](#the-npm-facade-options--typed-returns), which also says why the declarations are named apart from their modules). Staged verbatim by `patch_npm_package.ts` (`api_parse.js` + `facade_parse.d.ts` into the parse-capable packages only, `facade_format.d.ts` into the format-capable ones) and by `scripts/build_napi_packages.ts` into the native `@fuzdev/tsv` — one source for both package sets. `scripts/npm_facade.ts` owns what both staging scripts share: the facade file table (with `locations.*` and `types/tsv_ast.d.ts` in the parse half), the `./locations` exports entry, and the re-exported type names
 - `npm/api_strip.js` + `npm/facade_strip.d.ts` — The facade's strip half (`create_strip_api`, the result object; [The npm Facade](#the-npm-facade-options--typed-returns)), staged into `@fuzdev/tsv-wasm` and the native `@fuzdev/tsv` alone, as `scripts/npm_facade.ts`'s strip family
 - `npm/api_imports.js` + `npm/facade_imports.d.ts` — The facade's imports half (`create_imports_api`), staged into the same two packages, as `scripts/npm_facade.ts`'s imports family
-- `npm/locations.js` + `npm/locations.d.ts` — Pure-JS line/column reconstruction for the span-only wire; ships in the parse-capable packages, run by `api_parse.js` for `{locations: true}`, re-exported from the `./parse` entries (`parse.js` / `parse_browser.js`, and `parse.d.ts`) by `patch_npm_package.ts`, and exported alone as the `./locations` subpath. Also copied into the native `@fuzdev/tsv` by `scripts/build_napi_packages.ts` — this file is the single source for both, which is what the napi loader being ESM bought (see [Line/Column Reconstruction Helper](#linecolumn-reconstruction-helper-npmlocationsjs))
+- `npm/locations.js` + `npm/locations.d.ts` — Pure-JS line/column reconstruction for the span-only wire; ships in the parse-capable packages, re-exported from the `./parse` entries (`parse.js` / `parse_browser.js`, and `parse.d.ts`) by `patch_npm_package.ts`, and exported alone as the `./locations` subpath. Also copied into the native `@fuzdev/tsv` by `scripts/build_napi_packages.ts` — this file is the single source for both, which is what the napi loader being ESM bought (see [Line/Column Reconstruction Helper](#linecolumn-reconstruction-helper-npmlocationsjs))
 - `README_format.md` — Shipped as `README.md` in `@fuzdev/tsv-format-wasm` (copied by `patch_npm_package.ts`)
 - `README_parse.md` — Shipped as `README.md` in `@fuzdev/tsv-parse-wasm` (copied by `patch_npm_package.ts`)
 - `README_all.md` — Shipped as `README.md` in `@fuzdev/tsv-wasm` (copied by `patch_npm_package.ts`). Each README's TypeScript and JavaScript blocks (```ts / ```typescript / ```js / ```javascript, the JavaScript under `checkJs`) compile against its package in `npm run typecheck:packages`, so every one must be a standalone module with its own imports; a block that only compiles under Node carries `<!-- typecheck: node -->` on the line above its fence

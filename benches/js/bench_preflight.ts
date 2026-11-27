@@ -328,9 +328,9 @@ const SURFACE_DISCLOSURES: ReadonlyArray<SurfaceDisclosure> = [
 		row: 'tsv+locations',
 		direction: 'excluded',
 		prose:
-			'**Excluded here:** tsv+locations — the default span-only parse plus `loc` ' +
-			'reconstructed in JS (`{locations: true}`), a consumer-cost row measured on the perf ' +
-			'corpus. The parse it runs is tsv’s, so its coverage is that row’s.\n'
+			'**Excluded here:** tsv+locations — the default parse with `loc` built in JS as its ' +
+			'tape is decoded (the packages’ `{locations: true}`), a consumer-cost row measured on ' +
+			'the perf corpus. The parse it runs is tsv’s, so its coverage is that row’s.\n'
 	},
 	{
 		row: 'tsv-wasm+locations',

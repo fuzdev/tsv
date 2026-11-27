@@ -197,8 +197,9 @@ byte for byte the native wire, `--pretty`'s tab indent included (the package sui
 two bins to it, the deepest tree the parser accepts included); a tree too deep for
 `JSON.stringify`'s recursion on the JS stack is serialized from an explicit stack instead, to
 the same bytes. Its `parse --locations` gets the same `loc` from the packages'
-`{locations: true}` — the JS reconstruction over the span-only tree — so its tree deep-equals
-the native one while the key order differs (`loc` after `end` natively, appended last in JS).
+`{locations: true}` — the tape decoder's loc mode, which builds each `loc` right after `end`
+and each Svelte `name_loc` right after `name`, as the native writer does — so it is the native
+`--locations` wire byte for byte too.
 Orthogonal to `--source-type` (the source type drives the parser, `--locations` the writer), so
 the two compose.
 
@@ -662,8 +663,10 @@ iteration spends none. The printer builds those type chains and a commented non-
 into one flat doc for the same reason, since every later walk of a doc nested a level per
 link would recurse once per link.
 
-The packages' `{locations: true}` reconstruction (`locations.js`) walks the tree with an
-explicit stack rather than recursion, so it adds no depth of its own.
+The packages' `{locations: true}` builds `loc` inside the tape decode, whose fast pass recurses
+but falls back on a `RangeError` to an interpreter that recurses nowhere
+([tape_format.md §Decoding](tape_format.md#decoding)); the `reconstruct_locations` walk
+(`locations.js`) uses an explicit stack, so neither adds depth of its own.
 
 Below those stacks, a WASM overflow is a trap the process survives but the *instance* does
 not — the shadow stack pointer stays where the deep call left it, poisoning every later

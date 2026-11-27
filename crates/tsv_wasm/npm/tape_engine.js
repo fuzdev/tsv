@@ -14,9 +14,13 @@
  *
  * The tape's offsets index the text the wire's do: the caller's source for TypeScript, the
  * source less a leading U+FEFF for Svelte and CSS, whose wires elide it as Svelte's
- * `parse` and `parseCss` do (the rule `locations.js` reads a source by too). A decode that
- * fails is an engine bug, never the caller's source: it throws a plain `Error` naming
- * that, the decoder's own error as its `cause`.
+ * `parse` and `parseCss` do (`locations_core.js`'s `indexed_text`, the rule `locations.js`
+ * reads a source by too). A decode that fails is an engine bug, never the caller's source: it
+ * throws a plain `Error` naming that, the decoder's own error as its `cause`.
+ *
+ * `locations: true` decodes the same tape in the decoder's loc mode, under the language's line
+ * rule: the tree `JSON.parse` makes of `tsv parse --locations`'s JSON, `loc` right after `end`
+ * and a Svelte `name_loc` right after `name` — no second walk over the tree.
  *
  * Its own module, beside the decoder it imports, so only an entry that publishes the parse
  * family loads either (the packages' `./parse` entries).
@@ -24,32 +28,35 @@
  * @module
  */
 
+import { indexed_text } from './locations_core.js';
 import { decode_tape } from './tape_decode.js';
 
 /** The tape header's length in bytes (`docs/tape_format.md` §The tape). */
 const HEADER_BYTES = 32;
 
-/** U+FEFF, the byte-order mark a Svelte or CSS wire elides at index 0. */
-const BOM = 0xfeff;
-
 /**
  * Build the `engine.parse` table over an engine's raw tape exports, keyed by language.
  *
  * @param {Record<string, (source: string, source_type?: string) => unknown>} parse_tape -
- * 	each language's raw `parse_tape_<lang>`
- * @returns {Record<string, (source: string, source_type?: string) => unknown>} each
- * 	language's `(source, source_type?) => {ok: true, ast} | failure`
+ * 	each language's raw `parse_tape_<lang>`, keyed by `locations.js`'s language names
+ * @returns {Record<string, (source: string, source_type?: string, locations?: boolean) => unknown>}
+ * 	each language's `(source, source_type?, locations?) => {ok: true, ast} | failure`
  */
 export function create_tape_parse(parse_tape) {
-	/** @type {Record<string, (source: string, source_type?: string) => unknown>} */
+	/** @type {Record<string, (source: string, source_type?: string, locations?: boolean) => unknown>} */
 	const engine = {};
 	for (const [language, raw] of Object.entries(parse_tape)) {
-		engine[language] = (source, source_type) => {
+		const document = /** @type {'typescript' | 'svelte' | 'css'} */ (language);
+		engine[language] = (source, source_type, locations) => {
 			const returned = raw(source, source_type);
 			if (!(returned instanceof Uint32Array)) return returned;
 			let ast;
 			try {
-				ast = decode_tape(tape_bytes(returned), indexed_text(source, language));
+				ast = decode_tape(
+					tape_bytes(returned),
+					indexed_text(source, document),
+					locations === true ? document : undefined
+				);
 			} catch (cause) {
 				throw new Error('internal error: the engine returned a tape that does not decode', {
 					cause
@@ -75,17 +82,4 @@ function tape_bytes(words) {
 		throw new Error(`tape: ${words.byteLength} bytes cannot hold the tape its header names`);
 	}
 	return new Uint8Array(words.buffer, words.byteOffset, length);
-}
-
-/**
- * The string a language's wire offsets index (`locations.js`'s rule): `source` for
- * TypeScript, `source` without a leading U+FEFF for Svelte and CSS.
- *
- * @param {string} source
- * @param {string} language
- * @returns {string}
- */
-function indexed_text(source, language) {
-	if (language !== 'typescript' && source.charCodeAt(0) === BOM) return source.slice(1);
-	return source;
 }

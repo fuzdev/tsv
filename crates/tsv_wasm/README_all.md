@@ -73,7 +73,7 @@ Every export takes `(source, options?)` with an acorn-style options object.
 
 `{sourceType: 'script' | 'module'}` sets TypeScript's parse goal — at `'script'` the code is sloppy unless its own `"use strict"` prologue makes it strict. `parse_svelte`/`parse_css` and `format_svelte`/`format_css` throw on a set value. An **omitted** `sourceType` is `'module'` to a parser, while a formatter or the strip parses as a module and retries as a script only if that fails, so a legacy sloppy script formats and strips with no options; a set value is exact on all three. When both grammars reject a format's or a strip's source, the error is the one that best explains the failure (the rule is in the repo's [docs/cli.md](https://github.com/fuzdev/tsv/blob/main/docs/cli.md#multi-file-formatting)).
 
-The object parsers also take `{locations: true}`, adding per-node `loc` (line/column, as acorn's `locations: true` does) and Svelte's `name_loc`. Every other export throws on a `locations` key, whatever its value, so only a `sourceType`-only bag forwards to any export.
+The object parsers also take `{locations: true}`, adding per-node `loc` (line/column, as acorn's `locations: true` does) and Svelte's `name_loc`, built in JS as the tree is decoded, in the key order `tsv parse --locations` writes (`loc` right after `end`, `name_loc` right after `name`). Every other export throws on a `locations` key, whatever its value, so only a `sourceType`-only bag forwards to any export.
 
 A supported key set to `undefined` reads as its default — `sourceType: undefined` included on Svelte and CSS. Argument errors are thrown `TypeError`s:
 
@@ -83,14 +83,14 @@ A supported key set to `undefined` reads as its default — `sourceType: undefin
 
 ### Reconstructing line/column
 
-`{locations: true}` runs `reconstruct_locations`, a pure-JS helper the parse entry also exports for a tree you already hold:
+For a tree you already hold, `reconstruct_locations` — a pure-JS helper the parse entry also exports — adds the same `loc` that `{locations: true}` builds:
 
 ```typescript
 import {parse_typescript, reconstruct_locations} from '@fuzdev/tsv-wasm/parse';
 
 const src = 'const x = 1;\n';
 const located = parse_typescript(src, {locations: true});
-// the same, in two steps:
+// the same data, in two steps (the helper appends its keys last):
 const parsed = parse_typescript(src);
 if (parsed.ok) {
 	const same = reconstruct_locations(parsed.ast, src);

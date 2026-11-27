@@ -132,8 +132,7 @@ const FORMATTERS = {
  * `./parse` entry (`parse.js`, a file both packages ship), whose static graph holds the
  * tape decoder, so a `format` or `strip` run never loads parse code. Each parser returns
  * the span-only tree decoded from the engine's tape, which `parse` stringifies;
- * `{locations: true}` (`parse --locations`) reconstructs `loc` over it first (the facade's
- * sugar).
+ * `{locations: true}` (`parse --locations`) decodes the same tape with its `loc` in place.
  */
 async function load_parsers() {
 	const parse = await import('./parse.js');
@@ -1566,11 +1565,10 @@ function run_parse({ values, positionals }, PARSERS) {
 	// form, emits no integer-like keys (so V8's key reordering never fires), and escapes
 	// exactly what `JSON.stringify` escapes. The package test pins the equality on both
 	// bins, `--pretty`'s tab indent included. --locations adds per-node `loc` (svelte also
-	// `name_loc`) through the facade's `{locations: true}` — the JS reconstruction over the
-	// span tree; orthogonal to --source-type (the source type drives the TS parser), so they
-	// compose. The native CLI writes `loc` with its Rust emitter instead: the two trees are
-	// deep-equal, but its `loc` sits after `end` where the reconstruction appends it last, so
-	// the bytes differ by key order.
+	// `name_loc`) through the facade's `{locations: true}`, which the decoder builds in the
+	// loc wire's key order (`loc` after `end`, `name_loc` after `name`) — so it is the native
+	// CLI's `--locations` wire byte for byte too, whose `loc` its Rust emitter writes;
+	// orthogonal to --source-type (the source type drives the TS parser), so they compose.
 	// The engine call and the serialization are caught apart: a throw out of the first is the
 	// engine's (or the input's), one out of the second is this process's own JS failing on a
 	// tree the engine produced fine — reported as the engine's, it would blame the input.

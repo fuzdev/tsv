@@ -760,14 +760,14 @@ export function get_benchmark_tasks(
 			parse_call
 		);
 
-		// The span-only wire PLUS `loc` reconstructed in JS over the whole tree — the
-		// published `parse_<lang>(source, {locations: true})`, so what the option costs
-		// over the default: the same parse, then the facade's own call of the SHIPPED
-		// helper (`crates/tsv_wasm/npm/locations.js`, the source every parse-capable
-		// package bundles), its line-table build inside the timed region.
+		// The same parse with `loc` built in JS as its tape is decoded — the published
+		// `parse_<lang>(source, {locations: true})`, so what the option costs over the
+		// default: the same parse, decoded by the SHIPPED decoder in its loc mode (the
+		// source every parse-capable package bundles), its line-table build inside the
+		// timed region.
 		//
-		// The facade names the language to the helper (the export's own), so a Svelte
-		// row times the walk a Svelte consumer runs: the line rule and the Svelte
+		// The facade names the language to the decoder (the export's own), so a Svelte
+		// row times the decode a Svelte consumer runs: the line rule and the Svelte
 		// stamping (`name_loc`, the `character` field) both key on it.
 		//
 		// PERF-ONLY: a consumer-cost row, and the parse it runs is the default row's, so on

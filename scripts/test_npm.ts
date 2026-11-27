@@ -55,6 +55,7 @@ import { assert_staged_fresh, wasm_package_checks } from './check_staged_freshne
 import { register_discovery_parity_suite } from './discovery_parity_suite.ts';
 import { register_dts_specifier_test } from './dts_specifiers.ts';
 import { register_facade_surface_suite } from './facade_surface_suite.ts';
+import { loc_key_order } from './loc_key_order.ts';
 import { register_imports_api_suite } from './imports_suite.ts';
 import { register_strip_api_suite, register_strip_cli_suite } from './strip_suite.ts';
 import {
@@ -894,20 +895,24 @@ describe(`raw engine parse failure (tsv_wasm.js): ${pkg_dir}`, () => {
 	);
 });
 
-// Locations helper (locations.js, re-exported from index.js) and the `{locations: true}`
-// sugar that runs it — `loc` reconstructed from `start`/`end` + source over the span-only
-// tree every parse returns. These assert the shipped package's wiring end to end; whether
-// the reconstruction equals the Rust `loc` emitter is `npm run check:loc`'s (every
-// fixture document) and `tests/loc_definition.rs`'s, which grade the engine itself, and
-// at corpus scale the bench's `+locations` rows run it too.
+// Locations helper (locations.js, re-exported from index.js) and `{locations: true}` — the
+// tape decoder's loc mode, `loc` built from `start`/`end` + source as the tape decodes, under
+// the rules the helper reconstructs by (`locations_core.js`, which both import). These assert
+// the shipped package's wiring end to end: the two agree, and the located tree keeps the
+// native wire's key order (`loc` after `end`, `name_loc` after `name`). Whether they equal
+// the Rust `loc` emitter is `npm run check:tape`'s and `npm run check:loc`'s (every fixture
+// document) and `tests/loc_definition.rs`'s, which grade the engine itself, and at corpus
+// scale the bench's `+locations` rows run it too.
 describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => {
-	it('`{locations: true}` is the reconstruction of the default parse', () => {
+	it('`{locations: true}` is the reconstruction of the default parse, in wire key order', () => {
 		const ts = 'const x = 1;\nconst y = 2;\n';
 		const located = ok_ast(parse_entry.parse_typescript(ts, { locations: true }));
 		assert.deepEqual(
 			located,
 			parse_entry.reconstruct_locations(ok_ast(parse_entry.parse_typescript(ts)), ts)
 		);
+		assert.equal(loc_key_order(located), null);
+		assert.deepEqual(Object.keys(located.body[0]).slice(0, 4), ['type', 'start', 'end', 'loc']);
 		// acorn's `loc`: 1-based line, 0-based UTF-16 column, on every node
 		assert.deepEqual(located.body[1].loc, {
 			start: { line: 2, column: 0 },
@@ -953,6 +958,7 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 			located,
 			parse_entry.reconstruct_locations(ok_ast(parse_entry.parse_css(css)), css)
 		);
+		assert.equal(loc_key_order(located), null);
 		// a lone CR opens no line in a CSS document (it is a column), and the CRLF's LF ends
 		// line 1: the rule closes on line 2 after `\tcolor: red;\r}`
 		assert.deepEqual(located.children[0].loc, {
@@ -980,7 +986,16 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 			);
 		}
 		const located = ok_ast(parse_entry.parse_svelte(sources[0], { locations: true }));
+		assert.equal(loc_key_order(located), null);
 		const div = located.fragment.nodes.find((n: any) => n.type === 'RegularElement');
+		assert.deepEqual(Object.keys(div).slice(0, 6), [
+			'type',
+			'start',
+			'end',
+			'loc',
+			'name',
+			'name_loc'
+		]);
 		const name_at = sources[0].indexOf('<div') + 1;
 		assert.deepEqual(div.name_loc, {
 			start: { line: 5, column: 1, character: name_at },
@@ -1482,14 +1497,21 @@ mkdirSync(dirname(consumer_link), { recursive: true });
 // type argument is ignored on POSIX.
 symlinkSync(fileURLToPath(new URL(`../${pkg_dir}`, import.meta.url)), consumer_link, 'junction');
 // A second consumer whose copy of the package holds ONLY what the `./locations` subpath
-// claims to need — package.json and the helper, no engine at all. Importing the subpath
+// claims to need — package.json and the helper (with the internal module it imports), no
+// engine at all. Importing the subpath
 // there and using it is the proof that it loads no engine: there is none to load. A copy,
 // not a link, since the point is what is absent.
 const locations_only_dir = mkdtempSync(join(tmpdir(), 'tsv-locations-only-'));
 if (has_parse) {
 	const pkg_copy = join(locations_only_dir, 'node_modules', pkg_name);
 	mkdirSync(pkg_copy, { recursive: true });
-	for (const file of ['package.json', 'locations.js', 'locations.d.ts', 'tsv_ast.d.ts']) {
+	for (const file of [
+		'package.json',
+		'locations.js',
+		'locations_core.js',
+		'locations.d.ts',
+		'tsv_ast.d.ts'
+	]) {
 		cpSync(fileURLToPath(new URL(`../${pkg_dir}/${file}`, import.meta.url)), join(pkg_copy, file));
 	}
 }
@@ -2225,7 +2247,9 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 			bare.stdout,
 			`${JSON.stringify(ok_ast(parse_entry.parse_typescript('const x = 1;')))}\n`
 		);
-		// --locations is the facade's `{locations: true}`, stringified
+		// --locations is the facade's `{locations: true}`, stringified — in the native CLI's key
+		// order, so byte for byte its `--locations` wire (`scripts/test_napi_npm.ts` holds the
+		// two bins to it)
 		const composed = run_cli([
 			'parse',
 			'--locations',
@@ -2237,12 +2261,15 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 			'ts'
 		]);
 		assert.equal(composed.status, 0, composed.stderr);
-		assert.deepEqual(
-			JSON.parse(composed.stdout),
-			ok_ast(
-				parse_entry.parse_typescript('var await = 1;', { sourceType: 'script', locations: true })
-			)
+		assert.equal(
+			composed.stdout,
+			`${JSON.stringify(
+				ok_ast(
+					parse_entry.parse_typescript('var await = 1;', { sourceType: 'script', locations: true })
+				)
+			)}\n`
 		);
+		assert.equal(loc_key_order(JSON.parse(composed.stdout)), null);
 		assert.match(composed.stdout, /"sourceType":"script"/);
 		// svelte carries name_loc on request; css loc
 		for (const [parser, source, parse] of [
@@ -2254,7 +2281,11 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 			assert.doesNotMatch(span.stdout, /"name_loc"|"loc"/);
 			const located = run_cli(['parse', '--locations', '--content', source, '--parser', parser]);
 			assert.equal(located.status, 0, located.stderr);
-			assert.deepEqual(JSON.parse(located.stdout), ok_ast(parse(source, { locations: true })));
+			assert.equal(
+				located.stdout,
+				`${JSON.stringify(ok_ast(parse(source, { locations: true })))}\n`
+			);
+			assert.equal(loc_key_order(JSON.parse(located.stdout)), null);
 		}
 		// --pretty --locations: the same tree, tab-indented
 		const pretty = run_cli([

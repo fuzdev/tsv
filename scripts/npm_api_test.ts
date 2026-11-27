@@ -1,15 +1,16 @@
 /**
  * The npm packages' facade (`crates/tsv_wasm/npm/api.js` + `api_parse.js`) over a FAKE
  * engine: the options reader every package shares, its refusals word for word, the
- * source-type forwarding, the `{locations: true}` sugar, and the result every export returns
+ * source-type and `locations` forwarding, and the result every export returns
  * (the failure an engine returns, handed back as it is once checked; what it throws, passed
  * through).
  *
  * A fake engine rather than a built package on purpose: what this grades is the
  * facade's own logic, which needs no artifact — so it gates in `npm run check`
  * (`test:node`) on a bare clone. The package suites (`scripts/test_npm.ts`,
- * `scripts/test_napi_npm.ts`) grade the same surface through the real engines, and
- * `npm run check:loc` grades the reconstruction itself against the Rust emitter.
+ * `scripts/test_napi_npm.ts`) grade the same surface through the real engines (the tape
+ * decoder's loc mode included, whose `npm run check:tape` leg grades it against the Rust
+ * emitter), and `npm run check:loc` grades the reconstruction itself against that emitter.
  */
 
 import { deepStrictEqual, strictEqual, throws } from 'node:assert';
@@ -19,7 +20,7 @@ import { create_format_api, read_options } from '../crates/tsv_wasm/npm/api.js';
 import { create_parse_api } from '../crates/tsv_wasm/npm/api_parse.js';
 import { create_locator, reconstruct_locations } from '../crates/tsv_wasm/npm/locations.js';
 
-type Call = { source: string; source_type: string | undefined };
+type Call = { source: string; source_type: string | undefined; locations?: boolean };
 
 /** A node literal handed to the reconstruction, which stamps its `loc` in place. */
 type LocatedNode = {
@@ -42,23 +43,29 @@ function fake_engine() {
 		typescript: 'Program',
 		css: 'StyleSheetFile'
 	};
-	const family = <T>(op: string, f: (language: string, source: string) => T) =>
+	const family = <T>(op: string, f: (language: string, source: string, locations?: boolean) => T) =>
 		Object.fromEntries(
 			Object.keys(roots).map((language) => [
 				language,
-				(source: string, source_type?: string) => {
-					calls.push({ op, language, source, source_type });
-					return f(language, source);
+				(source: string, source_type?: string, locations?: boolean) => {
+					calls.push(
+						locations === undefined
+							? { op, language, source, source_type }
+							: { op, language, source, source_type, locations }
+					);
+					return f(language, source, locations);
 				}
 			])
 		);
 	return {
 		calls,
 		engine: {
-			parse: family('parse', (language, source) => ({
-				ok: true,
-				ast: JSON.parse(span_wire(roots[language], source))
-			})),
+			// the engine builds `loc` itself when asked, as the tape route's decoder does
+			parse: family('parse', (language, source, locations) => {
+				const ast = JSON.parse(span_wire(roots[language]!, source));
+				if (locations === true) reconstruct_locations(ast, source, { language: language as 'css' });
+				return { ok: true, ast };
+			}),
 			format: family('format', (_language, source) => `formatted:${source}`)
 		}
 	};
@@ -248,30 +255,34 @@ test('read_options: a non-plain object reads as a keyless bag — all defaults',
 	}
 });
 
-test('parse: the span tree by default, `loc` reconstructed on request', () => {
+test("parse: the span tree by default, the engine's `loc` tree on request", () => {
 	const { engine, calls } = fake_engine();
 	const api = create_parse_api(engine);
 	const source = 'let x = 1;\nx;';
 	const ast = api.parse_typescript(source);
 	deepStrictEqual(ast, { ok: true, ast: JSON.parse(span_wire('Program', source)) });
 	strictEqual(calls.at(-1)?.op, 'parse');
+	strictEqual(calls.at(-1)?.locations, false);
 	const located = api.parse_typescript(source, { locations: true }).ast;
-	deepStrictEqual(
-		located,
-		reconstruct_locations(JSON.parse(span_wire('Program', source)), source, {
-			language: 'typescript'
-		})
-	);
+	strictEqual(calls.at(-1)?.locations, true);
 	deepStrictEqual(located.loc, { start: { line: 1, column: 0 }, end: { line: 2, column: 2 } });
 });
 
-test('parse: the language reaches the reconstruction (Svelte counts LF alone)', () => {
-	const { engine } = fake_engine();
+test("parse: `locations` reaches every language's engine, a boolean either way", () => {
+	const { engine, calls } = fake_engine();
 	const api = create_parse_api(engine);
-	// a lone CR: a line under ECMAScript's rule, none under Svelte's
-	const source = 'a\rb';
-	strictEqual(api.parse_svelte(source, { locations: true }).ast.loc.end.line, 1);
-	strictEqual(api.parse_typescript(source, { locations: true }).ast.loc.end.line, 2);
+	for (const language of ['svelte', 'typescript', 'css'] as const) {
+		api[`parse_${language}`]('a', { locations: true });
+		deepStrictEqual(calls.at(-1), {
+			op: 'parse',
+			language,
+			source: 'a',
+			source_type: undefined,
+			locations: true
+		});
+		api[`parse_${language}`]('a', { locations: undefined });
+		strictEqual(calls.at(-1)?.locations, false);
+	}
 });
 
 test('reconstruct_locations: the language is inferred from a root, never guessed', () => {

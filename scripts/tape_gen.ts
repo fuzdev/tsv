@@ -26,9 +26,12 @@ import {
 	TAPE_MAGIC,
 	TAPE_MAX_ENTRIES,
 	pre_type_max,
+	TAPE_HOT_PATH,
 	TAPE_SHAPES_PATH,
+	type TapeEntry,
 	type TapeSchema
 } from './tape_schema.ts';
+import { NAME_LOC_KINDS, STAMP_HOSTS } from '../crates/tsv_wasm/npm/locations_core.js';
 
 /** The AST schema table's path (`ast_schema.ts`'s `AST_SCHEMA_PATH`, which imports this module). */
 const AST_SCHEMA_PATH = 'crates/tsv_wasm/types/tsv_ast_schema.json';
@@ -117,13 +120,129 @@ function json_table(name: string, doc: string, value: unknown): string[] {
 	];
 }
 
-/** The generated JS decoder's text. */
-export function generate_tape_decoder(schema: TapeSchema): string {
+/**
+ * One fast shape's function: `s<id>`, its plain record, or with `loc` its loc twin `q<id>` —
+ * the loc wire's record: `loc` right after `end`, a Svelte `name_loc` right after `name`,
+ * nested reads through the loc-mode readers, and a record `stamp_character_locs` re-stamps
+ * handed to the decode's host list.
+ */
+function shape_function(
+	schema: TapeSchema,
+	shape: TapeSchema['shapes'][number],
+	loc: boolean,
+	keyword_of: (values: ReadonlyArray<string>) => number
+): string[] {
+	const entry = schema.entries[shape.entry]!;
+	const present = entry.fields.filter((f) => f.bit === -1 || (shape.mask & (1 << f.bit)) !== 0);
+	const own = present.some((f) => f.enc === Enc.own);
+	const spanned = loc && entry.loc;
+	const named = spanned && entry.name_loc;
+	const host = loc && entry.type !== null && STAMP_HOSTS.has(entry.type);
+	const bind = own || spanned;
+	const props: string[] = [];
+	for (const f of present) {
+		let ex: string;
+		switch (f.enc) {
+			case Enc.type:
+				ex = js_string(entry.type!);
+				break;
+			case Enc.offset:
+				ex = bind && (f.key === 'start' || f.key === 'end') ? `(${f.key[0]} = u[p++])` : 'u[p++]';
+				break;
+			case Enc.boolean:
+				ex = 'u[p++] !== 0';
+				break;
+			case Enc.number:
+				ex = 'N()';
+				break;
+			case Enc.null:
+				ex = 'null';
+				break;
+			case Enc.own:
+				ex = 'src.slice(s, e)';
+				break;
+			case Enc.keyword:
+				ex = `K${keyword_of(f.values!)}[u[p++]]`;
+				break;
+			case Enc.ref:
+				ex = 'S()';
+				break;
+			case Enc.ref_nullable:
+				ex = 'SN()';
+				break;
+			case Enc.strings:
+				ex = 'L()';
+				break;
+			case Enc.record:
+				ex = loc ? 'RL()' : 'R()';
+				break;
+			case Enc.list:
+				ex = loc ? 'AL()' : 'A()';
+				break;
+			default:
+				ex = loc ? 'VL()' : 'V()';
+		}
+		if (named && f.key === 'name') ex = `(n = ${ex})`;
+		props.push(`${js_key(f.key)}: ${ex}`);
+		if (spanned && f.key === 'end') props.push('loc: LOC(s, e)');
+		if (named && f.key === 'name') {
+			props.push(`name_loc: name_loc_of(${js_string(name_loc_kind(entry))}, s, e, n, src, ls, lh)`);
+		}
+	}
+	const out = [
+		`/** ${entry.name}, mask ${shape.mask}${loc ? ', with its loc-wire fields' : ''} */`,
+		`function ${loc ? 'q' : 's'}${shape.id}() {`
+	];
+	if (named) out.push('\tlet s, e, n;');
+	else if (bind) out.push('\tlet s, e;');
+	out.push(host ? '\tconst o = {' : '\treturn {');
+	props.forEach((prop, n) => out.push(`\t\t${prop}${n < props.length - 1 ? ',' : ''}`));
+	out.push('\t};');
+	if (host) out.push('\tif (hosts !== null) hosts.push(o);', '\treturn o;');
+	out.push('}');
+	return out;
+}
+
+/** A `name_loc` entry's kind (`locations_core.js`'s `NAME_LOC_KINDS`, keyed by `type`). */
+function name_loc_kind(entry: TapeEntry): string {
+	const kind = entry.type === null ? undefined : NAME_LOC_KINDS.get(entry.type);
+	if (kind === undefined) throw new Error(`tape_gen: ${entry.name} has no name_loc kind`);
+	return kind;
+}
+
+/**
+ * Whether the loc-wire fields the table gives each entry are the ones `locations_core.js`
+ * builds: a `name_loc` exactly on the entries whose `type` `NAME_LOC_KINDS` names (every such
+ * entry with a `name`), so the decoder's entry-generic paths may ask `NAME_LOC_KINDS` by `type`,
+ * as `locations.js` does.
+ */
+function loc_wire_errors(schema: TapeSchema): string[] {
+	const errors: string[] = [];
+	for (const entry of schema.entries) {
+		const kind = entry.type === null ? undefined : NAME_LOC_KINDS.get(entry.type);
+		const named = entry.fields.some((f) => f.key === 'name');
+		if (entry.name_loc && kind === undefined) {
+			errors.push(`${entry.name}: a name_loc, but locations_core.js names no kind for its type`);
+		} else if (!entry.name_loc && kind !== undefined && named) {
+			errors.push(`${entry.name}: no name_loc, but locations_core.js names a kind for its type`);
+		}
+	}
+	return errors;
+}
+
+/**
+ * The generated JS decoder's text. `hot` names the fast shapes whose loc twin it writes: every
+ * other shape's loc-mode record is read by `X`, the entry-generic loc reader (or by its plain
+ * function, where its twin would be the plain function's body).
+ */
+export function generate_tape_decoder(schema: TapeSchema, hot: ReadonlySet<number>): string {
+	const loc_errors = loc_wire_errors(schema);
+	if (loc_errors.length > 0) throw new Error(`tape_gen: ${loc_errors.join('; ')}`);
 	const { lists, index } = keyword_tables(schema);
 	const keyword_of = (values: ReadonlyArray<string>): number => index.get(JSON.stringify(values))!;
 	const out: string[] = [
-		`// GENERATED by ` + '`npm run ast-schema:update`' + ` from ${AST_SCHEMA_PATH} and`,
-		`// ${TAPE_SHAPES_PATH} — edit those, never this file.`,
+		`// GENERATED by ` + '`npm run ast-schema:update`' + ` from ${AST_SCHEMA_PATH},`,
+		`// ${TAPE_SHAPES_PATH} and ${TAPE_HOT_PATH} — edit those, never this file.`,
 		...HEAD.split('\n'),
 		`export const TAPE_FORMAT_VERSION = ${TAPE_FORMAT_VERSION};`,
 		'',
@@ -178,63 +297,30 @@ export function generate_tape_decoder(schema: TapeSchema): string {
 		...STATIC.split('\n')
 	);
 	for (const shape of schema.shapes) {
-		const entry = schema.entries[shape.entry]!;
-		const present = entry.fields.filter((f) => f.bit === -1 || (shape.mask & (1 << f.bit)) !== 0);
-		const own = present.some((f) => f.enc === Enc.own);
-		const props = present.map((f) => {
-			let ex: string;
-			switch (f.enc) {
-				case Enc.type:
-					ex = js_string(entry.type!);
-					break;
-				case Enc.offset:
-					ex = own && (f.key === 'start' || f.key === 'end') ? `(${f.key[0]} = u[p++])` : 'u[p++]';
-					break;
-				case Enc.boolean:
-					ex = 'u[p++] !== 0';
-					break;
-				case Enc.number:
-					ex = 'N()';
-					break;
-				case Enc.null:
-					ex = 'null';
-					break;
-				case Enc.own:
-					ex = 'src.slice(s, e)';
-					break;
-				case Enc.keyword:
-					ex = `K${keyword_of(f.values!)}[u[p++]]`;
-					break;
-				case Enc.ref:
-					ex = 'S()';
-					break;
-				case Enc.ref_nullable:
-					ex = 'SN()';
-					break;
-				case Enc.strings:
-					ex = 'L()';
-					break;
-				case Enc.record:
-					ex = 'R()';
-					break;
-				case Enc.list:
-					ex = 'A()';
-					break;
-				default:
-					ex = 'V()';
-			}
-			return `${js_key(f.key)}: ${ex}`;
-		});
-		out.push('', `/** ${entry.name}, mask ${shape.mask} */`, `function s${shape.id}() {`);
-		if (own) out.push('\tlet s, e;');
-		out.push('\treturn {');
-		props.forEach((prop, n) => out.push(`\t\t${prop}${n < props.length - 1 ? ',' : ''}`));
-		out.push('\t};', '}');
+		out.push('', ...shape_function(schema, shape, false, keyword_of));
 	}
 	out.push(
 		'',
 		'/** The fast shapes, by header word. */',
-		...js_array('const SHAPES = ', ['null', ...schema.shapes.map((s) => `s${s.id}`)], ';')
+		...js_array('const SHAPES = ', ['null', ...schema.shapes.map((s) => `s${s.id}`)], ';'),
+		...STATIC_LOC.split('\n')
+	);
+	// a hot shape gets its twin `q<id>`; a shape whose twin would be its plain body (no span, no
+	// nested read) reuses `s<id>`; every other shape's loc-mode record is read by `X`
+	const names: string[] = ['null'];
+	for (const shape of schema.shapes) {
+		const plain = shape_function(schema, shape, false, keyword_of);
+		const twin = shape_function(schema, shape, true, keyword_of);
+		if (twin.slice(2).join('\n') === plain.slice(2).join('\n')) names.push(`s${shape.id}`);
+		else if (hot.has(shape.id)) {
+			out.push('', ...twin);
+			names.push(`q${shape.id}`);
+		} else names.push('X');
+	}
+	out.push(
+		'',
+		'/** The fast shapes in loc mode, by header word: a twin, a plain function, or `X`. */',
+		...js_array('const SHAPES_LOC = ', names, ';')
 	);
 	return `${out.join('\n')}\n`;
 }
@@ -256,8 +342,27 @@ const HEAD = `
  * Generated, with the descriptor tables and one function per fast shape, by
  * \`scripts/tape_gen.ts\`, where the hand-written part below lives.
  *
+ * **Loc mode.** Handed a language, a decode builds the \`loc\`-bearing wire instead — the tree
+ * \`JSON.parse\` makes of \`tsv parse --locations\`'s JSON, key order included: \`loc\` right after
+ * \`end\` on every record with offsets, a Svelte \`name_loc\` right after \`name\`, and Svelte's
+ * \`character\`-bearing positions re-stamped once the tree is whole. The rules are
+ * \`locations_core.js\`'s, the ones \`locations.js\` reconstructs by. The hottest fast shapes
+ * (\`tsv_tape_hot.json\`) have a generated twin that builds the record with its \`loc\` in one
+ * literal; every other record is read by \`X\`, which reads its entry's descriptors as \`slow\`
+ * does, or by its plain function where nothing in it moves.
+ *
  * @module
  */
+
+import {
+	build_line_starts,
+	line_index_near,
+	NAME_LOC_KINDS,
+	name_loc_of,
+	STAMP_HOSTS,
+	stamp_character_locs,
+	stamp_in_tag_comment_locs
+} from './locations_core.js';
 
 /** The tape format's version, which the header's second word must carry. */`;
 
@@ -281,6 +386,19 @@ let p = 0;
 let src = '';
 /** The tape's string pool, decoded once. */
 let pool = '';
+
+const NO_LINES = [0];
+/** Loc mode: whether this decode builds the loc wire's fields. */
+let lm = false;
+/** Loc mode: the line-start offsets of the source. */
+let ls = NO_LINES;
+/** Loc mode: the line of the last \`start\` looked up, where the next lookup starts. */
+let lh = 0;
+/**
+ * Loc mode over a Svelte tape: the records \`stamp_character_locs\` re-stamps once the tree is
+ * whole; \`null\` in every other decode.
+ */
+let hosts = null;
 `;
 
 /** The decoder's hand-written part: the entry points, the readers and the slow path. */
@@ -289,22 +407,27 @@ const STATIC = `
  * Decodes a tape against \`source\`, the exact string the parse read.
  * @param {Uint8Array} bytes - the tape
  * @param {string} source
+ * @param {'typescript' | 'svelte' | 'css'} [language] - the document's language, to decode the
+ * \`loc\`-bearing wire under its line rule (loc mode, the module doc); unset, the span-only wire
  * @returns {unknown} the tree \`JSON.parse\` makes of the same wire's JSON
  * @throws {Error} when the header names another format, schema or shape list, or the tape is
- * malformed
+ * malformed, or \`language\` names no language
  */
-export function decode_tape(bytes, source) {
-	const end = open(bytes, source);
+export function decode_tape(bytes, source, language) {
+	const end = open(bytes, source, language);
 	try {
 		let tree;
 		try {
-			tree = R();
+			tree = lm ? RL() : R();
 		} catch (error) {
 			if (!(error instanceof RangeError)) throw error;
 			p = 0;
+			lh = 0;
+			if (hosts !== null) hosts = [];
 			tree = slow();
 		}
 		if (p !== end) throw new Error(\`tape: \${end - p} words left after the root record\`);
+		if (hosts !== null) restamp(tree);
 		return tree;
 	} finally {
 		close();
@@ -316,13 +439,15 @@ export function decode_tape(bytes, source) {
  * stack overflow, exposed so a gate can run every tape through it.
  * @param {Uint8Array} bytes - the tape
  * @param {string} source
+ * @param {'typescript' | 'svelte' | 'css'} [language] - as \`decode_tape\` takes it
  * @returns {unknown}
  */
-export function decode_tape_iterative(bytes, source) {
-	const end = open(bytes, source);
+export function decode_tape_iterative(bytes, source, language) {
+	const end = open(bytes, source, language);
 	try {
 		const tree = slow();
 		if (p !== end) throw new Error(\`tape: \${end - p} words left after the root record\`);
+		if (hosts !== null) restamp(tree);
 		return tree;
 	} finally {
 		close();
@@ -330,12 +455,22 @@ export function decode_tape_iterative(bytes, source) {
 }
 
 /**
- * Reads the header and points the module state at the body and the pool.
+ * Reads the header and points the module state at the body, the pool and, in loc mode, the
+ * source's line table.
  * @param {Uint8Array} bytes
  * @param {string} source
+ * @param {string | undefined} language
  * @returns {number} the body's length in words
  */
-function open(bytes, source) {
+function open(bytes, source, language) {
+	if (
+		language !== undefined &&
+		language !== 'typescript' &&
+		language !== 'svelte' &&
+		language !== 'css'
+	) {
+		throw new Error(\`tape: no line rule for the language \${String(language)}\`);
+	}
 	if (!LITTLE_ENDIAN) throw new Error('tape: this decoder reads a little-endian host only');
 	if (bytes.byteOffset % 4 !== 0) bytes = bytes.slice();
 	if (bytes.byteLength < HEADER_BYTES) throw new Error('tape: shorter than its header');
@@ -364,6 +499,10 @@ function open(bytes, source) {
 	}
 	src = source;
 	p = 0;
+	lh = 0;
+	lm = language !== undefined;
+	ls = lm ? build_line_starts(source, language === 'typescript') : NO_LINES;
+	hosts = language === 'svelte' ? [] : null;
 	return words;
 }
 
@@ -373,6 +512,9 @@ function close() {
 	i = NO_INTS;
 	src = '';
 	pool = '';
+	lm = false;
+	ls = NO_LINES;
+	hosts = null;
 }
 
 /** A string ref. */
@@ -643,8 +785,166 @@ function fill(frame, stack) {
 				frame.f = f;
 				return 1;
 		}
+		if (lm && (key === 'end' || key === 'name')) loc_field(o, key, e);
 	}
+	if (hosts !== null && STAMP_HOSTS.has(ENTRY_TYPE[e])) hosts.push(o);
 	return 3;
+}`;
+
+/** The decoder's loc-mode readers (the module doc), after the fast shapes. */
+const STATIC_LOC = `
+/**
+ * A record's \`loc\` over its own span: the start's line searched from the last one looked up,
+ * the end's from the start's.
+ * @param {number} s
+ * @param {number} e
+ */
+function LOC(s, e) {
+	const a = (lh = line_index_near(s, ls, lh));
+	const b = line_index_near(e, ls, a);
+	return {
+		start: { line: a + 1, column: s - ls[a] },
+		end: { line: b + 1, column: e - ls[b] }
+	};
+}
+
+/**
+ * The loc-wire field a typed record takes after its \`key\`, read by the entry-generic paths:
+ * \`loc\` after an offset \`end\` (every entry with offset \`start\` and \`end\` carries one), a
+ * Svelte \`name_loc\` after the \`name\` of an entry whose \`type\` \`NAME_LOC_KINDS\` names.
+ * @param {any} o - the record, filled through \`key\`
+ * @param {string} key
+ * @param {number} e - its entry
+ */
+function loc_field(o, key, e) {
+	if (typeof o.start !== 'number' || typeof o.end !== 'number') return;
+	if (key === 'end') o.loc = LOC(o.start, o.end);
+	else {
+		const kind = NAME_LOC_KINDS.get(ENTRY_TYPE[e]);
+		if (kind !== undefined) o.name_loc = name_loc_of(kind, o.start, o.end, o.name, src, ls, lh);
+	}
+}
+
+/**
+ * A loc-mode fast shape with no twin: its fields read from its entry's descriptors, nested reads
+ * through the loc-mode readers (so only this record, not its subtree, is generic).
+ */
+function X() {
+	const h = i[p - 1];
+	const e = SHAPE_ENTRY[h];
+	const m = SHAPE_MASK[h];
+	const keys = ENTRY_KEYS[e];
+	const encodings = ENTRY_ENCODINGS[e];
+	const bits = ENTRY_BITS[e];
+	const o = {};
+	for (let f = 0; f < keys.length; f++) {
+		const bit = bits[f];
+		if (bit >= 0 && (m & (1 << bit)) === 0) continue;
+		const key = keys[f];
+		switch (encodings[f]) {
+			case 0:
+				o[key] = ENTRY_TYPE[e];
+				break;
+			case 1:
+				o[key] = u[p++];
+				break;
+			case 2:
+				o[key] = u[p++] !== 0;
+				break;
+			case 3:
+				o[key] = N();
+				break;
+			case 4:
+				o[key] = null;
+				break;
+			case 5:
+				o[key] = src.slice(o.start, o.end);
+				break;
+			case 6:
+				o[key] = KW[ENTRY_KEYWORDS[e][f]][u[p++]];
+				break;
+			case 7:
+				o[key] = S();
+				break;
+			case 8:
+				o[key] = SN();
+				break;
+			case 9:
+				o[key] = L();
+				break;
+			case 10:
+				o[key] = RL();
+				break;
+			case 11:
+				o[key] = AL();
+				break;
+			default:
+				o[key] = VL();
+		}
+		if (key === 'end' || key === 'name') loc_field(o, key, e);
+	}
+	if (hosts !== null && STAMP_HOSTS.has(ENTRY_TYPE[e])) hosts.push(o);
+	return o;
+}
+
+/** \`R\` in loc mode. */
+function RL() {
+	const h = i[p];
+	if (h > 0) {
+		const shape = SHAPES_LOC[h];
+		if (shape === undefined) throw new Error(\`tape: no fast shape \${h}\`);
+		p++;
+		return shape();
+	}
+	if (h === 0) {
+		p++;
+		return null;
+	}
+	return slow();
+}
+
+/** \`A\` in loc mode. */
+function AL() {
+	const n = u[p++];
+	const a = new Array(n);
+	for (let k = 0; k < n; k++) a[k] = RL();
+	return a;
+}
+
+/** \`V\` in loc mode. */
+function VL() {
+	switch (u[p++]) {
+		case 0:
+			return null;
+		case 1:
+			return false;
+		case 2:
+			return true;
+		case 3:
+			return N();
+		case 4:
+			return S();
+		case 5: {
+			const n = u[p++];
+			const a = new Array(n);
+			for (let k = 0; k < n; k++) a[k] = VL();
+			return a;
+		}
+		case 6:
+			return RL();
+	}
+	throw new Error(\`tape: bad value tag at word \${p - 1}\`);
+}
+
+/**
+ * Loc mode over a Svelte tape, once the tree is whole: the \`character\`-bearing positions
+ * Svelte's own template reader creates, \`locations.js\`'s two stamps — each overwriting a
+ * \`loc\` already in place, so no key moves.
+ * @param {any} tree
+ */
+function restamp(tree) {
+	for (const host of hosts) stamp_character_locs(host, ls, src);
+	if (Array.isArray(tree?.comments)) stamp_in_tag_comment_locs(tree, ls, src);
 }`;
 
 /** The Rust name of an encoding. */

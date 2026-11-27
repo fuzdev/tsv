@@ -74,7 +74,7 @@ into `crates/tsv_napi/pkg/` (gitignored):
   both entries so the addon loads once), `npm/platform.js` (triple detection, shared by
   `addon.js` and `bin.js`) + `npm/bin.js` (the `tsv` bin — a dispatcher, see below) +
   `npm/README.md` + the facade with its parse, strip and imports halves (`api.js` / `api_parse.js` /
-  `api_strip.js` / `api_imports.js`, `locations.js`, the declarations — `facade_format.d.ts` /
+  `api_strip.js` / `api_imports.js`, `locations.js` + `locations_core.js`, the declarations — `facade_format.d.ts` /
   `facade_parse.d.ts` / `facade_strip.d.ts` / `facade_imports.d.ts`,
   named apart from the modules they sit beside, `facade_error.d.ts`, `locations.d.ts`
   — and `tsv_wasm`'s `tsv_ast.d.ts` — the file table
@@ -128,7 +128,8 @@ in from `crates/tsv_wasm/npm/`), so there is one options reader for both, and
 decoded from the addon's `parse_tape_<lang>` (`tape_engine.js`, the tape route
 [../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §The npm Facade describes — the words copied
 into a buffer the JS engine owns) — the tree `JSON.parse` makes of the wire, whose
-`JSON.stringify` is the wire — (`{locations: true}` adds `loc`, reconstructed in JS); a failure is
+`JSON.stringify` is the wire — (`{locations: true}` decodes the same tape with `loc` in the
+native `--locations` wire's key order); a failure is
 `{ok: false, error}`. No export emits the JSON wire itself. The root `index.js`
 imports the format, strip and imports facade files and `parse.js` the parse half, each of
 which sits beside it only once staged; the root loads no parse code and no decoder. The deliberately
@@ -151,11 +152,12 @@ exports the engine-only `parse_internal_*` / `parse_tape_*` families
 `ENGINE_ONLY_PREFIXES`).
 
 The locations helpers (`reconstruct_locations` / `create_locator`)
-ship here too: `tsv_wasm/npm/locations.js` is pure JS over the span-only wire —
-the facade's `{locations: true}` runs it — so the staging script copies that same
-file in and the loader's `parse.js` re-exports it whole (`export *`), so the names are
+ship here too: `tsv_wasm/npm/locations.js` is pure JS over the span-only wire, over the
+internal `locations_core.js` it shares with the decoder's loc mode (which builds
+`{locations: true}`'s `loc`) — so the staging script copies those same files in and the
+loader's `parse.js` re-exports the helper whole (`export *`), so the names are
 never listed a second time. It is also the loader's `./locations` subpath, as in the wasm
-packages that parse: pure JS importing nothing, so it loads no addon —
+packages that parse: pure JS importing nothing but its sibling core, so it loads no addon —
 `scripts/test_napi_npm.ts` imports it from the staging that has no platform package, where
 the loader itself throws. The `IgnoreStack` discovery class ships too — a `#[napi]` twin of
 `tsv_wasm`'s wrapper over the same `tsv_ignore` / `tsv_discover` pair, re-exported

@@ -81,6 +81,7 @@ import { npm_pack_reports, THIRD_PARTY_NOTICE } from './npm_metadata.ts';
 import { register_discovery_parity_suite } from './discovery_parity_suite.ts';
 import { register_dts_specifier_test } from './dts_specifiers.ts';
 import { register_facade_surface_suite } from './facade_surface_suite.ts';
+import { loc_key_order } from './loc_key_order.ts';
 import {
 	register_strip_api_suite,
 	register_strip_cli_suite,
@@ -495,14 +496,15 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		assert.equal(css.children[0].loc, undefined);
 	});
 
-	// The facade and the helper that `{locations: true}` runs ship together — the
-	// pure-JS `api_parse.js` and `locations.js` are copied in from the wasm packages, so
-	// this asserts the copies landed and are WIRED: `{locations: true}` is exactly the
-	// helper's reconstruction of the default parse, in all three languages. Whether that
-	// reconstruction equals the native `loc` emitter is `npm run check:loc`'s, over
-	// every fixture document; the CLI section below compares it with the native binary's
-	// `parse --locations` directly.
-	it('the locations helpers ship, and {locations: true} runs them', () => {
+	// The facade, the decoder and the helper ship together — the pure-JS `api_parse.js`,
+	// `tape_decode.js`, `locations.js` and the `locations_core.js` the last two share are
+	// copied in from the wasm packages, so this asserts the copies landed and are WIRED:
+	// `{locations: true}` (the decoder's loc mode) deep-equals the helper's reconstruction of
+	// the default parse, in all three languages, with `loc` in the loc wire's key order.
+	// Whether both equal the native `loc` emitter is `npm run check:tape`'s and
+	// `npm run check:loc`'s, over every fixture document; the CLI section below compares
+	// `parse --locations` with the native binary's byte for byte.
+	it('the locations helpers ship, and {locations: true} matches them', () => {
 		const source = 'const x = 1;\nconst y = 2;\n';
 		const spans = ok_ast(api.parse_typescript(source));
 		assert.equal(spans.body[1].loc, undefined, 'the default wire starts without loc');
@@ -523,6 +525,10 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		const css_located = ok_ast(api.parse_css(css, { locations: true }));
 		assert.deepEqual(api.reconstruct_locations(ok_ast(api.parse_css(css)), css), css_located);
 		assert.ok(css_located.children[0].loc);
+		for (const tree of [ok_ast(api.parse_typescript(source, { locations: true })), sv_located]) {
+			assert.equal(loc_key_order(tree), null);
+		}
+		assert.equal(loc_key_order(css_located), null);
 	});
 
 	it('the TypeScript sourceType axis reaches parse AND format', () => {
@@ -1664,30 +1670,6 @@ describe('message parity: the native CLI and cli.js refuse in the same order', (
 		assert.equal(mirror.stdout, native.stdout);
 	});
 
-	/**
-	 * `assert.deepEqual` over a JSON tree of any depth: the assert recurses on the JS stack, which
-	 * the deepest tree outgrows, so this walks from an explicit stack. Key order is not compared.
-	 */
-	const assert_same_tree = (actual: unknown, expected: unknown): void => {
-		const stack: Array<[unknown, unknown, number]> = [[actual, expected, 0]];
-		while (stack.length > 0) {
-			const [a, e, depth] = stack.pop()!;
-			if (a === null || e === null || typeof a !== 'object' || typeof e !== 'object') {
-				assert.ok(Object.is(a, e), `the trees differ at depth ${depth}`);
-				continue;
-			}
-			assert.equal(Array.isArray(a), Array.isArray(e), `the trees differ at depth ${depth}`);
-			const a_record = a as Record<string, unknown>;
-			const e_record = e as Record<string, unknown>;
-			const keys = Object.keys(e_record);
-			assert.equal(Object.keys(a_record).length, keys.length, `keys differ at depth ${depth}`);
-			for (const key of keys) {
-				assert.ok(Object.hasOwn(a_record, key), `'${key}' is missing at depth ${depth}`);
-				stack.push([a_record[key], e_record[key], depth + 1]);
-			}
-		}
-	};
-
 	// The mirror serializes the decoded tree in JS, and `JSON.stringify` can recurse per nesting
 	// level on the JS stack, which a tree the native engine parsed fine outgrows; on that
 	// `RangeError` it serializes from an explicit stack instead (`stringify_iteratively`), so
@@ -1703,7 +1685,7 @@ describe('message parity: the native CLI and cli.js refuse in the same order', (
 	// only `--pretty`, which always takes the recursive path, does. So `--pretty` is graded on a
 	// shallower chain under a still smaller stack, which reaches the fallback on every Node (at
 	// the deepest tree its output is hundreds of megabytes of indent). The `--locations` leg
-	// compares trees, not bytes: the key order differs by design.
+	// is byte-equal too: the decoder builds `loc` in the native wire's key order.
 	it('a tree too deep for JSON.stringify prints on the mirror as the native bin prints it', () => {
 		const chain = (terms: number) => `x = ${Array.from({ length: terms }, () => '1').join('+')};\n`;
 		let [accepted, refused] = [2, 2 * 6_000];
@@ -1739,7 +1721,7 @@ describe('message parity: the native CLI and cli.js refuse in the same order', (
 			maxBuffer: 1024 * 1024 * 1024
 		});
 		assert.equal(native_located.status, 0, native_located.stderr);
-		assert_same_tree(JSON.parse(located.stdout), JSON.parse(native_located.stdout));
+		assert.ok(located.stdout === native_located.stdout, "the --locations wire is the native bin's");
 		const shallow = ['parse', '--pretty', '--content', chain(1_500), '--parser', 'typescript'];
 		const pretty_native = spawnSync(native_path, shallow, {
 			encoding: 'utf-8',
@@ -1752,13 +1734,12 @@ describe('message parity: the native CLI and cli.js refuse in the same order', (
 	});
 
 	// `parse --locations`: the native bin writes `loc` with its Rust emitter, the mirror
-	// through the facade's `{locations: true}` — the JS reconstruction over the span-only
-	// wire. One definition, two implementations, so the trees must be deep-equal; the
-	// bytes are not, since the Rust writer puts `loc` after `end` and the reconstruction
-	// appends it last. The sources reach `name_loc`, the `character` positions, a lone
-	// CR / U+2028 (each document's own line rule), and a leading BOM. The default wire
-	// stays byte-identical on both bins.
-	it('parse --locations is deep-equal on both bins, the default wire byte-identical', () => {
+	// through the facade's `{locations: true}` — the tape decoder's loc mode. One definition,
+	// two implementations, built in one key order (`loc` after `end`, `name_loc` after
+	// `name`), so the bytes must be equal. The sources reach `name_loc`, the `character`
+	// positions, a lone CR / U+2028 (each document's own line rule), and a leading BOM. The
+	// default wire stays byte-identical on both bins.
+	it('parse --locations and the default wire are byte-identical on both bins', () => {
 		const cases: Array<[string, string]> = [
 			['typescript', 'let a = 1;\rlet b = { c: [2, "\u2028"] };\r\nfunction f(x) { return x; }\n'],
 			// every number spelling and string escape class the stringified tree must reproduce:
@@ -1783,11 +1764,7 @@ describe('message parity: the native CLI and cli.js refuse in the same order', (
 				assert.equal(native.status, 0, native.stderr);
 				assert.equal(mirror.status, 0, mirror.stderr);
 				assert.match(native.stdout, /"loc"/);
-				assert.deepEqual(
-					JSON.parse(mirror.stdout),
-					JSON.parse(native.stdout),
-					`${parser} ${extra}`
-				);
+				assert.equal(mirror.stdout, native.stdout, `${parser} ${extra}`);
 				const span = ['parse', ...extra, '--content', source, '--parser', parser];
 				assert.equal(run_mirror(span).stdout, run_native(span).stdout, `${parser} default wire`);
 			}

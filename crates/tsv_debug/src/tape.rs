@@ -411,7 +411,7 @@ pub fn tape_to_json(tape: &[u8], source: &str) -> Result<Vec<u8>, String> {
     }
 }
 
-/// One fixture document's span-only wire.
+/// One fixture document's two parse wires.
 #[derive(Debug)]
 pub struct FixtureWire {
     /// The document's path under the walked root.
@@ -422,12 +422,14 @@ pub struct FixtureWire {
     pub source: String,
     /// The span-only wire JSON.
     pub span: Vec<u8>,
+    /// The `loc`-bearing wire JSON of the same parse (`tsv parse --locations`).
+    pub loc: Vec<u8>,
     /// The parse goal a TypeScript document was read at (the fixture's `goal` marker; `Module`
     /// for every other document).
     pub goal: tsv_ts::Goal,
 }
 
-/// Every parseable document under `root` the `loc_wires` walk grades, with its span-only wire:
+/// Every parseable document under `root` the `loc_wires` walk grades, with both its wires:
 /// each fixture's input and format variants; a prettier-side form tsv rejects is left out.
 ///
 /// # Errors
@@ -453,18 +455,21 @@ pub fn fixture_wires(root: &Path, mut each: impl FnMut(FixtureWire)) -> Result<u
                 Err(_) if claim == Claim::PrettierSide => continue,
                 Err(e) => return Err(format!("{relative}: {e}")),
             };
-            let (language, span) = match &parsed {
+            let (language, span, loc) = match &parsed {
                 ParsedInput::Svelte(ast) => (
                     "svelte",
                     tsv_svelte::__private::convert_ast_json_bytes(ast, &source),
+                    tsv_svelte::__private::convert_ast_json_bytes_with_locations(ast, &source),
                 ),
                 ParsedInput::Ts(ast) => (
                     "typescript",
                     tsv_ts::__private::convert_ast_json_bytes(ast, &source),
+                    tsv_ts::__private::convert_ast_json_bytes_with_locations(ast, &source),
                 ),
                 ParsedInput::Css(ast) => (
                     "css",
                     tsv_css::__private::convert_ast_json_bytes(ast, &source),
+                    tsv_css::__private::convert_ast_json_bytes_with_locations(ast, &source),
                 ),
             };
             each(FixtureWire {
@@ -472,6 +477,7 @@ pub fn fixture_wires(root: &Path, mut each: impl FnMut(FixtureWire)) -> Result<u
                 language,
                 source,
                 span,
+                loc,
                 goal,
             });
             n += 1;

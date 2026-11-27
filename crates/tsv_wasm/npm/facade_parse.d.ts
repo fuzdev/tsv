@@ -29,8 +29,9 @@ import type { TsvParseError } from './facade_error.js';
 export interface ParseOptions {
 	/**
 	 * Add per-node `loc` (line/column) — and Svelte's `name_loc` — to the span-only
-	 * tree, reconstructed in JS from the offsets plus the source by this package's
-	 * `reconstruct_locations` (TypeScript's matches acorn's `locations: true` exactly).
+	 * tree, built in JS as the tape is decoded, in `tsv parse --locations`'s key order (`loc`
+	 * right after `end`, `name_loc` right after `name`); TypeScript's matches acorn's
+	 * `locations: true` exactly.
 	 * @default false
 	 */
 	locations?: boolean | undefined;

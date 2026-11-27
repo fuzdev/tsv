@@ -1,16 +1,21 @@
 import { assert, test } from 'vitest';
 
-import type { AstSchema } from './ast_schema.ts';
+import type { AstSchema, AstSchemaEntry } from './ast_schema.ts';
 import {
 	build_tape_schema,
 	derive_tape_entries,
 	Enc,
 	field_encoding,
 	generic_header,
+	hot_file_from_counts,
+	hot_shape_ids,
+	layout_tape_hot,
 	layout_tape_shapes,
+	parse_tape_hot,
 	parse_tape_shapes,
 	read_generic_header,
 	shapes_file_from_census,
+	tape_hot_cut_changes,
 	TAPE_MASK_BITS,
 	TAPE_MAX_ENTRIES
 } from './tape_schema.ts';
@@ -28,8 +33,8 @@ const TABLE: AstSchema = {
 						{ key: 'type', kind: 'type' },
 						{ key: 'start', kind: 'offset' },
 						{ key: 'end', kind: 'offset' },
-						{ key: 'raw', kind: 'string', string: 'own' },
 						{ key: 'loc', kind: 'loc', entry: 'Loc', presence: 'locations' },
+						{ key: 'raw', kind: 'string', string: 'own' },
 						{ key: 'extra', kind: 'object', entry: 'Extra', presence: 'optional' }
 					]
 				},
@@ -90,6 +95,81 @@ test('entries drop loc fields, fold identical twins, and resolve type-less posit
 		]
 	);
 	assert.strictEqual(lit.fields[4]!.entry, 2);
+	// the loc wire's fields ride the entry as flags, outside the tape
+	assert.deepEqual(
+		derived.entries.map((e) => [e.loc, e.name_loc]),
+		[
+			[true, false],
+			[false, false],
+			[false, false],
+			[false, false]
+		]
+	);
+});
+
+/** A one-entry table of `fields`. */
+const one_entry = (fields: AstSchemaEntry['fields']): AstSchema =>
+	({
+		doc: [],
+		sections: [{ title: 'test', entries: [{ type: 'El', fields }] }]
+	}) as AstSchema;
+
+test('the loc-wire fields sit where the decoder builds them, or the table is refused', () => {
+	const loc = { key: 'loc', kind: 'loc', entry: 'Loc', presence: 'locations' } as const;
+	const name_loc = { key: 'name_loc', kind: 'loc', entry: 'Loc', presence: 'locations' } as const;
+	const head = [
+		{ key: 'type', kind: 'type' },
+		{ key: 'start', kind: 'offset' },
+		{ key: 'end', kind: 'offset' }
+	] as const;
+	const name = { key: 'name', kind: 'string', string: 'slice' } as const;
+	const ok = derive_tape_entries(one_entry([...head, loc, name, name_loc]));
+	if ('errors' in ok) throw new Error(ok.errors.join('\n'));
+	assert.deepEqual([ok.entries[0]!.loc, ok.entries[0]!.name_loc], [true, true]);
+	const refusals: Array<[AstSchema, RegExp]> = [
+		[one_entry([...head, name, loc]), /El\.loc: a loc-wire field/],
+		[one_entry([...head, loc, name, { key: 'x', kind: 'boolean' }, name_loc]), /El\.name_loc/],
+		[one_entry([...head]), /El: no `loc` despite/],
+		[
+			one_entry([{ key: 'type', kind: 'type' }, { key: 'end', kind: 'offset' }, loc]),
+			/El: a `loc` without/
+		],
+		[one_entry([...head, loc, { key: 'other', kind: 'loc', presence: 'locations' }]), /El\.other/]
+	];
+	for (const [table, pattern] of refusals) {
+		const derived = derive_tape_entries(table);
+		assert.ok('errors' in derived && derived.errors.some((e) => pattern.test(e)), String(pattern));
+	}
+});
+
+test('twins that fold must agree on their loc-wire fields', () => {
+	const derived = derive_tape_entries({
+		doc: [],
+		sections: [
+			{
+				title: 'test',
+				entries: [
+					{
+						type: 'El',
+						fields: [
+							{ key: 'type', kind: 'type' },
+							{ key: 'name', kind: 'string', string: 'slice' }
+						]
+					},
+					{
+						type: 'El',
+						variant: 'Named',
+						fields: [
+							{ key: 'type', kind: 'type' },
+							{ key: 'name', kind: 'string', string: 'pooled' },
+							{ key: 'name_loc', kind: 'loc', entry: 'Loc', presence: 'locations' }
+						]
+					}
+				]
+			}
+		]
+	} as AstSchema);
+	assert.ok('errors' in derived && derived.errors.some((e) => /El\/Named: folds into El/.test(e)));
 });
 
 test('an own field ahead of its span is carried as a ref', () => {
@@ -105,7 +185,8 @@ test('an own field ahead of its span is carried as a ref', () => {
 							{ key: 'type', kind: 'type' },
 							{ key: 'name', kind: 'string', string: 'own' },
 							{ key: 'start', kind: 'offset' },
-							{ key: 'end', kind: 'offset' }
+							{ key: 'end', kind: 'offset' },
+							{ key: 'loc', kind: 'loc', entry: 'Loc', presence: 'locations' }
 						]
 					}
 				]
@@ -163,4 +244,75 @@ test('the shape list lays out one shape per line and reads back', () => {
 	const text = layout_tape_shapes(file);
 	assert.deepEqual(parse_tape_shapes(text), file);
 	assert.ok('errors' in parse_tape_shapes('{"note": [], "shapes": [["Lit"]]}'));
+});
+
+test('the hot-shape list lays out one shape per line, reads back, and names fast shapes only', () => {
+	const schema = build_tape_schema(TABLE, { note: [], shapes: [['Lit', 1]] });
+	if ('errors' in schema) throw new Error(schema.errors.join('\n'));
+	const counts = {
+		typescript: new Map([
+			[1, 5],
+			[2, 9],
+			[3, 0]
+		]),
+		svelte: new Map([[1, 1]]),
+		css: new Map<number, number>()
+	};
+	const file = hot_file_from_counts(schema, counts);
+	// hottest first; a shape no record took is no hot shape
+	assert.deepEqual(file.typescript, [
+		['Lit', 1],
+		['Lit', 0]
+	]);
+	assert.deepEqual(file.svelte, [['Lit', 0]]);
+	assert.deepEqual(file.css, []);
+	const text = layout_tape_hot(file);
+	assert.deepEqual(parse_tape_hot(text), file);
+	assert.ok('errors' in parse_tape_hot('{"note": [], "typescript": []}'));
+	const ids = hot_shape_ids(schema, file);
+	assert.ok(!('errors' in ids) && [...ids].sort().join() === '1,2');
+	const stale = hot_shape_ids(schema, { ...file, css: [['Lit', 2]] });
+	assert.ok('errors' in stale && /css names Lit mask 2/.test(stale.errors[0]!));
+});
+
+test('the hot-list staleness check compares each cut as a set and names what crossed it', () => {
+	const file = (typescript: Array<[string, number]>, css: Array<[string, number]> = []) => ({
+		note: [],
+		typescript,
+		svelte: [] as Array<[string, number]>,
+		css
+	});
+	const committed = file([
+		['A', 0],
+		['B', 1]
+	]);
+	// a rank swap inside the cut is no change
+	assert.deepEqual(
+		tape_hot_cut_changes(
+			committed,
+			file([
+				['B', 1],
+				['A', 0]
+			])
+		),
+		[]
+	);
+	// a shape crossing a cut names the language and both directions
+	assert.deepEqual(
+		tape_hot_cut_changes(
+			committed,
+			file(
+				[
+					['A', 0],
+					['C', 2]
+				],
+				[['D', 0]]
+			)
+		),
+		[
+			'typescript: entered the cut: C mask 2',
+			'typescript: left the cut: B mask 1',
+			'css: entered the cut: D mask 0'
+		]
+	);
 });
