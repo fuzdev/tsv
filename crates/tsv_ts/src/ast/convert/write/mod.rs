@@ -645,11 +645,17 @@ pub(super) fn write_function_flags_fields<const E: u16>(
     w.bool(r#async);
 }
 
-/// Emit `,"importKind":"type"|"value"`. `"type"` is always written; `"value"` is
-/// omitted under vanilla acorn (Svelte non-`lang="ts"` context, see
-/// `Ctx::vanilla_acorn`) and written under acorn-typescript. Each emitting arm
-/// appends the whole field as one literal rather than the key followed by a
-/// runtime-chosen token.
+/// Whether a `"value"` `importKind` / `exportKind` is omitted: under vanilla acorn (Svelte
+/// non-`lang="ts"` context, see `Ctx::vanilla_acorn`); acorn-typescript writes it. A `"type"`
+/// kind is always written.
+#[inline]
+pub(super) fn omits_value_kind(ctx: &Ctx<'_>) -> bool {
+    ctx.vanilla_acorn
+}
+
+/// Emit `,"importKind":"type"|"value"`, `"value"` as [`omits_value_kind`] says. Each emitting
+/// arm appends the whole field as one literal rather than the key followed by a runtime-chosen
+/// token.
 #[inline]
 pub(super) fn write_import_kind_field<const E: u16>(
     w: &mut Sink<'_>,
@@ -658,13 +664,12 @@ pub(super) fn write_import_kind_field<const E: u16>(
 ) {
     match import_kind {
         ast::ImportKind::Type => raw!(w, @E, ",\"importKind\":\"type\""),
-        ast::ImportKind::Value if ctx.vanilla_acorn => {}
+        ast::ImportKind::Value if omits_value_kind(ctx) => {}
         ast::ImportKind::Value => raw!(w, @E, ",\"importKind\":\"value\""),
     }
 }
 
-/// Emit `,"exportKind":"type"|"value"`, with the same omission rule as
-/// [`write_import_kind_field`].
+/// Emit `,"exportKind":"type"|"value"`, `"value"` as [`omits_value_kind`] says.
 #[inline]
 pub(super) fn write_export_kind_field<const E: u16>(
     w: &mut Sink<'_>,
@@ -673,7 +678,7 @@ pub(super) fn write_export_kind_field<const E: u16>(
 ) {
     match export_kind {
         ast::ExportKind::Type => raw!(w, @E, ",\"exportKind\":\"type\""),
-        ast::ExportKind::Value if ctx.vanilla_acorn => {}
+        ast::ExportKind::Value if omits_value_kind(ctx) => {}
         ast::ExportKind::Value => raw!(w, @E, ",\"exportKind\":\"value\""),
     }
 }

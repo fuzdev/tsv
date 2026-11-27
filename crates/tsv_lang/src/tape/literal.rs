@@ -174,24 +174,20 @@ const fn scan(start: Option<u16>, lit: &'static str, out: &mut [LitOp], resolve:
                     push(&mut levels, &mut depth, Level::Record(Some(entry)));
                     at += 1;
                 }
-                last = None;
             }
             b'}' => {
                 op = LitOp::Close;
                 pop(&mut levels, &mut depth);
-                last = None;
                 at += 1;
             }
             b'[' => {
                 op = LitOp::ListOpen;
                 push(&mut levels, &mut depth, Level::List);
-                last = None;
                 at += 1;
             }
             b']' => {
                 op = LitOp::ListClose;
                 pop(&mut levels, &mut depth);
-                last = None;
                 at += 1;
             }
             // a string value's quotes split across two literals, its text a data call between
@@ -283,9 +279,8 @@ const fn scan(start: Option<u16>, lit: &'static str, out: &mut [LitOp], resolve:
             }
             _ => panic!("a byte the literal reader does not take"),
         }
-        if !matches!(op, LitOp::Open(_) | LitOp::OpenObject(_)) {
-            last = None;
-        }
+        // a value, a record or a list ends the key's turn (a key, a comma or a split string quote `continue`s past this)
+        last = None;
         if count < out.len() {
             out[count] = op;
         }

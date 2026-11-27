@@ -1362,12 +1362,13 @@ fn write_synth_relative_selector(
         // Descendant is the only combinator a synthesized argument produces —
         // Svelte's `read_combinator` hands back exactly the whitespace run it ate.
         Some(gap) => {
+            let comb = ast::Combinator::Descendant;
             let index = keyword_index!(
                 Combinator.name,
-                ast::Combinator::Descendant,
+                comb,
                 ast::Combinator => [Descendant, Child, NextSibling, SubsequentSibling, Column]
             );
-            write_combinator(w, " ", index, gap, ctx);
+            write_combinator(w, comb.as_str(), index, gap, ctx);
         }
         None => null_record!(w),
     }

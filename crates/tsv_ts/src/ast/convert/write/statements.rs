@@ -166,9 +166,10 @@ pub(super) fn write_statement(w: &mut Sink<'_>, stmt: &ast::Statement, ctx: &Ctx
             json_only! { write_export_kind_field::<0>(w, ast::ExportKind::Value, ctx); }
             // A default export is always a value export: its entry's `exportKind` vocabulary
             // holds that one word, so the tape copy writes `write_export_kind_field`'s `Value`
-            // arms alone (its `Type` arm's literal fails that entry's build).
+            // arms alone (its `Type` arm's literal fails that entry's build), under the same
+            // omission rule.
             tape! {
-                if !ctx.vanilla_acorn {
+                if !super::omits_value_kind(ctx) {
                     raw!(w, "ExportDefaultDeclaration", ",\"exportKind\":\"value\"");
                 }
             }
