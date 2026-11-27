@@ -910,7 +910,7 @@ impl<'a> Printer<'a> {
         //
         // Built directly in the shared arena — the surrounding doc tree (closing `}`, etc.)
         // provides natural lookahead via arena_fits_with_lookahead's rest_commands.
-        let value_doc = self.build_head_value_doc(expr, frozen, &self.head_embed());
+        let value_doc = self.build_head_value_doc(expr, frozen, self.head_embed());
         let value_doc = self.wrap_value_clarity_parens(expr, value_doc);
 
         self.assemble_head_expr(value_doc, span_start, expr, span_end, frozen)
@@ -974,7 +974,7 @@ impl<'a> Printer<'a> {
         };
 
         // Build expression doc tree
-        let mut inner_doc = self.build_head_value_doc(expr, frozen, &embed);
+        let mut inner_doc = self.build_head_value_doc(expr, frozen, embed);
         // A head that takes no comment at its end, built so it ends on one — a run the
         // value defers to its end, or a comment it prints there inline — is built again with
         // the author's grouping pairs kept around those comments
@@ -992,7 +992,7 @@ impl<'a> Printer<'a> {
                 value_end_takes_no_comment: true,
                 ..embed
             };
-            inner_doc = self.build_head_value_doc(expr, frozen, &embed);
+            inner_doc = self.build_head_value_doc(expr, frozen, embed);
         }
         // The instantiation pair and the assignment clarity pair are exclusive: the walk
         // never descends into an assignment, so at most one of the two wraps the head.

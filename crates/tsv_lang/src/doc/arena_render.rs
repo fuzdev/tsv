@@ -1,6 +1,5 @@
 //! Rendering algorithm for arena-based document trees.
 
-use crate::EmbedContext;
 use crate::config::TAB_WIDTH;
 use crate::printing::{next_width_relevant, split_lf, visual_width};
 use smallvec::SmallVec;
@@ -29,7 +28,7 @@ use crate::comment_ledger;
 
 /// The invariant context of one render pass: everything the render path needs that does not
 /// change as the doc tree is walked. Bundled so the mutually-recursive render functions pass one
-/// `&RenderCtx` instead of threading four parameters through every call — this is what retires
+/// `&RenderCtx` instead of threading three parameters through every call — this is what retires
 /// the `clippy::too_many_arguments` allows across this module.
 ///
 /// Deliberately holds **only shared references**. The mutable render state (`output`, `pos`,
@@ -40,12 +39,6 @@ use crate::comment_ledger;
 pub(super) struct RenderCtx<'a> {
     pub(super) arena: &'a DocArena,
     pub(super) render: &'a RenderConfig,
-    // TODO: the renderer reads no embedding state any more — every width it measures
-    // against is the print width from the column it is handed, and text a host writes after
-    // a doc rides a trailing reserve node. Drop this field and the `embed` parameter every
-    // render entry threads into it.
-    #[expect(dead_code)] // threaded by every render entry, read by none (TODO above)
-    pub(super) embed: &'a EmbedContext,
     pub(super) source: Option<&'a str>,
 }
 
@@ -541,8 +534,8 @@ fn flush_suffix_ahead_of_multiline_text(
 //
 
 /// Convert an arena doc tree to a formatted string (starting at column 0).
-pub fn arena_print_doc(arena: &DocArena, doc: DocId, embed: &EmbedContext) -> String {
-    arena_print_doc_with_indent_and_render(arena, doc, embed, 0, 0, &RenderConfig::default())
+pub fn arena_print_doc(arena: &DocArena, doc: DocId) -> String {
+    arena_print_doc_with_indent_and_render(arena, doc, 0, 0, &RenderConfig::default())
 }
 
 /// **Measure** a doc's flat-layout width: render at effectively infinite print width, so
@@ -553,12 +546,7 @@ pub fn arena_print_doc(arena: &DocArena, doc: DocId, embed: &EmbedContext) -> St
 /// as emitted. Writing this string into the document would make every comment it covers read
 /// as DROPPED to the ledger (and, if the real render also runs, DOUBLE-PRINTED). Use a
 /// `arena_print_doc_*` entry to produce output.
-pub fn arena_measure_doc_flat_resolved(
-    arena: &DocArena,
-    doc: DocId,
-    embed: &EmbedContext,
-    source: &str,
-) -> String {
+pub fn arena_measure_doc_flat_resolved(arena: &DocArena, doc: DocId, source: &str) -> String {
     let render = RenderConfig {
         print_width: usize::MAX / 2,
         // Measured and discarded, never written to the document — so reaching a comment's
@@ -574,7 +562,6 @@ pub fn arena_measure_doc_flat_resolved(
         &RenderCtx {
             arena,
             render: &render,
-            embed,
             source: Some(source),
         },
         doc,
@@ -605,7 +592,6 @@ pub fn arena_measure_doc_flat_resolved(
 pub fn arena_print_doc_with_indent_resolved_into(
     arena: &DocArena,
     doc: DocId,
-    embed: &EmbedContext,
     start_column: usize,
     start_indent_level: usize,
     source: &str,
@@ -621,7 +607,6 @@ pub fn arena_print_doc_with_indent_resolved_into(
         &RenderCtx {
             arena,
             render: &render,
-            embed,
             source: Some(source),
         },
         doc,
@@ -642,7 +627,6 @@ pub fn arena_print_doc_with_indent_resolved_into(
 pub fn arena_print_doc_with_indent_resolved_preserve_whitespace_into(
     arena: &DocArena,
     doc: DocId,
-    embed: &EmbedContext,
     start_column: usize,
     start_indent_level: usize,
     source: &str,
@@ -654,7 +638,6 @@ pub fn arena_print_doc_with_indent_resolved_preserve_whitespace_into(
         &RenderConfig::default(),
         arena,
         doc,
-        embed,
         start_column,
         start_indent_level,
         source,
@@ -673,7 +656,6 @@ pub fn arena_print_doc_with_indent_resolved_preserve_whitespace_into(
 pub fn arena_print_css_doc_into(
     arena: &DocArena,
     doc: DocId,
-    embed: &EmbedContext,
     start_column: usize,
     start_indent_level: usize,
     source: &str,
@@ -688,7 +670,6 @@ pub fn arena_print_css_doc_into(
         },
         arena,
         doc,
-        embed,
         start_column,
         start_indent_level,
         source,
@@ -700,13 +681,11 @@ pub fn arena_print_css_doc_into(
 /// ([`arena_print_doc_with_indent_resolved_preserve_whitespace_into`],
 /// [`arena_print_css_doc_into`]): a source-resolved render under `render`, with no
 /// final-line trim.
-#[expect(clippy::too_many_arguments)]
 #[inline]
 fn render_untrimmed_into(
     render: &RenderConfig,
     arena: &DocArena,
     doc: DocId,
-    embed: &EmbedContext,
     start_column: usize,
     start_indent_level: usize,
     source: &str,
@@ -719,7 +698,6 @@ fn render_untrimmed_into(
         &RenderCtx {
             arena,
             render,
-            embed,
             source: Some(source),
         },
         doc,
@@ -736,7 +714,6 @@ fn render_untrimmed_into(
 pub(crate) fn arena_print_doc_with_indent_and_render(
     arena: &DocArena,
     doc: DocId,
-    embed: &EmbedContext,
     start_column: usize,
     start_indent_level: usize,
     render: &RenderConfig,
@@ -748,7 +725,6 @@ pub(crate) fn arena_print_doc_with_indent_and_render(
         &RenderCtx {
             arena,
             render,
-            embed,
             source: None,
         },
         doc,
@@ -2077,7 +2053,6 @@ mod render_base_contract_tests {
         arena_print_doc_with_indent_resolved_into,
         arena_print_doc_with_indent_resolved_preserve_whitespace_into,
     };
-    use crate::EmbedContext;
     use crate::doc::arena::DocArena;
 
     /// A doc whose first command is a hard line break — the shape that reaches the
@@ -2091,17 +2066,16 @@ mod render_base_contract_tests {
     fn a_non_empty_base_lets_the_line_break_trim_reach_backwards() {
         let d = DocArena::new();
         let doc = break_first_doc(&d);
-        let embed = EmbedContext::default();
 
         // The contract-honouring shape: render into an empty buffer, then append.
         let mut scratch = String::new();
-        arena_print_doc_with_indent_resolved_into(&d, doc, &embed, 0, 0, "", &mut scratch);
+        arena_print_doc_with_indent_resolved_into(&d, doc, 0, 0, "", &mut scratch);
         let mut appended = String::from("x\t");
         appended.push_str(&scratch);
 
         // The same doc rendered into a buffer that already holds `"x\t"`.
         let mut in_place = String::from("x\t");
-        arena_print_doc_with_indent_resolved_into(&d, doc, &embed, 0, 0, "", &mut in_place);
+        arena_print_doc_with_indent_resolved_into(&d, doc, 0, 0, "", &mut in_place);
 
         assert_eq!(appended, "x\t\nb");
         assert_eq!(
@@ -2123,10 +2097,9 @@ mod render_base_contract_tests {
         // the final-line trim, which reaches back over an empty render outright.
         let d = DocArena::new();
         let empty_doc = d.text("");
-        let embed = EmbedContext::default();
 
         let mut in_place = String::from("x\t");
-        arena_print_doc_with_indent_resolved_into(&d, empty_doc, &embed, 0, 0, "", &mut in_place);
+        arena_print_doc_with_indent_resolved_into(&d, empty_doc, 0, 0, "", &mut in_place);
         assert_eq!(
             in_place, "x",
             "a doc that writes nothing still truncates a non-empty base"
@@ -2136,7 +2109,6 @@ mod render_base_contract_tests {
         arena_print_doc_with_indent_resolved_preserve_whitespace_into(
             &d,
             empty_doc,
-            &embed,
             0,
             0,
             "",
@@ -2154,12 +2126,11 @@ mod render_base_contract_tests {
         // The positive half: with nothing in front of the doc's first byte, both
         // shapes agree, which is the whole licence `write_arena_doc` takes.
         let d = DocArena::new();
-        let embed = EmbedContext::default();
         for doc in [break_first_doc(&d), d.text(""), d.text("b")] {
             let mut scratch = String::new();
-            arena_print_doc_with_indent_resolved_into(&d, doc, &embed, 0, 0, "", &mut scratch);
+            arena_print_doc_with_indent_resolved_into(&d, doc, 0, 0, "", &mut scratch);
             let mut in_place = String::new();
-            arena_print_doc_with_indent_resolved_into(&d, doc, &embed, 0, 0, "", &mut in_place);
+            arena_print_doc_with_indent_resolved_into(&d, doc, 0, 0, "", &mut in_place);
             assert_eq!(scratch, in_place);
         }
     }

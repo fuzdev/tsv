@@ -337,7 +337,6 @@ impl<'a> Printer<'a> {
                 tsv_lang::doc::arena_print_css_doc_into(
                     self.arena,
                     doc,
-                    &self.embed,
                     self.current_column(),
                     self.indent_level,
                     source,

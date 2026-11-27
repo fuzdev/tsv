@@ -8,8 +8,8 @@
  * driven by reality (each collection's total embedded CSS), not an arbitrary chunking
  * knob, and large files measure engine throughput rather than per-call fixed
  * costs. In the gates view the concats additionally exercise the *standalone*
- * CSS formatting path on real content (embedded CSS rides `EmbedContext` — a
- * different path), so this is conformance coverage too, not just perf sample
+ * CSS formatting path on real content (embedded CSS rides the Svelte host's
+ * embedded entry — a different path), so this is conformance coverage too, not just perf sample
  * size. The same bytes are also timed inside the svelte rows; rows are never
  * summed, so that's a disclosure note (benches/js/CLAUDE.md §Corpus), not a
  * distortion.

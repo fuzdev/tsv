@@ -411,7 +411,7 @@ impl<'a> Printer<'a> {
         // Built under the host's own embed: its `mode` stays Standalone, so the
         // embedded-root question does not fire and a root binary takes whatever its own
         // position says rather than ContinuationIndent.
-        let expr_doc = self.build_assignment_value_doc(expr, frozen, &self.embed, value_gap_start);
+        let expr_doc = self.build_assignment_value_doc(expr, frozen, self.embed, value_gap_start);
 
         // The run's last comment supplies the break the tag's `}` reuses —
         // `build_assignment_tag_doc` places that `}` in all three of its layouts, and

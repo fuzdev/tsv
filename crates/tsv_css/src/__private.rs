@@ -93,9 +93,10 @@ pub fn format_folded_in<'a>(
 
 /// Format an embedded CSS stylesheet into a caller-provided doc arena.
 ///
-/// `embed.base_indent_offset` seeds the indent so wrapped lines respect the host's
-/// indentation, and `source` is the whole host document (spans are absolute), so
-/// `line_table` is the host's whole-source table — never island-local.
+/// `indent_level` is the host indent level the stylesheet renders at: the printer starts
+/// there, so every line it breaks and indents itself lands at the host's indentation.
+/// `source` is the whole host document (spans are absolute), so `line_table` is the host's
+/// whole-source table — never island-local.
 ///
 /// The doc IR is built into `arena` rather than a freshly allocated one, so a Svelte host
 /// formatting a `<style>` block shares its own document arena instead of allocating a
@@ -112,7 +113,7 @@ pub fn format_embedded_in<'a>(
     stylesheet: impl Into<CssParsedRef<'a>>,
     source: &str,
     line_table: tsv_lang::printing::LineTable<'_>,
-    embed: tsv_lang::EmbedContext,
+    indent_level: usize,
     host_scan: HostBoundaryScan,
     arena: &tsv_lang::doc::arena::DocArena,
 ) -> String {
@@ -120,7 +121,7 @@ pub fn format_embedded_in<'a>(
         stylesheet.into(),
         source,
         line_table,
-        embed,
+        indent_level,
         host_scan,
         arena,
     )

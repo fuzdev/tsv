@@ -4,11 +4,11 @@
 
 ## Architecture Position
 
-Depends on `tsv_lang` for shared primitives (spans, doc builder, comments, embedding config). Consumed by `tsv_svelte` for `<style>` block embedding, and by `tsv_cli` / `tsv_wasm` / `tsv_ffi` / `tsv_napi` for top-level CSS files.
+Depends on `tsv_lang` for shared primitives (spans, doc builder, comments). Consumed by `tsv_svelte` for `<style>` block embedding, and by `tsv_cli` / `tsv_wasm` / `tsv_ffi` / `tsv_napi` for top-level CSS files.
 
 **Sources of truth**: Svelte's `parseCss` defines the public AST shape; Prettier's `css` printer defines formatter output. Both are checked at fixture-validation time.
 
-Standard `ast/lexer/parser/printer` crate layout — see [root CLAUDE.md §Project Structure](../../CLAUDE.md#project-structure) and [`tsv_lang/CLAUDE.md`](../tsv_lang/CLAUDE.md) for the cross-cutting types (`DocArena`, `Span`, `EmbedContext`). The internal-AST/wire-JSON split follows the workspace convention — see [root CLAUDE.md §AST Architecture](../../CLAUDE.md#ast-architecture-internal-ast-vs-wire-json).
+Standard `ast/lexer/parser/printer` crate layout — see [root CLAUDE.md §Project Structure](../../CLAUDE.md#project-structure) and [`tsv_lang/CLAUDE.md`](../tsv_lang/CLAUDE.md) for the cross-cutting types (`DocArena`, `Span`). The internal-AST/wire-JSON split follows the workspace convention — see [root CLAUDE.md §AST Architecture](../../CLAUDE.md#ast-architecture-internal-ast-vs-wire-json).
 
 ## Public API
 
@@ -26,7 +26,7 @@ Standard `ast/lexer/parser/printer` crate layout — see [root CLAUDE.md §Proje
 **Embedding** (`tsv_css::__private`, the hidden plumbing module; used by `tsv_svelte` for `<style>` blocks):
 
 - `parse_embedded(source, base_offset, host_nesting, stores: &mut CssStores) -> Result<CssStyleSheet>` — same parser, but span positions are shifted by `base_offset` so they index into the parent Svelte file; `stores` is the CSS half of the host document's stores for its top-level `<style>` (a `<style>` nested in markup, which the Svelte printer parses at format time, gets stores of its own)
-- `format_embedded_in(parsed: impl Into<CssParsedRef>, source, line_table, EmbedContext, HostBoundaryScan, &DocArena)` — starts its printer at `EmbedContext::base_indent_offset` (zeroed before anything renders) so wrapped lines respect outer Svelte indentation, building the CSS doc nodes into the host's doc arena rather than a fresh per-block one (it still renders to an owned `String`, and the arena is not reset so the host's in-flight nodes stay valid). Every `<style>` island takes it — the top-level section and a `<style>` nested in markup alike, each parsed at host offsets and formatted at the indent level it renders at. The Svelte host is its only caller, so there is no fresh-arena twin — an embedded stylesheet always has a host arena to lend
+- `format_embedded_in(parsed: impl Into<CssParsedRef>, source, line_table, indent_level, HostBoundaryScan, &DocArena)` — starts its printer at `indent_level`, the host indent level the island renders at, so wrapped lines respect outer Svelte indentation, building the CSS doc nodes into the host's doc arena rather than a fresh per-block one (it still renders to an owned `String`, and the arena is not reset so the host's in-flight nodes stay valid). Every `<style>` island takes it — the top-level section and a `<style>` nested in markup alike, each parsed at host offsets and formatted at the indent level it renders at. The Svelte host is its only caller, so there is no fresh-arena twin — an embedded stylesheet always has a host arena to lend
 - `HostBoundaryScan::of(source)` — the boundary-whitespace precondition (`printer/boundary_ws.rs` §The document precondition) over a whole host document, taken once per host and handed to every `format_embedded_in` call over it, so a component with several `<style>` islands pays one whole-source scan rather than one per island
 - `write_css_children` / `write_css_comments` — emit an embedded-`<style>` stylesheet's `children` and `comments` arrays (no `metadata`), the two adjacent keys `tsv_svelte`'s writer composes for the `<style>` element. The first takes the stylesheet as an `impl Into<CssParsedRef>` and returns the opaque `CssComments` run its walk gathered; the second spends it, reading no tree
 

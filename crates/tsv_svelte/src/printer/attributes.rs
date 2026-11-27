@@ -952,7 +952,7 @@ impl<'a> Printer<'a> {
         // is measured where it sits, unlike an unprefixed `{…}` value) plus the
         // leading-cast reflow every hugging braced head owes, and the clarity parens an
         // assignment owes (`{...(a = b)}`, `{@attach (a = b)}`).
-        let value_doc = self.build_head_value_doc(expr, frozen, &self.cannot_hang_embed());
+        let value_doc = self.build_head_value_doc(expr, frozen, self.cannot_hang_embed());
         let value_doc = self.wrap_value_clarity_parens(expr, value_doc);
 
         // The head's CONTENT only — the prefix and the `}` are the assembler's
@@ -1175,7 +1175,7 @@ impl<'a> Printer<'a> {
             jsdoc_cast_cannot_hang: host.cast_cannot_hang(),
             ..tsv_lang::EmbedContext::default()
         };
-        let value_doc = self.build_head_value_doc(expr, frozen, &embed);
+        let value_doc = self.build_head_value_doc(expr, frozen, embed);
         self.wrap_value_clarity_parens(expr, value_doc)
     }
 
@@ -1649,7 +1649,7 @@ impl<'a> Printer<'a> {
             .enumerate()
             .map(|(i, (expr, doc))| {
                 doc.unwrap_or_else(|| {
-                    self.build_head_value_doc(self.view.expr(*expr), frozen_at(i), &self.embed)
+                    self.build_head_value_doc(self.view.expr(*expr), frozen_at(i), self.embed)
                 })
             })
             .collect()

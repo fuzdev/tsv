@@ -1409,15 +1409,11 @@ impl<'a> Printer<'a> {
     ) -> Option<DocId> {
         let level = self.body_indent_level();
         let format_at = |level: usize| {
-            let embed = tsv_lang::EmbedContext {
-                base_indent_offset: level,
-                ..tsv_lang::EmbedContext::default()
-            };
             tsv_css::__private::format_embedded_in(
                 stylesheet,
                 self.source,
                 self.line_table(),
-                embed,
+                level,
                 self.css_host_scan(),
                 self.d(),
             )

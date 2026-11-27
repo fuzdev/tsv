@@ -34,7 +34,7 @@ mod values;
 use crate::ast::{Comment, CssBlockChild, CssDeclaration, CssNode, CssParsedRef, CssView};
 use crate::lexer::{Lexer, TokenKind};
 use tsv_lang::{
-    CommentFreeWindow, EmbedContext, INDENT, OutputBuffer, Span, TAB_WIDTH, comments_to_emit_from,
+    CommentFreeWindow, INDENT, OutputBuffer, Span, TAB_WIDTH, comments_to_emit_from,
     doc::{
         self, DocContext,
         arena::{DocArena, DocId},
@@ -49,8 +49,6 @@ pub(crate) struct Printer<'a> {
     buffer: OutputBuffer,
     /// Current indentation level
     pub(crate) indent_level: usize,
-    /// Embedding context (base indent offset, first-line offset, layout mode, etc.).
-    pub(crate) embed: EmbedContext,
     /// Arena allocator for doc nodes (borrowed so a multi-file driver can reuse
     /// one arena across files; see [`DocArena::reset`]).
     pub(crate) arena: &'a DocArena,
@@ -104,36 +102,26 @@ impl<'a> Printer<'a> {
         line_table: LineTable<'a>,
     ) -> Self {
         let holds_boundary_ws = source_holds_boundary_ws(source);
-        Self::with_embed(
-            arena,
-            source,
-            comments,
-            view,
-            line_table,
-            EmbedContext::default(),
-            holds_boundary_ws,
-        )
+        Self::with_boundary_scan(arena, source, comments, view, line_table, holds_boundary_ws)
     }
 
-    /// Create a new printer with the given embedding context. `source` is always a whole
-    /// document — a standalone stylesheet, or the Svelte host every `<style>` island (top
-    /// level or nested in markup) is spanned against — so a U+FEFF at its offset 0 is a
-    /// byte-order mark, and an island's content never sits there. `holds_boundary_ws` is
+    /// Create a new printer given the document's boundary-whitespace verdict. `source` is
+    /// always a whole document — a standalone stylesheet, or the Svelte host every `<style>`
+    /// island (top level or nested in markup) is spanned against — so a U+FEFF at its offset
+    /// 0 is a byte-order mark, and an island's content never sits there. `holds_boundary_ws` is
     /// [`source_holds_boundary_ws`] over that whole `source` — taken by the caller so a host
     /// with several islands scans once (`crate::__private::HostBoundaryScan`).
-    pub(crate) fn with_embed(
+    pub(crate) fn with_boundary_scan(
         arena: &'a DocArena,
         source: &'a str,
         comments: &'a [Comment],
         view: CssView<'a>,
         line_table: LineTable<'a>,
-        embed: EmbedContext,
         holds_boundary_ws: bool,
     ) -> Self {
         Self {
             buffer: OutputBuffer::with_capacity(source.len()),
             indent_level: 0,
-            embed,
             arena,
             source,
             comments,
@@ -579,7 +567,6 @@ impl<'a> Printer<'a> {
         doc::arena_print_css_doc_into(
             self.arena,
             d,
-            &self.embed,
             current_col,
             self.indent_level,
             self.source,
@@ -1373,15 +1360,15 @@ pub(crate) fn format_css_embedded_in(
     parsed: CssParsedRef<'_>,
     source: &str,
     line_table: LineTable<'_>,
-    embed: EmbedContext,
+    indent_level: usize,
     host_scan: crate::__private::HostBoundaryScan,
     arena: &DocArena,
 ) -> String {
     let stylesheet = parsed.stylesheet;
-    // Render at the host's final indentation directly (fold `base_indent_offset`
-    // into the starting `indent_level`, zeroing the offset), mirroring how the
-    // `<script>` embed renders the TS doc at `start_indent_level=1`. Structural
-    // lines get the wrapper indent from `write_indent` / hardlines; verbatim
+    // Render at the host's final indentation directly (`indent_level` is the
+    // printer's starting indent level), mirroring how the `<script>` embed
+    // renders the TS doc at `start_indent_level=1`. Structural lines get the
+    // wrapper indent from `write_indent` / hardlines; verbatim
     // content (raw at-rule preludes, comment interiors, `Invalid` selector text)
     // is written with no indent, so its embedded newlines stay at column 0 — the
     // same as standalone, matching prettier. This retires the Svelte host's
@@ -1394,21 +1381,15 @@ pub(crate) fn format_css_embedded_in(
     #[cfg(feature = "_internal_comment_check")]
     register_stylesheet_comments(parsed, source);
 
-    let base = embed.base_indent_offset;
-    let embed = EmbedContext {
-        base_indent_offset: 0,
-        ..embed
-    };
-    let mut printer = Printer::with_embed(
+    let mut printer = Printer::with_boundary_scan(
         arena,
         source,
         &stylesheet.comments,
         parsed.view,
         line_table,
-        embed,
         host_scan.holds_boundary_ws,
     );
-    printer.indent_level = base;
+    printer.indent_level = indent_level;
     printer.print_css_nodes(parsed.view.nodes(stylesheet.nodes));
     printer.into_string()
 }

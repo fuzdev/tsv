@@ -7235,7 +7235,7 @@ mod walk_memo_tests {
         DocArena, DocId, DocNode, FLATTEN_FRAMES, FlattenMode, LastLeaf, PendingRun, RUN_WIDTH_CAP,
         SuffixWalk, WALK_MEMO_AFTER, WalkMemo, WalkStore, test_memo_after,
     };
-    use crate::config::{EmbedContext, PRINT_WIDTH};
+    use crate::config::PRINT_WIDTH;
     use crate::doc::{Mode, arena_fits, arena_print_doc};
 
     /// A deterministic hash of the generator's seed and a node's path.
@@ -7355,7 +7355,7 @@ mod walk_memo_tests {
     }
 
     fn render(a: &DocArena, doc: DocId) -> String {
-        arena_print_doc(a, doc, &EmbedContext::default())
+        arena_print_doc(a, doc)
     }
 
     /// Every seed of the family, at every depth up to `max_depth`, as `(dag, tree)` — once

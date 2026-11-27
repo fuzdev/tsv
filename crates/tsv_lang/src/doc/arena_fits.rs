@@ -53,10 +53,9 @@ fn layout_to_width(v: u32) -> Option<u32> {
 /// carries it into the `rest_commands` look-ahead the same way — see
 /// `pending_flush` below.
 ///
-/// Takes no `EmbedContext`: a fits decision needs only the fixed
-/// [`crate::TAB_WIDTH`] and the caller's `remaining_width`. Text a host writes
-/// after an embedded doc is a trailing reserve node in the rest commands, charged
-/// here when the look-ahead reaches it flat.
+/// A fits decision needs only the fixed [`crate::TAB_WIDTH`] and the caller's
+/// `remaining_width`. Text a host writes after an embedded doc is a trailing reserve
+/// node in the rest commands, charged here when the look-ahead reaches it flat.
 pub(super) fn arena_fits_with_lookahead(
     arena: &DocArena,
     doc: DocId,

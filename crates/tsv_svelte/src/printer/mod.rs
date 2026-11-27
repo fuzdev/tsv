@@ -439,7 +439,7 @@ pub(crate) struct Printer<'a> {
     buffer: OutputBuffer,
     /// Current indentation level
     pub(crate) indent_level: usize,
-    /// Embedding context (layout mode, offsets)
+    /// Embedding context: the build-time layout axes (`EmbedContext`).
     embed: EmbedContext,
     /// Arena allocator for doc nodes (borrowed so a multi-file driver can reuse
     /// one arena across files; see [`DocArena::reset`]).
@@ -987,7 +987,7 @@ impl<'a> Printer<'a> {
         &self,
         expr: &Expression,
         frozen: bool,
-        embed: &EmbedContext,
+        embed: EmbedContext,
     ) -> DocId {
         if frozen {
             self.build_frozen_node_doc(expr.span())
@@ -998,7 +998,7 @@ impl<'a> Printer<'a> {
             // keys included ([`Self::build_ts_expression_doc`]).
             self.plain_source_span_doc(path)
         } else {
-            tsv_ts::__private::build_expression_doc(self.d(), expr, &self.ts_inputs(), *embed)
+            tsv_ts::__private::build_expression_doc(self.d(), expr, &self.ts_inputs(), embed)
         }
     }
 
@@ -1058,7 +1058,7 @@ impl<'a> Printer<'a> {
         &self,
         expr: &Expression,
         frozen: bool,
-        embed: &EmbedContext,
+        embed: EmbedContext,
         value_gap_start: Option<u32>,
     ) -> DocId {
         if frozen {
@@ -1068,7 +1068,7 @@ impl<'a> Printer<'a> {
                 self.d(),
                 expr,
                 &self.ts_inputs(),
-                *embed,
+                embed,
                 value_gap_start,
             )
         }
@@ -1580,7 +1580,7 @@ impl<'a> Printer<'a> {
     ///   `arena_print_doc_with_indent_resolved_preserve_whitespace_into` which preserves
     pub(crate) fn into_string(self) -> String {
         // Park the line-break scratch back on the arena for the next format
-        // (capacity retained, filled or not; see `with_embed`).
+        // (capacity retained, filled or not; see `with_line_breaks`).
         self.arena
             .park_line_breaks_scratch(self.line_breaks.into_scratch());
         self.buffer.into_string()
@@ -1610,7 +1610,6 @@ impl<'a> Printer<'a> {
         tsv_lang::doc::arena_print_doc_with_indent_resolved_preserve_whitespace_into(
             self.arena,
             d,
-            &self.embed,
             col,
             self.indent_level,
             self.source,
@@ -1629,7 +1628,7 @@ impl<'a> Printer<'a> {
     /// once there. For calls that need a custom embed context or empty comments, use the
     /// tsv_ts functions directly.
     pub(crate) fn build_ts_expression_doc(&self, expr: &Expression) -> DocId {
-        self.build_head_value_doc(expr, false, &self.embed)
+        self.build_head_value_doc(expr, false, self.embed)
     }
 
     /// [`Self::build_ts_expression_doc`] for a **braced-head** value: the host's embed plus
@@ -1638,7 +1637,7 @@ impl<'a> Printer<'a> {
     /// pattern printer's computed key use it; the main key arm reaches the same flag
     /// through [`Self::build_expression_doc_for_block`].
     pub(crate) fn build_ts_expression_doc_cannot_hang(&self, expr: &Expression) -> DocId {
-        self.build_head_value_doc(expr, false, &self.cannot_hang_embed())
+        self.build_head_value_doc(expr, false, self.cannot_hang_embed())
     }
 
     /// The host's embed plus `jsdoc_cast_cannot_hang` — the recipe for a hugging braced

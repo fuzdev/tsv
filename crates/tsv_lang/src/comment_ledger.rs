@@ -513,7 +513,6 @@ mod tests {
         // The renderer records a tagged comment node when it emits it; the flat
         // write-out records nothing, so while the ledger is armed it must refuse a doc
         // holding one — the fallback render then prints and records the comment once.
-        use crate::EmbedContext;
         use crate::doc::arena::DocArena;
         use crate::doc::{
             arena_print_doc_with_indent_resolved_preserve_whitespace_into,
@@ -524,7 +523,6 @@ mod tests {
         let ((refused, rendered, untagged), ledger) = with_check(|| {
             register_parsed(source, &comments);
             let d = DocArena::new();
-            let embed = EmbedContext::default();
             let comment = d.source_span(comments[0].span, source);
             d.tag_comment_doc(comment, comments[0].span, source);
             let doc = d.group(d.concat(&[comment, d.line(), d.text("x")]));
@@ -532,7 +530,7 @@ mod tests {
             let refused =
                 !arena_try_print_flat_into(&d, doc, 0, 0, 0, source, &mut out) && out.is_empty();
             arena_print_doc_with_indent_resolved_preserve_whitespace_into(
-                &d, doc, &embed, 0, 0, source, &mut out,
+                &d, doc, 0, 0, source, &mut out,
             );
             // A doc holding no tagged node is still written flat in the same arena.
             let mut plain = String::new();

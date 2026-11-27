@@ -142,17 +142,16 @@ mod arena_tests {
     #[cfg(feature = "_internal_comment_check")]
     use super::render_config::RenderPurpose;
     use super::*;
-    use crate::EmbedContext;
 
     /// Test helper: render with explicit width/indent overrides. Wraps the internal
     /// [`arena_print_doc_with_indent_and_render`] for compactness.
     fn render_test(arena: &DocArena, doc: DocId, render: &RenderConfig) -> String {
-        arena_print_doc_with_indent_and_render(arena, doc, &EmbedContext::default(), 0, 0, render)
+        arena_print_doc_with_indent_and_render(arena, doc, 0, 0, render)
     }
 
-    /// Test helper: render with default widths and the default embed context.
+    /// Test helper: render with default widths.
     fn render_default(arena: &DocArena, doc: DocId) -> String {
-        arena_print_doc(arena, doc, &EmbedContext::default())
+        arena_print_doc(arena, doc)
     }
 
     /// Test helper: render with explicit `print_width`, default indent.
@@ -887,18 +886,11 @@ mod arena_tests {
             #[cfg(feature = "_internal_comment_check")]
             purpose: RenderPurpose::Output,
         };
-        let embed = EmbedContext::default();
 
         let start_column = 6;
         let indent_level = 3;
-        let output = arena_print_doc_with_indent_and_render(
-            &a,
-            doc,
-            &embed,
-            start_column,
-            indent_level,
-            &render,
-        );
+        let output =
+            arena_print_doc_with_indent_and_render(&a, doc, start_column, indent_level, &render);
 
         assert!(
             !output.contains("a5555555555, a6666666666666666"),

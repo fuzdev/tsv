@@ -298,7 +298,7 @@ pub(crate) struct Printer<'a> {
     buffer: OutputBuffer,
     /// Current indentation level
     pub(crate) indent_level: usize,
-    /// Embedding context (base indent offset, first-line offset, layout mode, etc.).
+    /// Embedding context: the build-time layout axes (`EmbedContext`).
     pub(crate) embed: EmbedContext,
     /// Arena allocator for doc nodes (borrowed from caller or locally owned)
     pub(crate) arena: &'a DocArena,
@@ -1537,7 +1537,6 @@ impl<'a> Printer<'a> {
             doc::arena_print_doc_with_indent_resolved_into(
                 self.arena,
                 d,
-                &self.embed,
                 current_col,
                 self.indent_level,
                 self.source,
@@ -1554,7 +1553,6 @@ impl<'a> Printer<'a> {
         doc::arena_print_doc_with_indent_resolved_into(
             self.arena,
             d,
-            &self.embed,
             current_col,
             self.indent_level,
             self.source,
@@ -1566,7 +1564,7 @@ impl<'a> Printer<'a> {
 
     /// Render an arena DocId to a flat string with effectively infinite width.
     pub(crate) fn render_arena_doc_flat(&self, d: DocId) -> String {
-        doc::arena_measure_doc_flat_resolved(self.arena, d, &self.embed, self.source)
+        doc::arena_measure_doc_flat_resolved(self.arena, d, self.source)
     }
 
     /// Get the formatted output

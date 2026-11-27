@@ -80,7 +80,6 @@ impl<'a> Printer<'a> {
         doc::arena_print_doc_with_indent_resolved_into(
             self.d(),
             script_doc_id,
-            &embed,
             TAB_WIDTH, // start column = 1 tab's visual width
             1,         // start indent level = 1 (accounts for Svelte wrapper)
             self.source(),
@@ -136,13 +135,9 @@ impl<'a> Printer<'a> {
             // Pass the entire source to the CSS printer (CSS node spans are
             // absolute, which keeps blank-line detection correct) and share the
             // printer's whole-source line_breaks table rather than rebuilding it
-            // per <style> island. `base_indent_offset` is the wrapper indent level
-            // the CSS renders at directly (the CSS printer folds it into its
-            // starting `indent_level`), so the result needs no post-hoc re-indent.
-            let embed = tsv_lang::EmbedContext {
-                base_indent_offset: self.indent_level + 1,
-                ..tsv_lang::EmbedContext::default()
-            };
+            // per <style> island. The indent level passed is the wrapper indent level
+            // the CSS renders at directly (the CSS printer's starting
+            // `indent_level`), so the result needs no post-hoc re-indent.
             // Share the host document's doc arena rather than allocating a fresh
             // whole-host-sized one per `<style>` block. The embedded CSS renders
             // to its own string; only doc-node storage is shared, and the arena is
@@ -151,7 +146,7 @@ impl<'a> Printer<'a> {
                 style.css_parsed(self.css_view),
                 self.source(),
                 self.line_table(),
-                embed,
+                self.indent_level + 1,
                 self.css_host_scan(),
                 self.d(),
             );
@@ -261,7 +256,6 @@ impl<'a> Printer<'a> {
         doc::arena_print_doc_with_indent_resolved_preserve_whitespace_into(
             self.arena,
             doc,
-            &self.embed,
             col,
             self.indent_level,
             self.source(),

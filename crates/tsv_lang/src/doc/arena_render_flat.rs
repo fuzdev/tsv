@@ -139,12 +139,6 @@ use super::swallow::SwallowTracker;
 #[cfg(doc)]
 use super::types::DocContext;
 use super::types::{CachedWidth, DocText, LineKind, resolve_text};
-#[cfg(any(
-    debug_assertions,
-    feature = "_internal_swallow_check",
-    feature = "_internal_comment_check"
-))]
-use crate::EmbedContext;
 #[cfg(feature = "_internal_comment_check")]
 use crate::comment_ledger;
 
@@ -276,7 +270,6 @@ pub(super) fn try_print_flat(
             &RenderCtx {
                 arena,
                 render,
-                embed: &EmbedContext::default(),
                 source: Some(source),
             },
             doc,
@@ -504,7 +497,7 @@ mod tests {
     use super::super::render_config::RenderConfig;
     use super::super::types::DocContext;
     use super::{MAX_DEPTH, try_print_flat};
-    use crate::{EmbedContext, Span};
+    use crate::Span;
 
     /// What sits in the buffer ahead of the doc: it ends in the bytes a trim would eat.
     const BASE: &str = "base \t";
@@ -553,7 +546,6 @@ mod tests {
             &RenderCtx {
                 arena: a,
                 render,
-                embed: &EmbedContext::default(),
                 source: Some(source),
             },
             doc,

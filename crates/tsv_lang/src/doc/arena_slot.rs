@@ -173,12 +173,11 @@ pub fn parked_doc_arena_capacity() -> Option<usize> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::EmbedContext;
     use crate::doc::arena_print_doc;
 
     fn render(arena: &DocArena, word: &str) -> String {
         let id = arena.text_pooled(word);
-        arena_print_doc(arena, id, &EmbedContext::default())
+        arena_print_doc(arena, id)
     }
 
     // The arena is reset and reused across calls without the prior call's contents leaking:
@@ -334,7 +333,7 @@ mod tests {
             let (inner, inner_at) = one_shot("inner", true).expect("rendered");
             assert_ne!(inner_at, std::ptr::from_ref(outer) as usize);
             assert_eq!(inner, "inner");
-            arena_print_doc(outer, outer_id, &EmbedContext::default())
+            arena_print_doc(outer, outer_id)
         });
         assert_eq!(
             rendered, "outer",

@@ -194,7 +194,6 @@ pub(crate) fn note_line_end() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::EmbedContext;
     use crate::doc::arena::DocArena;
     use crate::doc::{arena_print_doc, arena_try_print_flat_into};
 
@@ -221,7 +220,7 @@ mod tests {
         let (_out, reports) = with_check(|d| {
             // `[ // c ]` collapsed flat: the `]` lands on the comment's line.
             let doc = d.concat(&[d.text("["), d.line_comment_text_pooled("// c"), d.text("]")]);
-            arena_print_doc(d, doc, &EmbedContext::default())
+            arena_print_doc(d, doc)
         });
         assert_eq!(reports.len(), 1, "expected one swallow");
         assert_eq!(reports[0].comment, "// c");
@@ -237,7 +236,7 @@ mod tests {
                 d.hardline(),
                 d.text("]"),
             ]);
-            arena_print_doc(d, doc, &EmbedContext::default())
+            arena_print_doc(d, doc)
         });
         assert!(
             reports.is_empty(),
@@ -250,7 +249,7 @@ mod tests {
         let (_out, reports) = with_check(|d| {
             // A plain text node (block comment shape) is not tagged → no swallow.
             let doc = d.concat(&[d.text("/* c */"), d.text("]")]);
-            arena_print_doc(d, doc, &EmbedContext::default())
+            arena_print_doc(d, doc)
         });
         assert!(reports.is_empty());
     }
@@ -269,7 +268,7 @@ mod tests {
                 d.line_suffix(d.line_comment_text_pooled(" // c2")),
                 d.hardline(),
             ]);
-            arena_print_doc(d, doc, &EmbedContext::default())
+            arena_print_doc(d, doc)
         });
         assert_eq!(
             out, "x; // c1 // c2\n",
@@ -308,9 +307,8 @@ mod tests {
         // render's piece is placed by its printer, which ends the line itself). The
         // flat write-out stands for a render, so text it writes is no swallow either.
         let (wrote, reports) = with_check(|d| {
-            let embed = EmbedContext::default();
             let pending = d.concat(&[d.text("x "), d.line_comment_text_pooled("// c")]);
-            let _ = arena_print_doc(d, pending, &embed);
+            let _ = arena_print_doc(d, pending);
             let mut out = String::new();
             arena_try_print_flat_into(d, d.text("y"), 0, 0, 0, "", &mut out) && out == "y"
         });
@@ -343,7 +341,7 @@ mod tests {
                 d.line_suffix(d.text(" /* c2 */")),
                 d.hardline(),
             ]);
-            arena_print_doc(d, doc, &EmbedContext::default())
+            arena_print_doc(d, doc)
         });
         assert_eq!(
             out, "x; /* c1 */ /* c2 */\n",
@@ -359,7 +357,7 @@ mod tests {
                 d.line_suffix(d.line_comment_text_pooled(" // c")),
                 d.hardline(),
             ]);
-            arena_print_doc(d, doc, &EmbedContext::default())
+            arena_print_doc(d, doc)
         });
         assert!(
             reports.is_empty(),

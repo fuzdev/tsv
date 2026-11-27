@@ -777,7 +777,7 @@ function assemble_entries(snapshot_entries: CorpusEntry[], live_trees: LiveTree[
 		// Derived but real content: component CSS beside the standalone files (which are
 		// mostly CSS-framework source), in naturally-sized files, and in the gates view
 		// exercises the *standalone* CSS
-		// path on real content (embedded CSS rides EmbedContext — a different path).
+		// path on real content (embedded CSS rides the Svelte host's embedded entry — a different path).
 		// The same bytes are also timed in the svelte rows; rows are never summed.
 		{
 			path: SVELTE_STYLES_CACHE,
