@@ -373,10 +373,11 @@ release side is the root [CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
   [docs/tasks.md §`publish:napi`](../../docs/tasks.md#publishnapi)) — completeness (addon + CLI binary per platform) and
   version-lockstep checks, re-arming the CLI binaries' executable bit (artifact transport
   drops file modes — without it every posix `npx tsv` would EACCES), platforms-then-loader
-  order, idempotent skip-if-published. Under `--dry-run` it skips nothing and runs
+  order, idempotent skip-if-published. It is a **dry run unless `--wetrun`** (which the job
+  passes only on a real publish): a dry run skips nothing and runs
   `npm publish --dry-run` over every package, reading npm's already-published refusal as a
   pass, so the dispatch and cron rehearsals really pack the set between releases. Locally,
-  `npm run publish:napi -- --dry-run` proves staging + the refusal logic, then **stops at
+  `npm run publish:napi` proves staging + the refusal logic, then **stops at
   the partial-set refusal by design** — local staging holds only the host platform; the
   full-set rehearsal is the `workflow_dispatch` dry run.
 - **Auth**: a granular `NPM_TOKEN` secret from the bootstrap releases (trusted publishing

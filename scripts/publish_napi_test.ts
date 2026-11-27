@@ -123,7 +123,12 @@ describe('a real publish', () => {
 	test('views then publishes each package, platforms first and the loader last', async () => {
 		const world = fake_world({ replies: not_on_registry });
 		strictEqual(
-			await run_publish_napi(world.deps, ['--provenance', '--expect-tag', `v${VERSION}`]),
+			await run_publish_napi(world.deps, [
+				'--wetrun',
+				'--provenance',
+				'--expect-tag',
+				`v${VERSION}`
+			]),
 			0
 		);
 		deepStrictEqual(world.npm, [
@@ -145,7 +150,7 @@ describe('a real publish', () => {
 
 	test('without --provenance the publish argv carries neither flag', async () => {
 		const world = fake_world({ replies: not_on_registry });
-		strictEqual(await run_publish_napi(world.deps, []), 0);
+		strictEqual(await run_publish_napi(world.deps, ['--wetrun']), 0);
 		deepStrictEqual(
 			world.npm.filter((args) => args[0] === 'publish').map((args) => args.slice(2)),
 			[
@@ -165,7 +170,7 @@ describe('a real publish', () => {
 						: E404
 					: undefined
 		});
-		strictEqual(await run_publish_napi(world.deps, ['--provenance']), 0);
+		strictEqual(await run_publish_napi(world.deps, ['--wetrun', '--provenance']), 0);
 		deepStrictEqual(
 			world.npm.map((args) => args.slice(0, 2)),
 			[
@@ -188,7 +193,7 @@ describe('a real publish', () => {
 		const world = fake_world({
 			replies: (args) => (args[0] === 'view' ? { stdout: VERSION } : undefined)
 		});
-		strictEqual(await run_publish_napi(world.deps, ['--provenance']), 0);
+		strictEqual(await run_publish_napi(world.deps, ['--wetrun', '--provenance']), 0);
 		deepStrictEqual(
 			world.npm.map((args) => args[0]),
 			['view', 'view', 'view']
@@ -200,7 +205,7 @@ describe('a real publish', () => {
 		const world = fake_world({
 			replies: (args) => (args[0] === 'view' ? { stdout: '1.2.2' } : undefined)
 		});
-		strictEqual(await run_publish_napi(world.deps, []), 0);
+		strictEqual(await run_publish_napi(world.deps, ['--wetrun']), 0);
 		strictEqual(world.out.at(-1), `published 3, skipped 0 (of 3) at v${VERSION}`);
 	});
 
@@ -212,7 +217,7 @@ describe('a real publish', () => {
 		const world = fake_world({
 			replies: (args) => (args[0] === 'view' ? { code: 1, stderr } : undefined)
 		});
-		strictEqual(await run_publish_napi(world.deps, []), 1);
+		strictEqual(await run_publish_napi(world.deps, ['--wetrun']), 1);
 		strictEqual(world.err[0], `FAIL: npm view ${GNU}@${VERSION} errored (not E404):`);
 		deepStrictEqual(world.out, []);
 	});
@@ -233,10 +238,10 @@ describe('a real publish', () => {
 			};
 		const all = new Set([GNU, WIN, '@fuzdev/tsv'].map((name) => `${name}@${VERSION}`));
 		const rerun = fake_world({ replies: json_npm(all) });
-		strictEqual(await run_publish_napi(rerun.deps, []), 0);
+		strictEqual(await run_publish_napi(rerun.deps, ['--wetrun']), 0);
 		strictEqual(rerun.out.at(-1), `published 0, skipped 3 (of 3) at v${VERSION}`);
 		const fresh = fake_world({ replies: json_npm(new Set()) });
-		strictEqual(await run_publish_napi(fresh.deps, []), 0);
+		strictEqual(await run_publish_napi(fresh.deps, ['--wetrun']), 0);
 		strictEqual(fresh.out.at(-1), `published 3, skipped 0 (of 3) at v${VERSION}`);
 	});
 
@@ -245,7 +250,7 @@ describe('a real publish', () => {
 			replies: (args) =>
 				args[0] === 'view' ? { code: 1, stderr: '  npm error code E401\n' } : undefined
 		});
-		strictEqual(await run_publish_napi(world.deps, ['--provenance']), 1);
+		strictEqual(await run_publish_napi(world.deps, ['--wetrun', '--provenance']), 1);
 		deepStrictEqual(world.npm, [['view', `${GNU}@${VERSION}`, 'version', '--json=false']]);
 		deepStrictEqual(world.err, [
 			`FAIL: npm view ${GNU}@${VERSION} errored (not E404):`,
@@ -258,7 +263,7 @@ describe('a real publish', () => {
 		const world = fake_world({
 			replies: (args) => (args[0] === 'view' ? { code: 1, stdout: 'offline\n' } : undefined)
 		});
-		strictEqual(await run_publish_napi(world.deps, []), 1);
+		strictEqual(await run_publish_napi(world.deps, ['--wetrun']), 1);
 		strictEqual(world.err.at(-1), 'offline');
 	});
 
@@ -271,7 +276,7 @@ describe('a real publish', () => {
 						? { code: 1, stderr: 'npm error code E403\n' }
 						: undefined
 		});
-		strictEqual(await run_publish_napi(world.deps, ['--provenance']), 1);
+		strictEqual(await run_publish_napi(world.deps, ['--wetrun', '--provenance']), 1);
 		deepStrictEqual(
 			world.npm.map((args) => args.slice(0, 2)),
 			[
@@ -297,15 +302,15 @@ describe('a real publish', () => {
 							stderr: 'You cannot publish over the previously published versions: 1.2.3.'
 						}
 		});
-		strictEqual(await run_publish_napi(world.deps, []), 1);
+		strictEqual(await run_publish_napi(world.deps, ['--wetrun']), 1);
 		strictEqual(world.err[0], `FAIL: npm publish ${GNU}@${VERSION} exited 1:`);
 	});
 });
 
 describe('a dry run', () => {
-	test('views nothing and packs every package with --dry-run', async () => {
+	test('without --wetrun, views nothing and packs every package with --dry-run', async () => {
 		const world = fake_world({ replies: () => ({ code: 0 }) });
-		strictEqual(await run_publish_napi(world.deps, ['--dry-run']), 0);
+		strictEqual(await run_publish_napi(world.deps, []), 0);
 		deepStrictEqual(world.npm, [
 			['publish', `${PKG}/linux-x64-gnu`, '--access', 'public', '--dry-run'],
 			['publish', `${PKG}/win32-x64`, '--access', 'public', '--dry-run'],
@@ -327,7 +332,7 @@ describe('a dry run', () => {
 							stderr: 'npm error You cannot publish over the previously published versions: 1.2.3.'
 						}
 		});
-		strictEqual(await run_publish_napi(world.deps, ['--dry-run', '--provenance']), 0);
+		strictEqual(await run_publish_napi(world.deps, ['--provenance']), 0);
 		deepStrictEqual(world.out, [
 			`npm publish ${PKG}/linux-x64-gnu --access public --provenance --dry-run`,
 			`PASS: ${GNU} packs cleanly (v${VERSION} already on the registry)`,
@@ -346,7 +351,7 @@ describe('a dry run', () => {
 					'Cannot implicitly apply the "latest" tag because previously published version 2.0.0 is higher'
 			})
 		});
-		strictEqual(await run_publish_napi(world.deps, ['--dry-run']), 1);
+		strictEqual(await run_publish_napi(world.deps, []), 1);
 		strictEqual(world.npm.length, 1);
 		strictEqual(world.err[0], `FAIL: npm publish ${GNU}@${VERSION} exited 1:`);
 	});
@@ -355,7 +360,7 @@ describe('a dry run', () => {
 describe('the staged set', () => {
 	test('re-arms the posix CLI binary to 0o755 and verifies it, never the Windows one', async () => {
 		const world = fake_world({ replies: not_on_registry });
-		strictEqual(await run_publish_napi(world.deps, []), 0);
+		strictEqual(await run_publish_napi(world.deps, ['--wetrun']), 0);
 		const binary = at(`${PKG}/linux-x64-gnu/tsv`);
 		deepStrictEqual(
 			world.calls.filter(([op]) => op === 'set_mode' || op === 'mode'),
@@ -368,7 +373,7 @@ describe('the staged set', () => {
 
 	test('the mode is set before any npm run', async () => {
 		const world = fake_world({ replies: not_on_registry });
-		await run_publish_napi(world.deps, []);
+		await run_publish_napi(world.deps, ['--wetrun']);
 		const first_npm = world.calls.findIndex(([op]) => op === 'npm');
 		const last_mode = world.calls.findLastIndex(([op]) => op === 'mode');
 		strictEqual(last_mode < first_npm, true);
@@ -376,7 +381,7 @@ describe('the staged set', () => {
 
 	test('a Windows host sets no mode', async () => {
 		const world = fake_world({ replies: not_on_registry, platform: 'win32' });
-		strictEqual(await run_publish_napi(world.deps, []), 0);
+		strictEqual(await run_publish_napi(world.deps, ['--wetrun']), 0);
 		deepStrictEqual(
 			world.calls.filter(([op]) => op === 'set_mode' || op === 'mode'),
 			[]
@@ -385,7 +390,7 @@ describe('the staged set', () => {
 
 	test('a mode that does not take refuses the set, and nothing runs npm', async () => {
 		const world = fake_world({ replies: not_on_registry, resist_mode: true });
-		strictEqual(await run_publish_napi(world.deps, []), 1);
+		strictEqual(await run_publish_napi(world.deps, ['--wetrun']), 1);
 		deepStrictEqual(world.err, [
 			`NOT EXECUTABLE: ${PKG}/linux-x64-gnu/tsv — chmod 755 did not take`,
 			'FAIL: refusing to publish a partial set'
@@ -398,7 +403,7 @@ describe('the staged set', () => {
 		files.delete(at(`${PKG}/linux-x64-gnu/tsv_napi.node`));
 		files.delete(at(`${PKG}/win32-x64/tsv.exe`));
 		const world = fake_world({ files, replies: not_on_registry });
-		strictEqual(await run_publish_napi(world.deps, ['--provenance']), 1);
+		strictEqual(await run_publish_napi(world.deps, ['--wetrun', '--provenance']), 1);
 		deepStrictEqual(world.err, [
 			`MISSING: ${PKG}/linux-x64-gnu/tsv_napi.node (${GNU}) — did its matrix job fail?`,
 			`MISSING: ${PKG}/win32-x64/tsv.exe (${WIN}) — did its matrix job fail?`,
@@ -420,7 +425,7 @@ describe('the staged set', () => {
 			const files = staged_files({ [GNU]: pin });
 			files.set(at(`${PKG}/linux-x64-gnu/package.json`), JSON.stringify({ name, version }));
 			const world = fake_world({ files, replies: not_on_registry });
-			strictEqual(await run_publish_napi(world.deps, []), 1);
+			strictEqual(await run_publish_napi(world.deps, ['--wetrun']), 1);
 			deepStrictEqual(world.err, [
 				`MISMATCH: ${PKG}/linux-x64-gnu stages ${name}@${version}, loader pins ${GNU}@${pin}, ` +
 					`loader version ${VERSION}`,
@@ -432,7 +437,7 @@ describe('the staged set', () => {
 
 	test('a tag the staged version disagrees with is refused before the set is read', async () => {
 		const world = fake_world({ replies: not_on_registry });
-		strictEqual(await run_publish_napi(world.deps, ['--expect-tag', 'v1.2.4']), 1);
+		strictEqual(await run_publish_napi(world.deps, ['--wetrun', '--expect-tag', 'v1.2.4']), 1);
 		deepStrictEqual(world.err, [
 			`FAIL: staged version v${VERSION} does not match the triggering tag v1.2.4 — ` +
 				'the checkout and the staged artifacts disagree'
@@ -442,7 +447,7 @@ describe('the staged set', () => {
 
 	test('an unreadable loader package.json fails, naming it and the error', async () => {
 		const world = fake_world({ files: new Map() });
-		strictEqual(await run_publish_napi(world.deps, []), 1);
+		strictEqual(await run_publish_napi(world.deps, ['--wetrun']), 1);
 		deepStrictEqual(world.err, [
 			`FAIL: cannot read ${PKG}/napi/package.json — is the set staged?`,
 			`Error: ENOENT: ${at(`${PKG}/napi/package.json`)}`
@@ -453,7 +458,7 @@ describe('the staged set', () => {
 		const files = staged_files();
 		files.set(at(`${PKG}/win32-x64/package.json`), '{');
 		const world = fake_world({ files, replies: not_on_registry });
-		strictEqual(await run_publish_napi(world.deps, []), 1);
+		strictEqual(await run_publish_napi(world.deps, ['--wetrun']), 1);
 		strictEqual(
 			world.err[0],
 			`FAIL: cannot read ${PKG}/win32-x64/package.json — is the set staged?`
@@ -471,7 +476,7 @@ describe('the staged set', () => {
 				]
 			]);
 			const world = fake_world({ files });
-			strictEqual(await run_publish_napi(world.deps, []), 1);
+			strictEqual(await run_publish_napi(world.deps, ['--wetrun']), 1);
 			deepStrictEqual(world.err, [
 				'FAIL: loader package.json has no optionalDependencies — stale staging?'
 			]);
@@ -484,7 +489,7 @@ describe('the staged set', () => {
 		const world = fake_world({ files, replies: not_on_registry });
 		strictEqual(files.has(at(`${PKG}/${name}/tsv`)), true);
 		await rejects(
-			run_publish_napi(world.deps, []),
+			run_publish_napi(world.deps, ['--wetrun']),
 			/refusing to set a mode outside crates\/tsv_napi\/pkg/
 		);
 		deepStrictEqual(
@@ -496,7 +501,7 @@ describe('the staged set', () => {
 
 	test('every path it reads is beneath the checkout', async () => {
 		const world = fake_world({ replies: not_on_registry });
-		await run_publish_napi(world.deps, []);
+		await run_publish_napi(world.deps, ['--wetrun']);
 		const paths = world.calls.filter(([op]) => op !== 'npm').map(([, path]) => String(path));
 		strictEqual(paths.length > 0, true);
 		deepStrictEqual(
@@ -508,7 +513,7 @@ describe('the staged set', () => {
 
 describe('arguments', () => {
 	test('an unknown flag or a positional throws before anything is read', async () => {
-		for (const argv of [['--wetrun'], ['v1.2.3'], ['--', '--dry-run']]) {
+		for (const argv of [['--dry-run'], ['--wet-run'], ['v1.2.3'], ['--', '--wetrun']]) {
 			const world = fake_world();
 			await rejects(run_publish_napi(world.deps, argv), TypeError);
 			deepStrictEqual(world.calls, []);

@@ -538,14 +538,15 @@ jobs:
           if [ "$GITHUB_REF_TYPE" = "tag" ]; then
             flags+=(--expect-tag "$GITHUB_REF_NAME")
           fi
+          # The script is a dry run unless `--wetrun`, so a rehearsal passes no flag of its own.
           if [ "$GITHUB_EVENT_NAME" = "schedule" ] || [ "$DRY_RUN" = "true" ]; then
             # schedule is ALWAYS dry-run — see the trigger comment.
-            flags+=(--dry-run)
+            :
           elif [ "$GITHUB_REF_TYPE" != "tag" ]; then
             echo "::error::refusing a real publish off the non-tag ref '$GITHUB_REF_NAME' — dispatch it on the release tag"
             exit 1
           else
-            flags+=(--provenance)
+            flags+=(--wetrun --provenance)
           fi
           node scripts/roots/publish_napi.ts "${flags[@]}"
 

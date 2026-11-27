@@ -1,8 +1,8 @@
 /**
- * Publish the staged N-API npm packages — the release workflow's publish step,
- * also runnable locally with `--dry-run` (`npm run publish:napi -- --dry-run`). A local
- * run stages only the HOST platform package, so it deliberately ends at
- * the partial-set refusal below: staging + the refusal logic proven, nothing
+ * Publish the staged N-API npm packages — the release workflow's publish step. A dry run
+ * unless `--wetrun`, like `release` and `publish:crates`, so a local `npm run publish:napi`
+ * publishes nothing. A local run stages only the HOST platform package, so it deliberately
+ * ends at the partial-set refusal below: staging + the refusal logic proven, nothing
  * published. The full-set rehearsal is the release workflow's dispatch dry run.
  *
  * Reads `crates/tsv_napi/pkg/`: the loader (`pkg/napi/`) plus every platform
@@ -25,7 +25,7 @@
  * `scripts/publish.ts`: a version already on the registry is skipped
  * (re-running a partially-failed workflow publishes only what's missing).
  * `npm view` errors other than E404 (auth, network) fail loudly rather than
- * being read as "not published". A `--dry-run` skips that check and runs
+ * being read as "not published". A dry run skips that check and runs
  * `npm publish --dry-run` over every package, reading npm's already-published
  * refusal as a pass — the rehearsal must pack each package even when its
  * version is live, which a dispatch or cron dry run between releases always is.
@@ -36,11 +36,13 @@
  * the checkout, so the package directories it names (`crates/tsv_napi/pkg/<triple>`) are the
  * ones checked.
  *
- * Usage: node scripts/roots/publish_napi.ts [--dry-run] [--provenance] [--expect-tag v<version>]
+ * Usage: node scripts/roots/publish_napi.ts [--wetrun] [--provenance] [--expect-tag v<version>]
  *
- * `--provenance` is passed by the release workflow (needs the workflow's
- * `id-token: write`); `--expect-tag` asserts the staged version matches the
- * triggering tag before anything publishes.
+ * `--wetrun` publishes for real; without it every package is packed with
+ * `npm publish --dry-run`. A flag `parseArgs` doesn't know, a misspelled `--wetrun` among
+ * them, throws before anything runs. `--provenance` is passed by the release workflow
+ * (needs the workflow's `id-token: write`); `--expect-tag` asserts the staged version
+ * matches the triggering tag before anything publishes.
  *
  * @module
  */
@@ -90,7 +92,7 @@ class PublishNapiExit extends Error {}
 /**
  * Check the staged set, re-arm the CLI binaries' mode, and publish platforms then loader
  * (module doc).
- * @returns the exit code: 0 once every package is published, skipped, or (under `--dry-run`)
+ * @returns the exit code: 0 once every package is published, skipped, or (in a dry run)
  *   packed; 1 for an unreadable package.json, a loader with no platforms, a tag the staged
  *   version disagrees with, a partial or mismatched set, a binary whose mode didn't take, an
  *   `npm view` error other than E404, or a failed `npm publish`
@@ -105,7 +107,7 @@ export async function run_publish_napi(
 	const { values: args } = parseArgs({
 		args: argv,
 		options: {
-			'dry-run': { type: 'boolean' },
+			wetrun: { type: 'boolean' },
 			provenance: { type: 'boolean' },
 			'expect-tag': { type: 'string' }
 		}
@@ -121,8 +123,9 @@ export async function run_publish_napi(
 
 const publish = async (
 	deps: PublishNapiDeps,
-	args: { 'dry-run'?: boolean; provenance?: boolean; 'expect-tag'?: string }
+	args: { wetrun?: boolean; provenance?: boolean; 'expect-tag'?: string }
 ): Promise<void> => {
+	const dry_run = args.wetrun !== true;
 	const at = (path: string): string => join(deps.checkout, path);
 	const fail = (...lines: Array<string>): never => {
 		for (const line of lines) deps.print_error(line);
@@ -232,7 +235,7 @@ const publish = async (
 		// --dry-run` over every package (the rehearsal release.yml's dispatch and weekly
 		// cron promise), and the staged version is usually already live there — skipping
 		// those would rehearse nothing.
-		if (!args['dry-run'] && (await already_published(name))) {
+		if (!dry_run && (await already_published(name))) {
 			deps.print(`skip: ${name}@${version} already on the registry`);
 			skipped++;
 			continue;
@@ -243,11 +246,11 @@ const publish = async (
 			'--access',
 			'public',
 			...(args.provenance ? ['--provenance'] : []),
-			...(args['dry-run'] ? ['--dry-run'] : [])
+			...(dry_run ? ['--dry-run'] : [])
 		];
 		deps.print(`npm ${publish_args.join(' ')}`);
 		const res = await npm(publish_args);
-		if (res.code !== 0 && args['dry-run'] && ALREADY_PUBLISHED.test(res.stderr)) {
+		if (res.code !== 0 && dry_run && ALREADY_PUBLISHED.test(res.stderr)) {
 			deps.print(`PASS: ${name} packs cleanly (v${version} already on the registry)`);
 			skipped++;
 			continue;
@@ -258,7 +261,7 @@ const publish = async (
 		published++;
 	}
 	deps.print(
-		args['dry-run']
+		dry_run
 			? `DRY-RUN: ${published + skipped} of ${to_publish.length} packed cleanly at v${version} ` +
 					`(${published} would publish, ${skipped} already on the registry)`
 			: `published ${published}, skipped ${skipped} (of ${to_publish.length}) at v${version}`
