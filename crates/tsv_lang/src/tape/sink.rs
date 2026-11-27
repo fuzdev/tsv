@@ -334,17 +334,26 @@ impl TapeWriter<'_> {
         self.sink.tape.push(0);
     }
 
-    /// The open record's entry's field `key` (`None` with no record open, or a key it lacks) —
-    /// for a writer's debug assertion about a field it writes without declaring the key. Debug
-    /// builds alone: it asks the generated lookup by name, which no release build carries.
-    #[cfg(all(feature = "_tape_literals", debug_assertions))]
-    #[must_use]
-    pub fn t_top_field(&self, key: &str) -> Option<Field> {
-        match self.sink.frames.last() {
+    /// Hands `check` the open record's entry's field `key` (`None` with no record open, or a
+    /// key it lacks) — for a writer's assertion about a field it writes without declaring the
+    /// key. Debug builds of this crate alone: it asks the generated lookup by name, which no
+    /// release build carries. A site calls it in every build, so a writer crate and this one
+    /// may differ in debug assertions; in a release build of this crate it is empty.
+    #[cfg(feature = "_tape_literals")]
+    #[expect(
+        clippy::inline_always,
+        reason = "empty in a release build: no call may survive at a site"
+    )]
+    #[inline(always)]
+    pub fn t_top_field_debug(&self, key: &str, check: impl FnOnce(Option<Field>)) {
+        #[cfg(debug_assertions)]
+        check(match self.sink.frames.last() {
             Some(f) if f.entry < OBJECT => shapes::field_named(f.entry, key.as_bytes())
                 .map(|i| shapes::ENTRIES[usize::from(f.entry)].fields[usize::from(i)]),
             _ => None,
-        }
+        });
+        #[cfg(not(debug_assertions))]
+        let _ = (key, check);
     }
 
     /// The open record's entry, or `None` with no record open on top.

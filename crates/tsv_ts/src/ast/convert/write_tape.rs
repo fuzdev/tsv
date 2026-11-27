@@ -105,12 +105,14 @@ fn header_run<const CHARACTER: bool>(
 /// tape copy's hottest.
 #[inline]
 fn write_name_field(w: &mut TapeWriter<'_>, name: ast::IdentName, name_start: u32, ctx: &Ctx<'_>) {
-    #[cfg(debug_assertions)]
-    debug_assert!(
-        w.t_top_field("name")
-            .is_some_and(|f| f.enc == tsv_lang::tape::Enc::Ref && f.bit == tsv_lang::tape::NO_BIT),
-        "an identifier's name is a required ref of the open record"
-    );
+    w.t_top_field_debug("name", |field| {
+        assert!(
+            field.is_some_and(
+                |f| f.enc == tsv_lang::tape::Enc::Ref && f.bit == tsv_lang::tape::NO_BIT
+            ),
+            "an identifier's name is a required ref of the open record"
+        );
+    });
     match name.escaped {
         Some(id) => w.string(ctx.view.escaped_text(id)),
         None => {
