@@ -23,7 +23,7 @@ use tsv_lang::Span;
 pub(super) fn write_decorator(w: &mut Sink<'_>, decorator: &ast::Decorator, ctx: &Ctx<'_>) {
     let parenthesized = decorator.span.end > ctx.view.expr(decorator.expression).span().end;
     node_header!(w, "Decorator", decorator.span, ctx);
-    raw!(w, "Decorator", ",\"expression\":");
+    keyed!(w, "Decorator", ",\"expression\":");
     write_expression_inner(
         w,
         ctx.view.expr(decorator.expression),
@@ -47,7 +47,7 @@ pub(super) fn write_decorators_field<const E: u16>(
     ctx: &Ctx<'_>,
 ) {
     if let Some(decs) = decorators {
-        raw!(w, @E, ",\"decorators\":");
+        keyed!(w, @E, ",\"decorators\":");
         write_array(w, decs, |w, d| write_decorator(w, d, ctx));
     }
 }
@@ -61,14 +61,14 @@ pub(super) fn write_type_alias_declaration(
     ctx: &Ctx<'_>,
 ) {
     node_header!(w, "TSTypeAliasDeclaration", span, ctx);
-    raw!(w, "TSTypeAliasDeclaration", ",\"id\":");
+    keyed!(w, "TSTypeAliasDeclaration", ",\"id\":");
     write_identifier_plain(w, &type_alias.id, ctx);
     write_type_parameters_field::<{ at!("TSTypeAliasDeclaration") }>(
         w,
         type_alias.type_parameters.as_ref(),
         ctx,
     );
-    raw!(w, "TSTypeAliasDeclaration", ",\"typeAnnotation\":");
+    keyed!(w, "TSTypeAliasDeclaration", ",\"typeAnnotation\":");
     write_type(w, ctx.view.ty(type_alias.type_annotation), ctx);
     if type_alias.declare {
         raw!(w, "TSTypeAliasDeclaration", ",\"declare\":true");
@@ -85,7 +85,7 @@ pub(super) fn write_function_declaration(
     ctx: &Ctx<'_>,
 ) {
     node_header!(w, "FunctionDeclaration", func_decl.span, ctx);
-    raw!(w, "FunctionDeclaration", ",\"id\":");
+    keyed!(w, "FunctionDeclaration", ",\"id\":");
     write_or_null(w, func_decl.id.as_ref(), |w, id| {
         write_identifier_plain(w, id, ctx);
     });
@@ -99,14 +99,14 @@ pub(super) fn write_function_declaration(
         func_decl.type_parameters.as_ref(),
         ctx,
     );
-    raw!(w, "FunctionDeclaration", ",\"params\":");
+    keyed!(w, "FunctionDeclaration", ",\"params\":");
     write_expressions(w, ctx.view.exprs(func_decl.params), ctx);
     write_return_type_field::<{ at!("FunctionDeclaration") }>(
         w,
         func_decl.return_type.as_ref(),
         ctx,
     );
-    raw!(w, "FunctionDeclaration", ",\"body\":");
+    keyed!(w, "FunctionDeclaration", ",\"body\":");
     write_block_statement(w, &func_decl.body, ctx);
     close_node(w, "FunctionDeclaration", func_decl.span, ctx);
 }
@@ -151,19 +151,19 @@ fn write_super_class_fields<const E: u16>(
         super_type_parameters.map(|tp| tp.span.end),
         ctx.source,
     );
-    raw!(w, @E, ",\"superClass\":");
+    keyed!(w, @E, ",\"superClass\":");
     if let (Some(e), Some(stp), Some(ws)) = (super_class, super_type_parameters, wrap_span) {
         // Wrapped: `superTypeParameters` is consumed into the wrapper.
         node_header!(w, "TSInstantiationExpression", ws, ctx);
-        raw!(w, "TSInstantiationExpression", ",\"expression\":");
+        keyed!(w, "TSInstantiationExpression", ",\"expression\":");
         write_expression(w, e, ctx);
-        raw!(w, "TSInstantiationExpression", ",\"typeArguments\":");
+        keyed!(w, "TSInstantiationExpression", ",\"typeArguments\":");
         write_type_parameter_instantiation(w, stp, ctx);
         close_node(w, "TSInstantiationExpression", ws, ctx);
     } else {
         write_or_null(w, super_class, |w, e| write_expression(w, e, ctx));
         if let Some(stp) = super_type_parameters {
-            raw!(w, @E, ",\"superTypeParameters\":");
+            keyed!(w, @E, ",\"superTypeParameters\":");
             write_type_parameter_instantiation(w, stp, ctx);
         }
     }
@@ -192,7 +192,7 @@ pub(super) fn write_class_declaration(
         ctx.view.opt_decorators(class_decl.decorators),
         ctx,
     );
-    raw!(w, "ClassDeclaration", ",\"id\":");
+    keyed!(w, "ClassDeclaration", ",\"id\":");
     write_or_null(w, class_decl.id.as_ref(), |w, id| {
         write_identifier_plain(w, id, ctx);
     });
@@ -213,7 +213,7 @@ pub(super) fn write_class_declaration(
         ctx.view.heritages(class_decl.implements),
         ctx,
     );
-    raw!(w, "ClassDeclaration", ",\"body\":");
+    keyed!(w, "ClassDeclaration", ",\"body\":");
     write_class_body(w, &class_decl.body, ctx);
     close_node(w, "ClassDeclaration", class_decl.span, ctx);
 }
@@ -234,7 +234,7 @@ pub(super) fn write_class_expression(
     if class_expr.r#abstract {
         raw!(w, "ClassExpression", ",\"abstract\":true");
     }
-    raw!(w, "ClassExpression", ",\"id\":");
+    keyed!(w, "ClassExpression", ",\"id\":");
     write_or_null(w, class_expr.id.as_ref(), |w, id| {
         write_identifier_plain(w, id, ctx);
     });
@@ -255,7 +255,7 @@ pub(super) fn write_class_expression(
         ctx.view.heritages(class_expr.implements),
         ctx,
     );
-    raw!(w, "ClassExpression", ",\"body\":");
+    keyed!(w, "ClassExpression", ",\"body\":");
     write_class_body(w, &class_expr.body, ctx);
     close_node(w, "ClassExpression", span, ctx);
 }
@@ -270,7 +270,7 @@ fn write_implements_field<const E: u16>(
     if implements.is_empty() {
         return;
     }
-    raw!(w, @E, ",\"implements\":");
+    keyed!(w, @E, ",\"implements\":");
     write_array(w, implements, |w, h| {
         write_expression_with_type_arguments(w, h, ctx);
     });
@@ -279,7 +279,7 @@ fn write_implements_field<const E: u16>(
 /// Emits a `ClassBody` node (dispatching each `ClassMember`).
 fn write_class_body(w: &mut Sink<'_>, body: &ast::ClassBody, ctx: &Ctx<'_>) {
     node_header!(w, "ClassBody", body.span, ctx);
-    raw!(w, "ClassBody", ",\"body\":");
+    keyed!(w, "ClassBody", ",\"body\":");
     write_array(w, ctx.view.class_members(body.body), |w, m| match m {
         ast::ClassMember::MethodDefinition(method) => {
             write_method_definition(w, method, ctx);
@@ -289,7 +289,7 @@ fn write_class_body(w: &mut Sink<'_>, body: &ast::ClassBody, ctx: &Ctx<'_>) {
         }
         ast::ClassMember::StaticBlock(block) => {
             node_header!(w, "StaticBlock", block.span, ctx);
-            raw!(w, "StaticBlock", ",\"body\":");
+            keyed!(w, "StaticBlock", ",\"body\":");
             write_array(w, ctx.view.stmt_list(block.body), |w, s| {
                 write_statement(w, ctx.view.stmt(*s), ctx);
             });
@@ -346,18 +346,18 @@ fn write_method_definition(w: &mut Sink<'_>, method: &ast::MethodDefinition, ctx
     w.bool(method.is_static);
     raw!(w, "MethodDefinition", ",\"computed\":");
     w.bool(method.computed);
-    raw!(w, "MethodDefinition", ",\"key\":");
+    keyed!(w, "MethodDefinition", ",\"key\":");
     write_expression(w, ctx.view.expr(method.key), ctx);
     if method.optional {
         raw!(w, "MethodDefinition", ",\"optional\":true");
     }
-    raw!(w, "MethodDefinition", ",\"kind\":");
     keyword!(
         w,
+        "MethodDefinition",
+        ",\"kind\":",
         token,
         method.kind => as_str,
-        ast::MethodKind => [Constructor, Method, Get, Set],
-        "MethodDefinition"."kind"
+        ast::MethodKind => [Constructor, Method, Get, Set]
     );
     let func = &method.value;
     write_type_parameters_field::<{ at!("MethodDefinition") }>(
@@ -378,7 +378,7 @@ fn write_method_definition(w: &mut Sink<'_>, method: &ast::MethodDefinition, ctx
     } else {
         ("FunctionExpression", Some(&func.body))
     };
-    raw!(w, "MethodDefinition", ",\"value\":");
+    keyed!(w, "MethodDefinition", ",\"value\":");
     let value_span = Span::new(func.params_start, func.span.end);
     tape! {
         let entry = if is_bodyless {
@@ -401,7 +401,7 @@ fn write_method_definition(w: &mut Sink<'_>, method: &ast::MethodDefinition, ctx
             write_function_flags_fields::<{ entry!("FunctionExpression") }>(w, generator, r#async);
         }
     }
-    raw!(w, @in entry => "TSDeclareMethod" | "FunctionExpression", ",\"params\":");
+    keyed!(w, @in entry => "TSDeclareMethod" | "FunctionExpression", ",\"params\":");
     write_expressions(w, ctx.view.exprs(func.params), ctx);
     json_only! { write_return_type_field::<0>(w, func.return_type.as_ref(), ctx); }
     tape! {
@@ -413,7 +413,7 @@ fn write_method_definition(w: &mut Sink<'_>, method: &ast::MethodDefinition, ctx
         }
     }
     if let Some(body) = body {
-        raw!(w, "FunctionExpression", ",\"body\":");
+        keyed!(w, "FunctionExpression", ",\"body\":");
         write_block_statement(w, body, ctx);
     }
     // Close the `value` function node, then the `MethodDefinition`.
@@ -452,7 +452,7 @@ fn write_property_definition(w: &mut Sink<'_>, prop: &ast::PropertyDefinition, c
     w.bool(prop.is_static);
     raw!(w, "PropertyDefinition", ",\"computed\":");
     w.bool(prop.computed);
-    raw!(w, "PropertyDefinition", ",\"key\":");
+    keyed!(w, "PropertyDefinition", ",\"key\":");
     write_expression(w, ctx.view.expr(prop.key), ctx);
     if matches!(prop.modifier, ast::PropertyModifier::Optional) {
         raw!(w, "PropertyDefinition", ",\"optional\":true");
@@ -465,7 +465,7 @@ fn write_property_definition(w: &mut Sink<'_>, prop: &ast::PropertyDefinition, c
         prop.type_annotation.as_ref(),
         ctx,
     );
-    raw!(w, "PropertyDefinition", ",\"value\":");
+    keyed!(w, "PropertyDefinition", ",\"value\":");
     write_or_null(w, prop.value.as_ref(), |w, v| {
         write_expression(w, ctx.view.expr(*v), ctx);
     });
@@ -486,7 +486,7 @@ pub(super) fn write_type_parameter_declaration(
     ctx: &Ctx<'_>,
 ) {
     node_header!(w, "TSTypeParameterDeclaration", params.span, ctx);
-    raw!(w, "TSTypeParameterDeclaration", ",\"params\":");
+    keyed!(w, "TSTypeParameterDeclaration", ",\"params\":");
     write_array(w, ctx.view.type_params(params.params), |w, p| {
         write_type_parameter(w, p, ctx);
     });
@@ -522,11 +522,11 @@ pub(super) fn write_type_parameter(w: &mut Sink<'_>, param: &ast::TSTypeParamete
     }
     write_name_field(w, param.name.ident_name(), param.name.span.start, ctx);
     if let Some(c) = ctx.view.opt_ty(param.constraint) {
-        raw!(w, "TSTypeParameter", ",\"constraint\":");
+        keyed!(w, "TSTypeParameter", ",\"constraint\":");
         write_type(w, c, ctx);
     }
     if let Some(d) = ctx.view.opt_ty(param.default) {
-        raw!(w, "TSTypeParameter", ",\"default\":");
+        keyed!(w, "TSTypeParameter", ",\"default\":");
         write_type(w, d, ctx);
     }
     close_node(w, "TSTypeParameter", param.span, ctx);
@@ -541,10 +541,10 @@ fn write_expression_with_type_arguments(
     ctx: &Ctx<'_>,
 ) {
     node_header!(w, "TSExpressionWithTypeArguments", heritage.span, ctx);
-    raw!(w, "TSExpressionWithTypeArguments", ",\"expression\":");
+    keyed!(w, "TSExpressionWithTypeArguments", ",\"expression\":");
     write_entity_name(w, &heritage.expression, ctx);
     if let Some(ta) = &heritage.type_arguments {
-        raw!(w, "TSExpressionWithTypeArguments", ",\"typeParameters\":");
+        keyed!(w, "TSExpressionWithTypeArguments", ",\"typeParameters\":");
         write_type_parameter_instantiation(w, ta, ctx);
     }
     close_node(w, "TSExpressionWithTypeArguments", heritage.span, ctx);

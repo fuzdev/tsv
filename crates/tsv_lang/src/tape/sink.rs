@@ -167,6 +167,8 @@ impl TapeSink {
             skip,
             #[cfg(feature = "_tape_literals")]
             pending: None,
+            #[cfg(all(feature = "_tape_literals", debug_assertions))]
+            stated: None,
         }
     }
 
@@ -269,6 +271,10 @@ pub struct TapeWriter<'a> {
     /// keyed form: in a world without it the sink is the plain one, compiled as before.
     #[cfg(feature = "_tape_literals")]
     pending: Option<(Enc, u16)>,
+    /// The encoding of a stated key's field whose value is not written yet (§Stated keys
+    /// below) — debug builds alone, which check that the next data call is that encoding's.
+    #[cfg(all(feature = "_tape_literals", debug_assertions))]
+    stated: Option<(Enc, u16)>,
 }
 
 impl TapeWriter<'_> {
@@ -372,6 +378,8 @@ impl TapeWriter<'_> {
     /// The open record closes: its header is written.
     #[inline]
     pub fn t_close(&mut self) {
+        #[cfg(all(feature = "_tape_literals", debug_assertions))]
+        self.stated_value(None);
         #[cfg(feature = "_tape_literals")]
         if self.pending.is_some() {
             self.fail(SinkError::Unbalanced);
@@ -403,6 +411,8 @@ impl TapeWriter<'_> {
     /// A list's `[`: its count slot.
     #[inline]
     pub fn t_list_open(&mut self) {
+        #[cfg(all(feature = "_tape_literals", debug_assertions))]
+        self.stated_value(Some(Enc::List));
         #[cfg(feature = "_tape_literals")]
         let strings = match self.pending.take() {
             None | Some((Enc::List, _)) => false,
@@ -422,6 +432,8 @@ impl TapeWriter<'_> {
     /// A list's `]`: its count.
     #[inline]
     pub fn t_list_close(&mut self) {
+        #[cfg(all(feature = "_tape_literals", debug_assertions))]
+        self.stated_value(None);
         match self.sink.frames.pop() {
             Some(f) if f.entry == LIST => self.sink.tape[f.slot as usize] = f.count,
             _ => self.fail(SinkError::Unbalanced),
@@ -447,6 +459,8 @@ impl TapeWriter<'_> {
     /// A `null` in a nullable-ref position.
     #[inline]
     pub fn t_null_ref(&mut self) {
+        #[cfg(all(feature = "_tape_literals", debug_assertions))]
+        self.stated_value(Some(Enc::RefNullable));
         #[cfg(feature = "_tape_literals")]
         if let Some((enc, _)) = self.pending.take()
             && enc != Enc::RefNullable
@@ -459,12 +473,16 @@ impl TapeWriter<'_> {
     /// A boolean field's word.
     #[inline]
     pub fn t_bool(&mut self, b: bool) {
+        #[cfg(all(feature = "_tape_literals", debug_assertions))]
+        self.stated_value(Some(Enc::Boolean));
         self.sink.tape.push(u32::from(b));
     }
 
     /// A number's two words.
     #[inline]
     pub fn t_number(&mut self, n: f64) {
+        #[cfg(all(feature = "_tape_literals", debug_assertions))]
+        self.stated_value(Some(Enc::Number));
         let bits = n.to_bits();
         self.push2(bits as u32, (bits >> 32) as u32);
     }
@@ -472,6 +490,8 @@ impl TapeWriter<'_> {
     /// A tagged value's tag word (`TAG_*`), its payload written after it.
     #[inline]
     pub fn t_tag(&mut self, tag: u32) {
+        #[cfg(all(feature = "_tape_literals", debug_assertions))]
+        self.stated_value(Some(Enc::Value));
         self.sink.tape.push(tag);
     }
 
@@ -480,6 +500,14 @@ impl TapeWriter<'_> {
     /// key's field must be a keyword field of that vocabulary, or the tape is refused.
     #[inline]
     pub fn t_keyword_id(&mut self, vocab: u16, index: u32) {
+        #[cfg(all(feature = "_tape_literals", debug_assertions))]
+        {
+            let aux = self.stated_value(Some(Enc::Keyword));
+            assert!(
+                aux == super::NO_AUX || aux == vocab,
+                "a stated keyword key's value is of its vocabulary"
+            );
+        }
         #[cfg(feature = "_tape_literals")]
         if self.pending.is_some() {
             self.keyword_keyed(vocab, index);
@@ -493,6 +521,8 @@ impl TapeWriter<'_> {
     /// else a pool entry.
     #[inline]
     pub fn t_ref(&mut self, s: &[u8]) {
+        #[cfg(all(feature = "_tape_literals", debug_assertions))]
+        self.stated_value(Some(Enc::Ref));
         if let Some(p) = self.offset_of(s) {
             let (a, b) = (
                 self.positions.pos(p as u32),
@@ -535,6 +565,8 @@ impl TapeWriter<'_> {
     #[cfg(feature = "_tape_literals")]
     #[inline(never)]
     pub fn t_field(&mut self, field: Field) {
+        #[cfg(all(feature = "_tape_literals", debug_assertions))]
+        self.stated_value(None);
         if self.pending.is_some() {
             self.fail(SinkError::Unbalanced);
         }
@@ -552,6 +584,83 @@ impl TapeWriter<'_> {
             self.fail(SinkError::Name);
         }
         self.t_field(field);
+    }
+
+    // ── stated keys: a key whose value its data call writes in its own encoding ──────────
+    //
+    // A key whose field lays its value down as the data call after it does with no key declared — a
+    // record it opens, a list it opens, a ref it writes, a keyword index — needs no pending field:
+    // the site states it ([`Self::t_key_stated`], its presence bit resolved at build time by
+    // `tape::stated_key`, which refuses any other encoding), and the data call takes its plain
+    // path. A keyword key is the one exception `stated_key` refuses too: it is stated through
+    // `tape::stated_keyword` alone (the writers' `keyword!` / `keyword_key!`), which ties the key
+    // to its index's vocabulary (`tape::stated_vocab`), so a keyword key stated any other way
+    // fails the build.
+    // The open record is still checked, in every build. The one value of those encodings a
+    // plain call cannot write is a record field's `null`, which a nullable site writes through
+    // [`Self::null_or_record`]. That the data call is the field's encoding — any other takes its
+    // plain path, so a `token` or a `null` would write nothing, and a `string` or a `u32` a ref or
+    // a number where a record belongs — is checked in debug builds (`stated`), and the tape gates
+    // grade every tape against the JSON wire; a release build leaves it to them, since the check is
+    // the per-value branch a stated key exists to drop.
+
+    /// A stated key (`tape::stated_key`, or `tape::stated_keyword` for a keyword key): bit `bit`
+    /// of the open record, which must be `entry`'s (else the tape is refused,
+    /// [`SinkError::Name`]); its value is the next data call's own.
+    #[cfg(feature = "_tape_literals")]
+    #[inline(never)]
+    pub fn t_key_stated(&mut self, entry: u16, bit: u8) {
+        #[cfg(debug_assertions)]
+        self.stated_value(None);
+        if self.pending.is_some() {
+            self.fail(SinkError::Unbalanced);
+        }
+        match self.sink.frames.last_mut() {
+            Some(f) if f.entry == entry => {
+                if bit != NO_BIT {
+                    f.mask |= 1 << bit;
+                }
+            }
+            _ => self.fail(SinkError::Name),
+        }
+    }
+
+    /// The stated key just written is `field`, so the next data call must be its encoding's
+    /// (`stated_value`), a keyword of its vocabulary — recorded in debug builds alone. A site
+    /// calls it in every build, so a writer crate and this one may differ in debug assertions;
+    /// in a release build of this crate it is empty.
+    #[cfg(feature = "_tape_literals")]
+    #[expect(
+        clippy::inline_always,
+        reason = "empty in a release build: no call may survive at a site"
+    )]
+    #[inline(always)]
+    pub fn t_stated_debug(&mut self, field: Field) {
+        #[cfg(debug_assertions)]
+        {
+            self.stated = Some((field.enc, field.aux));
+        }
+        #[cfg(not(debug_assertions))]
+        let _ = field;
+    }
+
+    /// Debug builds: a data call of encoding `enc` (`None`: a call no stated key's value can
+    /// be — a key, a close, a `token`, a `null`) consumes the stated key ahead of it, which
+    /// must be that encoding's; returns the stated field's `aux` ([`super::NO_AUX`] with no key
+    /// stated).
+    #[cfg(all(feature = "_tape_literals", debug_assertions))]
+    fn stated_value(&mut self, enc: Option<Enc>) -> u16 {
+        match self.stated.take() {
+            Some((stated, aux)) => {
+                assert!(
+                    Some(stated) == enc,
+                    "a stated key's value is a data call of its field's encoding ({stated:?}, \
+                     not {enc:?})"
+                );
+                aux
+            }
+            None => super::NO_AUX,
+        }
     }
 
     /// A site whose record is one of a few entries chosen at run time found the open record is
@@ -657,6 +766,8 @@ impl TapeWriter<'_> {
     #[cfg(feature = "_tape_literals")]
     #[inline]
     pub fn t_object_key(&mut self, key: &[u8]) {
+        #[cfg(all(feature = "_tape_literals", debug_assertions))]
+        self.stated_value(None);
         if self.pending.is_none()
             && let Some(f) = self.sink.frames.last_mut()
             && f.entry == OBJECT
@@ -673,6 +784,8 @@ impl TapeWriter<'_> {
     #[cfg(feature = "_tape_literals")]
     #[inline]
     pub fn t_object_close(&mut self) {
+        #[cfg(all(feature = "_tape_literals", debug_assertions))]
+        self.stated_value(None);
         if self.pending.is_some() {
             self.fail(SinkError::Unbalanced);
         }
@@ -710,6 +823,8 @@ impl TapeWriter<'_> {
     #[cfg(feature = "_tape_literals")]
     #[inline]
     fn enter_record(&mut self) {
+        #[cfg(debug_assertions)]
+        self.stated_value(Some(Enc::Record));
         if self.pending.is_some() {
             self.enter_record_keyed();
         }
@@ -730,6 +845,8 @@ impl TapeWriter<'_> {
     #[cfg(feature = "_tape_literals")]
     #[inline(never)]
     pub fn bool(&mut self, b: bool) {
+        #[cfg(debug_assertions)]
+        self.stated_value(None);
         match self.pending.take() {
             Some((Enc::Boolean, _)) => self.t_bool(b),
             Some((Enc::Value, _)) => self.t_tag(if b { TAG_TRUE } else { TAG_FALSE }),
@@ -741,6 +858,8 @@ impl TapeWriter<'_> {
     #[cfg(feature = "_tape_literals")]
     #[inline]
     pub fn null(&mut self) {
+        #[cfg(debug_assertions)]
+        self.stated_value(None);
         if self.pending.is_some() {
             self.null_keyed();
         }
@@ -759,6 +878,24 @@ impl TapeWriter<'_> {
                 self.t_tag(TAG_NULL);
             }
             Some(_) => self.fail(SinkError::Unbalanced),
+        }
+    }
+
+    /// A nullable record field's `null`: as its declared field lays it down (`null`), or —
+    /// after a stated key ([`Self::t_key_stated`]), which leaves no field pending — the `null`
+    /// record.
+    #[cfg(feature = "_tape_literals")]
+    #[inline]
+    pub fn null_or_record(&mut self) {
+        if self.pending.is_some() {
+            self.null_keyed();
+        } else {
+            #[cfg(debug_assertions)]
+            assert!(
+                self.stated.is_some_and(|(enc, _)| enc == Enc::Record),
+                "a `null` with no key pending follows a stated record key"
+            );
+            self.t_null_record();
         }
     }
 
@@ -795,6 +932,8 @@ impl TapeWriter<'_> {
     #[cfg(feature = "_tape_literals")]
     #[inline]
     pub fn token(&mut self, s: &str) {
+        #[cfg(debug_assertions)]
+        self.stated_value(None);
         if self.pending.is_some() {
             self.string_keyed(s);
         }
@@ -805,6 +944,8 @@ impl TapeWriter<'_> {
     #[cfg(feature = "_tape_literals")]
     #[inline]
     pub fn u32(&mut self, n: u32) {
+        #[cfg(debug_assertions)]
+        self.stated_value(None);
         if self.pending.is_some() {
             self.u32_keyed(n);
         } else {

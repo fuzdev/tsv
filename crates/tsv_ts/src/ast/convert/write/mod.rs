@@ -230,17 +230,17 @@ pub fn write_pattern_embedded(w: &mut Sink<'_>, expr: &ast::Expression, env: Emb
 /// Emit the `Program` node.
 fn write_program(w: &mut Sink<'_>, program: &ast::Program, ctx: &Ctx<'_>) {
     node_header!(w, "Program", program.span, ctx);
-    raw!(w, "Program", ",\"body\":");
+    keyed!(w, "Program", ",\"body\":");
     write_body_array(w, ctx.view.stmt_list(program.body), ctx, |w, s| {
         write_statement(w, ctx.view.stmt(*s), ctx);
     });
-    raw!(w, "Program", ",\"sourceType\":");
     keyword!(
         w,
+        "Program",
+        ",\"sourceType\":",
         token,
         program.goal => source_type,
-        crate::Goal => [Module, Script],
-        "Program"."sourceType"
+        crate::Goal => [Module, Script]
     );
     close_node(w, "Program", program.span, ctx);
 }
@@ -579,7 +579,7 @@ pub(super) fn write_type_parameters_field<const E: u16>(
     ctx: &Ctx<'_>,
 ) {
     if let Some(tp) = type_parameters {
-        raw!(w, @E, ",\"typeParameters\":");
+        keyed!(w, @E, ",\"typeParameters\":");
         write_type_parameter_declaration(w, tp, ctx);
     }
 }
@@ -592,7 +592,7 @@ pub(super) fn write_type_arguments_field<const E: u16>(
     ctx: &Ctx<'_>,
 ) {
     if let Some(ta) = type_arguments {
-        raw!(w, @E, ",\"typeArguments\":");
+        keyed!(w, @E, ",\"typeArguments\":");
         write_type_parameter_instantiation(w, ta, ctx);
     }
 }
@@ -607,7 +607,7 @@ pub(super) fn write_type_annotation_field<const E: u16>(
     ctx: &Ctx<'_>,
 ) {
     if let Some(ta) = type_annotation {
-        raw!(w, @E, ",\"typeAnnotation\":");
+        keyed!(w, @E, ",\"typeAnnotation\":");
         write_type_annotation(w, ta, ctx);
     }
 }
@@ -620,7 +620,7 @@ pub(super) fn write_return_type_field<const E: u16>(
     ctx: &Ctx<'_>,
 ) {
     if let Some(rt) = return_type {
-        raw!(w, @E, ",\"returnType\":");
+        keyed!(w, @E, ",\"returnType\":");
         write_type_annotation(w, rt, ctx);
     }
 }
@@ -729,7 +729,7 @@ pub(super) fn write_literal_fields(w: &mut Sink<'_>, lit: &ast::Literal, ctx: &C
         }
     }
     if let Some(decimal) = bigint {
-        raw!(w, "Literal", ",\"bigint\":");
+        keyed!(w, "Literal", ",\"bigint\":");
         w.string(&decimal);
     }
 }
@@ -811,7 +811,7 @@ fn write_identifier_tail(
     if let Some(decs) = decorators
         && !decs.is_empty()
     {
-        raw!(w, "Identifier", ",\"decorators\":");
+        keyed!(w, "Identifier", ",\"decorators\":");
         write_array(w, decs, |w, d| write_decorator(w, d, ctx));
     }
     close_node(w, "Identifier", span, ctx);

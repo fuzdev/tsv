@@ -15,22 +15,22 @@ pub(super) fn write_import_specifier(w: &mut Sink<'_>, spec: &ast::ImportSpecifi
     match spec {
         ast::ImportSpecifier::Default(default_spec) => {
             node_header!(w, "ImportDefaultSpecifier", default_spec.span, ctx);
-            raw!(w, "ImportDefaultSpecifier", ",\"local\":");
+            keyed!(w, "ImportDefaultSpecifier", ",\"local\":");
             write_identifier_plain(w, &default_spec.local, ctx);
             close_node(w, "ImportDefaultSpecifier", default_spec.span, ctx);
         }
         ast::ImportSpecifier::Named(named_spec) => {
             node_header!(w, "ImportSpecifier", named_spec.span, ctx);
-            raw!(w, "ImportSpecifier", ",\"imported\":");
+            keyed!(w, "ImportSpecifier", ",\"imported\":");
             write_module_export_name(w, &named_spec.imported, ctx);
-            raw!(w, "ImportSpecifier", ",\"local\":");
+            keyed!(w, "ImportSpecifier", ",\"local\":");
             write_identifier_plain(w, &named_spec.local, ctx);
             write_import_kind_field::<{ at!("ImportSpecifier") }>(w, named_spec.import_kind, ctx);
             close_node(w, "ImportSpecifier", named_spec.span, ctx);
         }
         ast::ImportSpecifier::Namespace(ns_spec) => {
             node_header!(w, "ImportNamespaceSpecifier", ns_spec.span, ctx);
-            raw!(w, "ImportNamespaceSpecifier", ",\"local\":");
+            keyed!(w, "ImportNamespaceSpecifier", ",\"local\":");
             write_identifier_plain(w, &ns_spec.local, ctx);
             close_node(w, "ImportNamespaceSpecifier", ns_spec.span, ctx);
         }
@@ -40,12 +40,12 @@ pub(super) fn write_import_specifier(w: &mut Sink<'_>, spec: &ast::ImportSpecifi
 /// Emits an `ImportAttribute` node.
 pub(super) fn write_import_attribute(w: &mut Sink<'_>, attr: &ast::ImportAttribute, ctx: &Ctx<'_>) {
     node_header!(w, "ImportAttribute", attr.span, ctx);
-    raw!(w, "ImportAttribute", ",\"key\":");
+    keyed!(w, "ImportAttribute", ",\"key\":");
     match &attr.key {
         ast::ImportAttributeKey::Identifier(id) => write_identifier_plain(w, id, ctx),
         ast::ImportAttributeKey::Literal(lit) => write_literal(w, lit, ctx),
     }
-    raw!(w, "ImportAttribute", ",\"value\":");
+    keyed!(w, "ImportAttribute", ",\"value\":");
     write_literal(w, &attr.value, ctx);
     close_node(w, "ImportAttribute", attr.span, ctx);
 }
@@ -54,9 +54,9 @@ pub(super) fn write_import_attribute(w: &mut Sink<'_>, attr: &ast::ImportAttribu
 /// `exportKind?`.
 pub(super) fn write_export_specifier(w: &mut Sink<'_>, spec: &ast::ExportSpecifier, ctx: &Ctx<'_>) {
     node_header!(w, "ExportSpecifier", spec.span, ctx);
-    raw!(w, "ExportSpecifier", ",\"local\":");
+    keyed!(w, "ExportSpecifier", ",\"local\":");
     write_module_export_name(w, &spec.local, ctx);
-    raw!(w, "ExportSpecifier", ",\"exported\":");
+    keyed!(w, "ExportSpecifier", ",\"exported\":");
     write_module_export_name(w, &spec.exported, ctx);
     write_export_kind_field::<{ at!("ExportSpecifier") }>(w, spec.export_kind, ctx);
     close_node(w, "ExportSpecifier", spec.span, ctx);

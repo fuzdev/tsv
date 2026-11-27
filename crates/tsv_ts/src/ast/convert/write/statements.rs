@@ -58,7 +58,7 @@ fn write_attributes_field<const E: u16>(
 ) {
     match attributes {
         Some(attrs) => {
-            raw!(w, @E, ",\"attributes\":");
+            keyed!(w, @E, ",\"attributes\":");
             write_array(w, attrs, |w, a| write_import_attribute(w, a, ctx));
         }
         None => {
@@ -74,7 +74,7 @@ pub(super) fn write_statement(w: &mut Sink<'_>, stmt: &ast::Statement, ctx: &Ctx
     match &stmt.kind {
         ast::StatementKind::ExpressionStatement(expr_stmt) => {
             node_header!(w, "ExpressionStatement", stmt.span, ctx);
-            raw!(w, "ExpressionStatement", ",\"expression\":");
+            keyed!(w, "ExpressionStatement", ",\"expression\":");
             write_expression(w, ctx.view.expr(expr_stmt.expression), ctx);
             if expr_stmt.is_directive {
                 // acorn stores the raw string contents without quotes. A
@@ -85,7 +85,7 @@ pub(super) fn write_statement(w: &mut Sink<'_>, stmt: &ast::Statement, ctx: &Ctx
                     .expr(expr_stmt.expression)
                     .span()
                     .extract(ctx.source);
-                raw!(w, "ExpressionStatement", ",\"directive\":");
+                keyed!(w, "ExpressionStatement", ",\"directive\":");
                 w.string(&raw[1..raw.len() - 1]);
             }
             close_node(w, "ExpressionStatement", stmt.span, ctx);
@@ -99,7 +99,7 @@ pub(super) fn write_statement(w: &mut Sink<'_>, stmt: &ast::Statement, ctx: &Ctx
         }
         ast::StatementKind::ReturnStatement(ret) => {
             node_header!(w, "ReturnStatement", stmt.span, ctx);
-            raw!(w, "ReturnStatement", ",\"argument\":");
+            keyed!(w, "ReturnStatement", ",\"argument\":");
             write_or_null(w, ret.argument.as_ref(), |w, e| {
                 write_expression(w, ctx.view.expr(*e), ctx);
             });
@@ -134,15 +134,15 @@ pub(super) fn write_statement(w: &mut Sink<'_>, stmt: &ast::Statement, ctx: &Ctx
                 export_decl.export_kind,
                 ctx,
             );
-            raw!(w, "ExportNamedDeclaration", ",\"declaration\":");
+            keyed!(w, "ExportNamedDeclaration", ",\"declaration\":");
             write_or_null(w, ctx.view.opt_stmt(export_decl.declaration), |w, d| {
                 write_statement(w, d, ctx);
             });
-            raw!(w, "ExportNamedDeclaration", ",\"specifiers\":");
+            keyed!(w, "ExportNamedDeclaration", ",\"specifiers\":");
             write_array(w, ctx.view.export_specs(export_decl.specifiers), |w, s| {
                 write_export_specifier(w, s, ctx);
             });
-            raw!(w, "ExportNamedDeclaration", ",\"source\":");
+            keyed!(w, "ExportNamedDeclaration", ",\"source\":");
             write_or_null(w, export_decl.source.as_ref(), |w, s| {
                 write_literal(w, s, ctx);
             });
@@ -173,7 +173,7 @@ pub(super) fn write_statement(w: &mut Sink<'_>, stmt: &ast::Statement, ctx: &Ctx
                     raw!(w, "ExportDefaultDeclaration", ",\"exportKind\":\"value\"");
                 }
             }
-            raw!(w, "ExportDefaultDeclaration", ",\"declaration\":");
+            keyed!(w, "ExportDefaultDeclaration", ",\"declaration\":");
             write_export_default_value(w, &export_decl.declaration, ctx);
             close_node(w, "ExportDefaultDeclaration", export_span, ctx);
         }
@@ -185,11 +185,11 @@ pub(super) fn write_statement(w: &mut Sink<'_>, stmt: &ast::Statement, ctx: &Ctx
                 export_decl.export_kind,
                 ctx,
             );
-            raw!(w, "ExportAllDeclaration", ",\"exported\":");
+            keyed!(w, "ExportAllDeclaration", ",\"exported\":");
             write_or_null(w, export_decl.exported.as_ref(), |w, name| {
                 write_module_export_name(w, name, ctx);
             });
-            raw!(w, "ExportAllDeclaration", ",\"source\":");
+            keyed!(w, "ExportAllDeclaration", ",\"source\":");
             write_literal(w, &export_decl.source, ctx);
             write_attributes_field::<{ at!("ExportAllDeclaration") }>(
                 w,
@@ -201,13 +201,13 @@ pub(super) fn write_statement(w: &mut Sink<'_>, stmt: &ast::Statement, ctx: &Ctx
         &ast::StatementKind::TSExportAssignment(export_assign) => {
             let export_assign = ctx.view.export_assign(export_assign);
             node_header!(w, "TSExportAssignment", stmt.span, ctx);
-            raw!(w, "TSExportAssignment", ",\"expression\":");
+            keyed!(w, "TSExportAssignment", ",\"expression\":");
             write_expression(w, ctx.view.expr(export_assign.expression), ctx);
             close_node(w, "TSExportAssignment", stmt.span, ctx);
         }
         ast::StatementKind::TSNamespaceExportDeclaration(ns_export) => {
             node_header!(w, "TSNamespaceExportDeclaration", stmt.span, ctx);
-            raw!(w, "TSNamespaceExportDeclaration", ",\"id\":");
+            keyed!(w, "TSNamespaceExportDeclaration", ",\"id\":");
             write_identifier_plain(w, &ns_export.id, ctx);
             close_node(w, "TSNamespaceExportDeclaration", stmt.span, ctx);
         }
@@ -219,19 +219,12 @@ pub(super) fn write_statement(w: &mut Sink<'_>, stmt: &ast::Statement, ctx: &Ctx
                 import_decl.import_kind,
                 ctx,
             );
-            if let Some(phase) = import_decl.phase.as_str() {
-                raw!(w, "ImportDeclaration", ",\"phase\":");
-                json_only! { w.token(phase); }
-                tape! {
-                    let _ = phase;
-                    phase_keyword!(w, import_decl.phase, "ImportDeclaration");
-                }
-            }
-            raw!(w, "ImportDeclaration", ",\"specifiers\":");
+            phase_keyword!(w, import_decl.phase, "ImportDeclaration", ",\"phase\":");
+            keyed!(w, "ImportDeclaration", ",\"specifiers\":");
             write_array(w, ctx.view.import_specs(import_decl.specifiers), |w, s| {
                 write_import_specifier(w, s, ctx);
             });
-            raw!(w, "ImportDeclaration", ",\"source\":");
+            keyed!(w, "ImportDeclaration", ",\"source\":");
             write_literal(w, &import_decl.source, ctx);
             write_attributes_field::<{ at!("ImportDeclaration") }>(
                 w,
@@ -243,16 +236,22 @@ pub(super) fn write_statement(w: &mut Sink<'_>, stmt: &ast::Statement, ctx: &Ctx
         &ast::StatementKind::TSImportEqualsDeclaration(import_eq) => {
             let import_eq = ctx.view.import_equals(import_eq);
             node_header!(w, "TSImportEqualsDeclaration", stmt.span, ctx);
-            raw!(w, "TSImportEqualsDeclaration", ",\"importKind\":");
+            // Hand-written, not `keyword!`: `keyword!` reads the word through a method of the
+            // enum (an `ImportKind::as_str`), and routing the JSON copy's word through one moves
+            // its codegen, which must not move. So the key literal is spelled twice, here and in
+            // the `stated_vocab` below, and the two must match (a debug build's `t_keyword_id`
+            // asserts the index's vocabulary is the stated key's).
+            keyword_key!(w, "TSImportEqualsDeclaration", ",\"importKind\":");
             let import_kind = match import_eq.import_kind {
                 ast::ImportKind::Value => "value",
                 ast::ImportKind::Type => "type",
             };
             json_only! { w.token(import_kind); }
             tape! {
-                const VOCAB: u16 = ::tsv_lang::tape::field_aux(
+                // The stated key's vocabulary (`keyword!`'s rule), read from the same key literal.
+                const VOCAB: u16 = ::tsv_lang::tape::stated_vocab(
                     entry!("TSImportEqualsDeclaration"),
-                    "importKind",
+                    ",\"importKind\":",
                 );
                 let index = by_variant!(import_eq.import_kind, ast::ImportKind => [Value, Type],
                     |k| -> u32 {
@@ -266,13 +265,13 @@ pub(super) fn write_statement(w: &mut Sink<'_>, stmt: &ast::Statement, ctx: &Ctx
             }
             raw!(w, "TSImportEqualsDeclaration", ",\"isExport\":");
             w.bool(import_eq.is_export);
-            raw!(w, "TSImportEqualsDeclaration", ",\"id\":");
+            keyed!(w, "TSImportEqualsDeclaration", ",\"id\":");
             write_identifier_plain(w, &import_eq.id, ctx);
-            raw!(w, "TSImportEqualsDeclaration", ",\"moduleReference\":");
+            keyed!(w, "TSImportEqualsDeclaration", ",\"moduleReference\":");
             match &import_eq.module_reference {
                 ast::TSModuleReference::ExternalModuleReference(ext_ref) => {
                     node_header!(w, "TSExternalModuleReference", ext_ref.span, ctx);
-                    raw!(w, "TSExternalModuleReference", ",\"expression\":");
+                    keyed!(w, "TSExternalModuleReference", ",\"expression\":");
                     write_literal(w, &ext_ref.expression, ctx);
                     close_node(w, "TSExternalModuleReference", ext_ref.span, ctx);
                 }
@@ -365,17 +364,17 @@ pub(super) fn write_module_declaration(
     if decl.global {
         raw!(w, "TSModuleDeclaration", ",\"global\":true");
     }
-    raw!(w, "TSModuleDeclaration", ",\"id\":");
+    keyed!(w, "TSModuleDeclaration", ",\"id\":");
     match &decl.id {
         ast::TSModuleName::Identifier(id) => write_identifier_plain(w, id, ctx),
         ast::TSModuleName::Literal(lit) => write_literal(w, lit, ctx),
     }
     if let Some(body) = &decl.body {
-        raw!(w, "TSModuleDeclaration", ",\"body\":");
+        keyed!(w, "TSModuleDeclaration", ",\"body\":");
         match body {
             ast::TSModuleDeclarationBody::TSModuleBlock(block) => {
                 node_header!(w, "TSModuleBlock", block.span, ctx);
-                raw!(w, "TSModuleBlock", ",\"body\":");
+                keyed!(w, "TSModuleBlock", ",\"body\":");
                 write_array(w, ctx.view.stmt_list(block.body), |w, s| {
                     write_statement(w, ctx.view.stmt(*s), ctx);
                 });
@@ -396,7 +395,7 @@ pub(super) fn write_module_declaration(
 /// Emits a `BlockStatement` node.
 pub(super) fn write_block_statement(w: &mut Sink<'_>, block: &ast::BlockStatement, ctx: &Ctx<'_>) {
     node_header!(w, "BlockStatement", block.span, ctx);
-    raw!(w, "BlockStatement", ",\"body\":");
+    keyed!(w, "BlockStatement", ",\"body\":");
     super::write_body_array(w, ctx.view.stmt_list(block.body), ctx, |w, s| {
         write_statement(w, ctx.view.stmt(*s), ctx);
     });
@@ -417,15 +416,15 @@ pub(super) fn write_variable_declaration(
     if var_decl.declare {
         raw!(w, "VariableDeclaration", ",\"declare\":true");
     }
-    raw!(w, "VariableDeclaration", ",\"declarations\":");
+    keyed!(w, "VariableDeclaration", ",\"declarations\":");
     write_array(w, ctx.view.declarators(var_decl.declarations), |w, d| {
         node_header!(w, "VariableDeclarator", d.span, ctx);
-        raw!(w, "VariableDeclarator", ",\"id\":");
+        keyed!(w, "VariableDeclarator", ",\"id\":");
         write_expression(w, ctx.view.expr(d.id), ctx);
         if d.definite {
             raw!(w, "VariableDeclarator", ",\"definite\":true");
         }
-        raw!(w, "VariableDeclarator", ",\"init\":");
+        keyed!(w, "VariableDeclarator", ",\"init\":");
         write_or_null(w, d.init.as_ref(), |w, e| {
             write_expression(w, ctx.view.expr(*e), ctx);
         });

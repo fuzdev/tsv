@@ -123,6 +123,66 @@ macro_rules! raw {
     }};
 }
 
+/// The tape half of a stated-key site (`keyed!`): the key's presence bit, resolved at build
+/// time for entry `$e` (`tsv_lang::tape::stated_key`, which fails the build for a literal that
+/// is not one key whose value its data call writes in its own encoding — a keyword key's
+/// included), with no field pending — and the field (`t_stated_debug`), which a debug build of
+/// the sink checks the data call after it against. `keyword [$e]` is a keyword key's
+/// (`keyword!`'s): resolved through `tsv_lang::tape::stated_keyword`, the one path that accepts
+/// one, so a keyword key is stated only beside an index whose vocabulary `stated_vocab` reads from
+/// the same literal.
+#[cfg_attr(
+    not(feature = "_tape"),
+    expect(unused_macros, reason = "expanded inside `tape!` alone")
+)]
+macro_rules! t_stated {
+    ($w:ident, [$e:literal], $s:literal) => {{
+        const E: u16 = ::tsv_lang::tape::entry_id($e);
+        const F: ::tsv_lang::tape::Field = ::tsv_lang::tape::stated_key(E, $s);
+        $w.t_key_stated(E, F.bit);
+        $w.t_stated_debug(F);
+    }};
+    ($w:ident, [@ $g:ident], $s:literal) => {{
+        let f: ::tsv_lang::tape::Field = const { ::tsv_lang::tape::stated_key($g, $s) };
+        $w.t_key_stated($g, f.bit);
+        $w.t_stated_debug(f);
+    }};
+    ($w:ident, keyword [$e:literal], $s:literal) => {{
+        const E: u16 = ::tsv_lang::tape::entry_id($e);
+        const F: ::tsv_lang::tape::Field = ::tsv_lang::tape::stated_keyword(E, $s);
+        $w.t_key_stated(E, F.bit);
+        $w.t_stated_debug(F);
+    }};
+}
+
+/// A stated-key site, `tsv_ts`'s form (its `write_macros.rs`): a literal holding one key whose
+/// value the data call after it writes — a record or a list it opens, a ref — so the tape states
+/// the key (`t_stated!`) rather than replaying the literal through the reader. Its entry as
+/// `raw!`'s. A record field that may be `null` writes it through `write_or_null` (the tape's
+/// `null_or_record`). A keyword key is not one: it goes through `keyword!`, and a `keyed!`
+/// naming one fails the build.
+macro_rules! keyed {
+    ($w:ident, $e:literal, $s:literal) => {{
+        tape! { t_stated!($w, [$e], $s); }
+        json_only! { $w.raw($s); }
+    }};
+    ($w:ident, @ $g:ident, $s:literal) => {{
+        tape! { t_stated!($w, [@ $g], $s); }
+        json_only! { $w.raw($s); }
+    }};
+    ($w:ident, @in $t:expr => $($c:literal)|+, $s:literal) => {{
+        tape! {
+            let t: u16 = $t;
+            $(if t == entry!($c) {
+                t_stated!($w, [$c], $s);
+            } else)+ {
+                $w.t_wrong_entry();
+            }
+        }
+        json_only! { $w.raw($s); }
+    }};
+}
+
 /// A node's head: the literal `$s` — `{"type":"T"`, any constant keys, `,"start":` — then the
 /// node's `start` and `end` (`span_start_end`). On the tape the record of entry `$e` opens, the
 /// literal's keys between its `type` and its `start` replay ([`tape_head`]), and the two offsets
@@ -258,17 +318,21 @@ macro_rules! by_variant {
     }};
 }
 
-/// A keyword field's value chosen at run time — `$v.$m()`, a word of enum `$t` — after the key
-/// a literal wrote: the word on the JSON wire (an escape-free token), its index in the field's
-/// vocabulary on the tape, resolved at build time per variant (`by_variant!`). The field is
-/// entry `$e`'s field `$f`.
+/// A keyword field: its key, stated through `t_stated!`'s `keyword` form (entry `$e`), then its
+/// value chosen at run time — `$v.$m()`, a word of enum `$t` — the word on the JSON wire (an
+/// escape-free token), its index on the tape, resolved at build time per variant (`by_variant!`)
+/// in the vocabulary of the field the key literal `$s` names (`tsv_lang::tape::stated_vocab`,
+/// which fails the build for a key that is not a keyword field's). The index's vocabulary is the
+/// stated key's, so the two cannot disagree.
 macro_rules! keyword {
-    ($w:ident, $v:expr => $m:ident, $($t:ident)::+ => [$($var:ident),+ $(,)?],
-        $e:literal . $f:literal) => {{
+    ($w:ident, $e:literal, $s:literal, $v:expr => $m:ident,
+        $($t:ident)::+ => [$($var:ident),+ $(,)?]) => {{
+        tape! { t_stated!($w, keyword [$e], $s); }
+        json_only! { $w.raw($s); }
         let v = $v;
         tape! {
             let (vocab, index) = by_variant!(v, $($t)::+ => [$($var),+], |x| -> (u16, u32) {{
-                let vocab = ::tsv_lang::tape::field_aux(::tsv_lang::tape::entry_id($e), $f);
+                let vocab = ::tsv_lang::tape::stated_vocab(::tsv_lang::tape::entry_id($e), $s);
                 (vocab, ::tsv_lang::tape::keyword_id(vocab, x.$m()))
             }});
             $w.t_keyword_id(vocab, index);

@@ -217,7 +217,13 @@ wire, into `tsv_lang::tape::TapeSink` (crates/tsv_lang/CLAUDE.md §Modules, `tap
 body is mounted a second time with the tape as its sink, each site naming what its JSON literal
 means on the tape — `tsv_css` as a token spec per site, `tsv_ts` and `tsv_svelte` by handing the
 literal itself to a compile-time reader (`tsv_lang::tape::literal_ops`) that resolves its keys
-against the schema and leaves each value to the field its key declared (crates/tsv_css/CLAUDE.md,
+against the schema and leaves each value to the field its key declared — except where the
+literal is one key whose value the next data call writes in its own encoding (a record or list it
+opens, a ref), which the site states instead (`keyed!`): the key's presence bit, resolved at
+build time, with nothing left pending. A keyword key is stated only through `keyword!`
+(`tsv_ts`'s `keyword_key!` for a hand-written site), beside the index whose vocabulary it reads
+from the key literal; a `keyed!` on one fails the build
+(crates/tsv_css/CLAUDE.md,
 crates/tsv_ts/CLAUDE.md and crates/tsv_svelte/CLAUDE.md §Distinctives, the twin-mounted writer).
 The Svelte writer's tape copy writes the embedded TypeScript and CSS through those writers' tape
 copies, into the one document. This is the producer every binding ships (§Where it ships). It
@@ -257,7 +263,9 @@ included, but for the const-generic directive head's check, which only a codegen
 evaluates), a self-describing record's string or number value or embedded expression written
 with no key ahead of it (the sink writes it as plain words, which the decoder reads in a key's
 place) or a `null` value with none (the sink writes nothing), and a key or a string of a
-`strings` field written as a plain ref where its counted form belongs — which only the roundtrip
+`strings` field written as a plain ref where its counted form belongs, and a data call after a
+stated key that is not its field's encoding (it takes its plain path: a `token` or a `null` writes
+nothing, a `string` a ref, a `u32` a number; debug builds check it) — which only the roundtrip
 gates catch.
 
 ### Grading a direct tape

@@ -39,7 +39,7 @@ pub(super) fn write_template_literal(
     ctx: &Ctx<'_>,
 ) {
     node_header!(w, "TemplateLiteral", span, ctx);
-    raw!(w, "TemplateLiteral", ",\"expressions\":");
+    keyed!(w, "TemplateLiteral", ",\"expressions\":");
     write_expressions(
         w,
         ctx.view
@@ -48,7 +48,7 @@ pub(super) fn write_template_literal(
             .map(|e| ctx.view.expr(*e)),
         ctx,
     );
-    raw!(w, "TemplateLiteral", ",\"quasis\":");
+    keyed!(w, "TemplateLiteral", ",\"quasis\":");
     write_array(w, ctx.view.quasis(template.quasis), |w, q| {
         write_template_element(w, q, ctx);
     });
@@ -109,7 +109,7 @@ pub(super) fn write_object_pattern(
         obj.type_annotation(ctx.view),
         ctx,
     );
-    raw!(w, "ObjectPattern", ",\"properties\":");
+    keyed!(w, "ObjectPattern", ",\"properties\":");
     write_array(w, ctx.view.pat_props(obj.properties), |w, p| match p {
         ast::ObjectPatternProperty::Property(p) => write_property(w, p, ctx),
         ast::ObjectPatternProperty::RestElement(r) => write_rest_element(w, r, ctx),
@@ -125,7 +125,7 @@ pub(super) fn write_object_pattern(
 /// Emits a `RestElement` node.
 pub(super) fn write_rest_element(w: &mut Sink<'_>, rest: &ast::RestElement, ctx: &Ctx<'_>) {
     node_header!(w, "RestElement", rest.span, ctx);
-    raw!(w, "RestElement", ",\"argument\":");
+    keyed!(w, "RestElement", ",\"argument\":");
     write_expression(w, ctx.view.expr(rest.argument), ctx);
     // acorn carries a rest parameter's `?` on the rest element (never on
     // `argument`), between `argument` and `typeAnnotation`, only when present.
@@ -176,20 +176,20 @@ pub(super) fn write_property(w: &mut Sink<'_>, prop: &ast::Property, ctx: &Ctx<'
         );
     }
     write_expression(w, ctx.view.expr(prop.key), ctx);
-    raw!(w, "Property", ",\"value\":");
+    keyed!(w, "Property", ",\"value\":");
     write_property_value(w, prop, ctx);
     // Nearly every property is `init`, so that kind appends the whole
     // field as one literal rather than a runtime-length copy of `as_str()`.
     match prop.kind {
         ast::PropertyKind::Init => raw!(w, "Property", ",\"kind\":\"init\""),
         kind => {
-            raw!(w, "Property", ",\"kind\":\"");
             keyword!(
                 w,
+                "Property",
+                ",\"kind\":\"",
                 quoted,
                 kind => as_str,
-                ast::PropertyKind => [Init, Get, Set],
-                "Property"."kind"
+                ast::PropertyKind => [Init, Get, Set]
             );
             raw!(w, "\"");
         }
@@ -226,9 +226,9 @@ fn write_property_value(w: &mut Sink<'_>, prop: &ast::Property, ctx: &Ctx<'_>) {
         ) if prop.shorthand => {
             debug_assert_eq!(assign.operator, ast::AssignmentOperator::Assign);
             node_header!(w, "AssignmentPattern", *span, ctx);
-            raw!(w, "AssignmentPattern", ",\"left\":");
+            keyed!(w, "AssignmentPattern", ",\"left\":");
             write_expression(w, ctx.view.expr(assign.left), ctx);
-            raw!(w, "AssignmentPattern", ",\"right\":");
+            keyed!(w, "AssignmentPattern", ",\"right\":");
             write_expression(w, ctx.view.expr(assign.right), ctx);
             close_node(w, "AssignmentPattern", *span, ctx);
         }
@@ -246,14 +246,14 @@ pub(super) fn write_assignment_pattern(
     span: Span,
 ) {
     node_header!(w, "AssignmentPattern", span, ctx);
-    raw!(w, "AssignmentPattern", ",\"left\":");
+    keyed!(w, "AssignmentPattern", ",\"left\":");
     // A default's target keeps its type-assertion wrapper (`{ a: (b as T) = 1 }` →
     // `TSAsExpression`): acorn-typescript's `toAssignable` validates through the
     // assertion but preserves the node — same as the simple `=` left in
     // `write_expression`'s `AssignmentExpression` arm. The internal-only JSDoc cast is
     // still peeled, by `write_expression` itself.
     write_expression(w, ctx.view.expr(pattern.left), ctx);
-    raw!(w, "AssignmentPattern", ",\"right\":");
+    keyed!(w, "AssignmentPattern", ",\"right\":");
     write_expression(w, ctx.view.expr(pattern.right), ctx);
     write_decorators_field::<{ at!("AssignmentPattern") }>(
         w,

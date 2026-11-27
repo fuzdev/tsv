@@ -31,7 +31,7 @@ pub(super) fn write_type_annotation(
         ctx
     };
     node_header!(w, "TSTypeAnnotation", type_annotation.span, ctx);
-    raw!(w, "TSTypeAnnotation", ",\"typeAnnotation\":");
+    keyed!(w, "TSTypeAnnotation", ",\"typeAnnotation\":");
     write_type(w, ctx.view.ty(type_annotation.type_annotation), ctx);
     close_node(w, "TSTypeAnnotation", type_annotation.span, ctx);
 }
@@ -46,7 +46,7 @@ pub(super) fn write_type(w: &mut Sink<'_>, ts_type: &ast::TSType, ctx: &Ctx<'_>)
         }
         ast::TSType::Union(u) => {
             node_header!(w, "TSUnionType", u.span, ctx);
-            raw!(w, "TSUnionType", ",\"types\":");
+            keyed!(w, "TSUnionType", ",\"types\":");
             write_array(w, ctx.view.ty_list(u.types), |w, &t| {
                 write_type(w, ctx.view.ty(t), ctx);
             });
@@ -54,7 +54,7 @@ pub(super) fn write_type(w: &mut Sink<'_>, ts_type: &ast::TSType, ctx: &Ctx<'_>)
         }
         ast::TSType::Intersection(i) => {
             node_header!(w, "TSIntersectionType", i.span, ctx);
-            raw!(w, "TSIntersectionType", ",\"types\":");
+            keyed!(w, "TSIntersectionType", ",\"types\":");
             write_array(w, ctx.view.ty_list(i.types), |w, &t| {
                 write_type(w, ctx.view.ty(t), ctx);
             });
@@ -62,7 +62,7 @@ pub(super) fn write_type(w: &mut Sink<'_>, ts_type: &ast::TSType, ctx: &Ctx<'_>)
         }
         ast::TSType::TypeReference(r) => {
             node_header!(w, "TSTypeReference", r.span, ctx);
-            raw!(w, "TSTypeReference", ",\"typeName\":");
+            keyed!(w, "TSTypeReference", ",\"typeName\":");
             write_entity_name(w, &r.type_name, ctx);
             write_type_arguments_field::<{ at!("TSTypeReference") }>(
                 w,
@@ -73,7 +73,7 @@ pub(super) fn write_type(w: &mut Sink<'_>, ts_type: &ast::TSType, ctx: &Ctx<'_>)
         }
         ast::TSType::TypeLiteral(t) => {
             node_header!(w, "TSTypeLiteral", t.span, ctx);
-            raw!(w, "TSTypeLiteral", ",\"members\":");
+            keyed!(w, "TSTypeLiteral", ",\"members\":");
             write_array(w, ctx.view.type_members(t.members), |w, m| {
                 write_type_element(w, m, ctx);
             });
@@ -87,9 +87,9 @@ pub(super) fn write_type(w: &mut Sink<'_>, ts_type: &ast::TSType, ctx: &Ctx<'_>)
                 f.type_parameters.as_ref(),
                 ctx,
             );
-            raw!(w, "TSFunctionType", ",\"parameters\":");
+            keyed!(w, "TSFunctionType", ",\"parameters\":");
             write_expressions(w, ctx.view.exprs(f.params), ctx);
-            raw!(w, "TSFunctionType", ",\"typeAnnotation\":");
+            keyed!(w, "TSFunctionType", ",\"typeAnnotation\":");
             write_type_annotation(w, &f.return_type, ctx);
             close_node(w, "TSFunctionType", f.span, ctx);
         }
@@ -103,15 +103,15 @@ pub(super) fn write_type(w: &mut Sink<'_>, ts_type: &ast::TSType, ctx: &Ctx<'_>)
                 c.type_parameters.as_ref(),
                 ctx,
             );
-            raw!(w, "TSConstructorType", ",\"parameters\":");
+            keyed!(w, "TSConstructorType", ",\"parameters\":");
             write_expressions(w, ctx.view.exprs(c.params), ctx);
-            raw!(w, "TSConstructorType", ",\"typeAnnotation\":");
+            keyed!(w, "TSConstructorType", ",\"typeAnnotation\":");
             write_type_annotation(w, &c.return_type, ctx);
             close_node(w, "TSConstructorType", c.span, ctx);
         }
         ast::TSType::Tuple(t) => {
             node_header!(w, "TSTupleType", t.span, ctx);
-            raw!(w, "TSTupleType", ",\"elementTypes\":");
+            keyed!(w, "TSTupleType", ",\"elementTypes\":");
             write_array(w, ctx.view.ty_list(t.element_types), |w, &e| {
                 write_type(w, ctx.view.ty(e), ctx);
             });
@@ -119,13 +119,13 @@ pub(super) fn write_type(w: &mut Sink<'_>, ts_type: &ast::TSType, ctx: &Ctx<'_>)
         }
         ast::TSType::Parenthesized(p) => {
             node_header!(w, "TSParenthesizedType", p.span, ctx);
-            raw!(w, "TSParenthesizedType", ",\"typeAnnotation\":");
+            keyed!(w, "TSParenthesizedType", ",\"typeAnnotation\":");
             write_type(w, ctx.view.ty(p.type_annotation), ctx);
             close_node(w, "TSParenthesizedType", p.span, ctx);
         }
         ast::TSType::TypePredicate(p) => {
             node_header!(w, "TSTypePredicate", p.span, ctx);
-            raw!(w, "TSTypePredicate", ",\"parameterName\":");
+            keyed!(w, "TSTypePredicate", ",\"parameterName\":");
             if p.parameter_name.name(ctx.source, ctx.view) == "this" {
                 write_bare_node(
                     w,
@@ -144,9 +144,9 @@ pub(super) fn write_type(w: &mut Sink<'_>, ts_type: &ast::TSType, ctx: &Ctx<'_>)
             // in `x is T`).
             match p.type_annotation {
                 Some(t) => {
-                    raw!(w, "TSTypePredicate", ",\"typeAnnotation\":");
+                    keyed!(w, "TSTypePredicate", ",\"typeAnnotation\":");
                     node_header!(w, "TSTypeAnnotation", ctx.view.ty(t).span(), ctx);
-                    raw!(w, "TSTypeAnnotation", ",\"typeAnnotation\":");
+                    keyed!(w, "TSTypeAnnotation", ",\"typeAnnotation\":");
                     write_type(w, ctx.view.ty(t), ctx);
                     close_node(w, "TSTypeAnnotation", ctx.view.ty(t).span(), ctx);
                 }
@@ -158,13 +158,13 @@ pub(super) fn write_type(w: &mut Sink<'_>, ts_type: &ast::TSType, ctx: &Ctx<'_>)
         }
         ast::TSType::Conditional(c) => {
             node_header!(w, "TSConditionalType", c.span, ctx);
-            raw!(w, "TSConditionalType", ",\"checkType\":");
+            keyed!(w, "TSConditionalType", ",\"checkType\":");
             write_type(w, ctx.view.ty(c.check_type), ctx);
-            raw!(w, "TSConditionalType", ",\"extendsType\":");
+            keyed!(w, "TSConditionalType", ",\"extendsType\":");
             write_type(w, ctx.view.ty(c.extends_type), ctx);
-            raw!(w, "TSConditionalType", ",\"trueType\":");
+            keyed!(w, "TSConditionalType", ",\"trueType\":");
             write_type(w, ctx.view.ty(c.true_type), ctx);
-            raw!(w, "TSConditionalType", ",\"falseType\":");
+            keyed!(w, "TSConditionalType", ",\"falseType\":");
             write_type(w, ctx.view.ty(c.false_type), ctx);
             close_node(w, "TSConditionalType", c.span, ctx);
         }
@@ -177,13 +177,13 @@ pub(super) fn write_type(w: &mut Sink<'_>, ts_type: &ast::TSType, ctx: &Ctx<'_>)
             // The `TSMappedTypeParameter`: the parameter name is a bare name
             // channel; the name token is the leading `raw_len` bytes of the
             // struct span (which covers `K in C`).
-            raw!(w, "TSMappedType", ",\"typeParameter\":");
+            keyed!(w, "TSMappedType", ",\"typeParameter\":");
             node_header!(w, "TSTypeParameter", m.type_parameter.span, ctx);
             write_name_field(w, m.type_parameter.name, m.type_parameter.span.start, ctx);
-            raw!(w, "TSTypeParameter", ",\"constraint\":");
+            keyed!(w, "TSTypeParameter", ",\"constraint\":");
             write_type(w, ctx.view.ty(m.type_parameter.constraint), ctx);
             close_node(w, "TSTypeParameter", m.type_parameter.span, ctx);
-            raw!(w, "TSMappedType", ",\"nameType\":");
+            keyed!(w, "TSMappedType", ",\"nameType\":");
             write_or_null(w, m.name_type.as_ref(), |w, &t| {
                 write_type(w, ctx.view.ty(t), ctx);
             });
@@ -192,29 +192,29 @@ pub(super) fn write_type(w: &mut Sink<'_>, ts_type: &ast::TSType, ctx: &Ctx<'_>)
                 write_mapped_type_modifier(w, modifier);
             }
             if let Some(t) = ctx.view.opt_ty(m.type_annotation) {
-                raw!(w, "TSMappedType", ",\"typeAnnotation\":");
+                keyed!(w, "TSMappedType", ",\"typeAnnotation\":");
                 write_type(w, t, ctx);
             }
             close_node(w, "TSMappedType", m.span, ctx);
         }
         ast::TSType::TypeOperator(o) => {
             node_header!(w, "TSTypeOperator", o.span, ctx);
-            raw!(w, "TSTypeOperator", ",\"operator\":");
             keyword!(
                 w,
+                "TSTypeOperator",
+                ",\"operator\":",
                 token,
                 o.operator => as_str,
-                ast::TSTypeOperatorKind => [Keyof, Unique, Readonly],
-                "TSTypeOperator"."operator"
+                ast::TSTypeOperatorKind => [Keyof, Unique, Readonly]
             );
-            raw!(w, "TSTypeOperator", ",\"typeAnnotation\":");
+            keyed!(w, "TSTypeOperator", ",\"typeAnnotation\":");
             write_type(w, ctx.view.ty(o.type_annotation), ctx);
             close_node(w, "TSTypeOperator", o.span, ctx);
         }
         &ast::TSType::Import(_, i) => write_import_type(w, ctx.view.import_type(i), ctx),
         ast::TSType::TypeQuery(q) => {
             node_header!(w, "TSTypeQuery", q.span, ctx);
-            raw!(w, "TSTypeQuery", ",\"exprName\":");
+            keyed!(w, "TSTypeQuery", ",\"exprName\":");
             match &q.expr_name {
                 ast::TSTypeQueryExprName::EntityName(entity) => match entity {
                     ast::TSEntityName::Identifier(id) => write_identifier_plain(w, id, ctx),
@@ -231,13 +231,13 @@ pub(super) fn write_type(w: &mut Sink<'_>, ts_type: &ast::TSType, ctx: &Ctx<'_>)
         }
         ast::TSType::Rest(r) => {
             node_header!(w, "TSRestType", r.span, ctx);
-            raw!(w, "TSRestType", ",\"typeAnnotation\":");
+            keyed!(w, "TSRestType", ",\"typeAnnotation\":");
             write_type(w, ctx.view.ty(r.type_annotation), ctx);
             close_node(w, "TSRestType", r.span, ctx);
         }
         ast::TSType::Optional(o) => {
             node_header!(w, "TSOptionalType", o.span, ctx);
-            raw!(w, "TSOptionalType", ",\"typeAnnotation\":");
+            keyed!(w, "TSOptionalType", ",\"typeAnnotation\":");
             write_type(w, ctx.view.ty(o.type_annotation), ctx);
             close_node(w, "TSOptionalType", o.span, ctx);
         }
@@ -245,18 +245,18 @@ pub(super) fn write_type(w: &mut Sink<'_>, ts_type: &ast::TSType, ctx: &Ctx<'_>)
             // Field order: `label`, `optional`, `elementType` — acorn-typescript stamps
             // the label first, reading it before the `?` it may carry.
             node_header!(w, "TSNamedTupleMember", n.span, ctx);
-            raw!(w, "TSNamedTupleMember", ",\"label\":");
+            keyed!(w, "TSNamedTupleMember", ",\"label\":");
             write_identifier_plain(w, &n.label, ctx);
             raw!(w, "TSNamedTupleMember", ",\"optional\":");
             w.bool(n.optional);
-            raw!(w, "TSNamedTupleMember", ",\"elementType\":");
+            keyed!(w, "TSNamedTupleMember", ",\"elementType\":");
             write_type(w, ctx.view.ty(n.element_type), ctx);
             close_node(w, "TSNamedTupleMember", n.span, ctx);
         }
         &ast::TSType::Infer(_, i) => {
             let i = ctx.view.infer_type(i);
             node_header!(w, "TSInferType", i.span, ctx);
-            raw!(w, "TSInferType", ",\"typeParameter\":");
+            keyed!(w, "TSInferType", ",\"typeParameter\":");
             write_type_parameter(w, &i.type_parameter, ctx);
             close_node(w, "TSInferType", i.span, ctx);
         }
@@ -281,14 +281,14 @@ fn write_mapped_type_modifier(w: &mut Sink<'_>, m: ast::TSMappedTypeModifier) {
 /// `typeArguments?`.
 fn write_import_type(w: &mut Sink<'_>, i: &ast::TSImportType, ctx: &Ctx<'_>) {
     node_header!(w, "TSImportType", i.span, ctx);
-    raw!(w, "TSImportType", ",\"argument\":");
+    keyed!(w, "TSImportType", ",\"argument\":");
     write_literal(w, &i.argument, ctx);
     if let Some(o) = ctx.view.opt_expr(i.options) {
-        raw!(w, "TSImportType", ",\"options\":");
+        keyed!(w, "TSImportType", ",\"options\":");
         write_expression(w, o, ctx);
     }
     if let Some(q) = &i.qualifier {
-        raw!(w, "TSImportType", ",\"qualifier\":");
+        keyed!(w, "TSImportType", ",\"qualifier\":");
         write_entity_name(w, q, ctx);
     }
     write_type_arguments_field::<{ at!("TSImportType") }>(w, i.type_arguments.as_ref(), ctx);
@@ -300,15 +300,15 @@ fn write_literal_type(w: &mut Sink<'_>, lit: &ast::TSLiteralType, ctx: &Ctx<'_>)
     match lit {
         ast::TSLiteralType::TemplateLiteral(template) => {
             node_header!(w, "TSLiteralType", template.span, ctx);
-            raw!(w, "TSLiteralType", ",\"literal\":");
+            keyed!(w, "TSLiteralType", ",\"literal\":");
             // A template-literal type: node type "TemplateLiteral", but its
             // expressions are types.
             node_header!(w, "TemplateLiteral", template.span, ctx);
-            raw!(w, "TemplateLiteral", ",\"expressions\":");
+            keyed!(w, "TemplateLiteral", ",\"expressions\":");
             write_array(w, ctx.view.ty_list(template.types), |w, &t| {
                 write_type(w, ctx.view.ty(t), ctx);
             });
-            raw!(w, "TemplateLiteral", ",\"quasis\":");
+            keyed!(w, "TemplateLiteral", ",\"quasis\":");
             write_array(w, ctx.view.quasis(template.quasis), |w, q| {
                 write_template_element(w, q, ctx);
             });
@@ -320,7 +320,7 @@ fn write_literal_type(w: &mut Sink<'_>, lit: &ast::TSLiteralType, ctx: &Ctx<'_>)
         | ast::TSLiteralType::Number(literal)
         | ast::TSLiteralType::BigInt(literal) => {
             node_header!(w, "TSLiteralType", literal.span, ctx);
-            raw!(w, "TSLiteralType", ",\"literal\":");
+            keyed!(w, "TSLiteralType", ",\"literal\":");
             write_literal(w, literal, ctx);
             close_node(w, "TSLiteralType", literal.span, ctx);
         }
@@ -334,15 +334,15 @@ fn write_literal_type(w: &mut Sink<'_>, lit: &ast::TSLiteralType, ctx: &Ctx<'_>)
                 )
             };
             node_header!(w, "TSLiteralType", unary.span, ctx);
-            raw!(w, "TSLiteralType", ",\"literal\":");
+            keyed!(w, "TSLiteralType", ",\"literal\":");
             node_header!(w, "UnaryExpression", unary.span, ctx);
-            raw!(w, "UnaryExpression", ",\"operator\":");
             keyword!(
                 w,
+                "UnaryExpression",
+                ",\"operator\":",
                 token,
                 unary.operator => as_str,
-                ast::UnaryOperator => [Minus, Plus, Bang, Typeof, Void, Delete, Tilde],
-                "UnaryExpression"."operator"
+                ast::UnaryOperator => [Minus, Plus, Bang, Typeof, Void, Delete, Tilde]
             );
             // Constant: acorn's `UnaryExpression` is always prefix.
             fixed!(w, "UnaryExpression", ",\"prefix\":true,\"argument\":");
@@ -362,7 +362,7 @@ fn write_keyword_type(w: &mut Sink<'_>, kw: &ast::TSKeywordType, ctx: &Ctx<'_>) 
         TSKeywordKind::True | TSKeywordKind::False => {
             let is_true = matches!(kw.kind, TSKeywordKind::True);
             node_header!(w, "TSLiteralType", kw.span, ctx);
-            raw!(w, "TSLiteralType", ",\"literal\":");
+            keyed!(w, "TSLiteralType", ",\"literal\":");
             node_header!(w, "Literal", kw.span, ctx);
             raw!(w, "Literal", ",\"value\":");
             w.bool(is_true);
@@ -410,7 +410,7 @@ fn write_qualified_name(w: &mut Sink<'_>, qn: &ast::TSQualifiedName, ctx: &Ctx<'
     let mut node = qn;
     loop {
         node_header!(w, "TSQualifiedName", node.span, ctx);
-        raw!(w, "TSQualifiedName", ",\"left\":");
+        keyed!(w, "TSQualifiedName", ",\"left\":");
         spine.push(node);
         match &node.left {
             &ast::TSEntityName::QualifiedName(_, left) => node = ctx.view.qual_name(left),
@@ -421,7 +421,7 @@ fn write_qualified_name(w: &mut Sink<'_>, qn: &ast::TSQualifiedName, ctx: &Ctx<'
         }
     }
     for node in spine.iter().rev() {
-        raw!(w, "TSQualifiedName", ",\"right\":");
+        keyed!(w, "TSQualifiedName", ",\"right\":");
         write_identifier_plain(w, &node.right, ctx);
         close_node(w, "TSQualifiedName", node.span, ctx);
     }
@@ -449,13 +449,13 @@ fn write_postfix_type_chain(w: &mut Sink<'_>, ts_type: &ast::TSType, ctx: &Ctx<'
         match node {
             ast::TSType::Array(arr) => {
                 node_header!(w, "TSArrayType", arr.span, ctx);
-                raw!(w, "TSArrayType", ",\"elementType\":");
+                keyed!(w, "TSArrayType", ",\"elementType\":");
                 spine.push(PostfixTypeLink::Array(arr));
                 node = ctx.view.ty(arr.element_type);
             }
             ast::TSType::IndexedAccess(i) => {
                 node_header!(w, "TSIndexedAccessType", i.span, ctx);
-                raw!(w, "TSIndexedAccessType", ",\"objectType\":");
+                keyed!(w, "TSIndexedAccessType", ",\"objectType\":");
                 spine.push(PostfixTypeLink::IndexedAccess(i));
                 node = ctx.view.ty(i.object_type);
             }
@@ -469,7 +469,7 @@ fn write_postfix_type_chain(w: &mut Sink<'_>, ts_type: &ast::TSType, ctx: &Ctx<'
         match *link {
             PostfixTypeLink::Array(arr) => close_node(w, "TSArrayType", arr.span, ctx),
             PostfixTypeLink::IndexedAccess(i) => {
-                raw!(w, "TSIndexedAccessType", ",\"indexType\":");
+                keyed!(w, "TSIndexedAccessType", ",\"indexType\":");
                 write_type(w, ctx.view.ty(i.index_type), ctx);
                 close_node(w, "TSIndexedAccessType", i.span, ctx);
             }
@@ -484,7 +484,7 @@ pub(super) fn write_type_parameter_instantiation(
     ctx: &Ctx<'_>,
 ) {
     node_header!(w, "TSTypeParameterInstantiation", params.span, ctx);
-    raw!(w, "TSTypeParameterInstantiation", ",\"params\":");
+    keyed!(w, "TSTypeParameterInstantiation", ",\"params\":");
     write_array(w, ctx.view.ty_list(params.params), |w, &p| {
         write_type(w, ctx.view.ty(p), ctx);
     });
@@ -506,7 +506,7 @@ fn write_type_element(w: &mut Sink<'_>, elem: &ast::TSTypeElement, ctx: &Ctx<'_>
             let is_new_key = matches!(&ctx.view.expr(p.key).kind, ast::ExpressionKind::Identifier(id)
                 if id.name(ctx.source, ctx.view) == "new");
             if !p.computed && !p.readonly && is_new_key {
-                raw!(w, "TSPropertySignature", ",\"key\":");
+                keyed!(w, "TSPropertySignature", ",\"key\":");
             } else {
                 pick!(
                     w,
@@ -543,7 +543,7 @@ fn write_type_element(w: &mut Sink<'_>, elem: &ast::TSTypeElement, ctx: &Ctx<'_>
             }
             raw!(w, "TSMethodSignature", ",\"computed\":");
             w.bool(m.computed);
-            raw!(w, "TSMethodSignature", ",\"key\":");
+            keyed!(w, "TSMethodSignature", ",\"key\":");
             write_expression(w, ctx.view.expr(m.key), ctx);
             if m.optional {
                 raw!(w, "TSMethodSignature", ",\"optional\":true");
@@ -553,7 +553,7 @@ fn write_type_element(w: &mut Sink<'_>, elem: &ast::TSTypeElement, ctx: &Ctx<'_>
                 m.type_parameters.as_ref(),
                 ctx,
             );
-            raw!(w, "TSMethodSignature", ",\"parameters\":");
+            keyed!(w, "TSMethodSignature", ",\"parameters\":");
             write_expressions(w, ctx.view.exprs(m.params), ctx);
             write_type_annotation_field::<{ at!("TSMethodSignature") }>(
                 w,
@@ -616,7 +616,7 @@ fn write_signature_declaration<const E: u16>(
 ) {
     node_header!(w, @dyn node_type => E, span, ctx);
     write_type_parameters_field::<E>(w, type_parameters, ctx);
-    raw!(w, @E, ",\"parameters\":");
+    keyed!(w, @E, ",\"parameters\":");
     write_expressions(w, params, ctx);
     write_type_annotation_field::<E>(w, return_type, ctx);
     close_node(w, node_type, span, ctx);
@@ -633,7 +633,7 @@ pub(super) fn write_index_signature(w: &mut Sink<'_>, sig: &ast::TSIndexSignatur
     if sig.readonly {
         raw!(w, "TSIndexSignature", ",\"readonly\":true");
     }
-    raw!(w, "TSIndexSignature", ",\"parameters\":");
+    keyed!(w, "TSIndexSignature", ",\"parameters\":");
     write_array(w, ctx.view.index_params(sig.parameters), |w, p| {
         // Index-signature parameters carry the binding's optional flag and
         // type annotation, never decorators.
@@ -651,7 +651,7 @@ pub(super) fn write_index_signature(w: &mut Sink<'_>, sig: &ast::TSIndexSignatur
     // entirely — acorn parses it that way (the missing value type is a deferred
     // tsc checker error, TS1021, not a parse error).
     if let Some(type_annotation) = &sig.type_annotation {
-        raw!(w, "TSIndexSignature", ",\"typeAnnotation\":");
+        keyed!(w, "TSIndexSignature", ",\"typeAnnotation\":");
         write_type_annotation(w, type_annotation, ctx);
     }
     // A class index signature's decorators come last, as acorn-typescript attaches
@@ -679,7 +679,7 @@ pub(super) fn write_interface_declaration(
     if iface.declare {
         raw!(w, "TSInterfaceDeclaration", ",\"declare\":true");
     }
-    raw!(w, "TSInterfaceDeclaration", ",\"id\":");
+    keyed!(w, "TSInterfaceDeclaration", ",\"id\":");
     write_identifier_plain(w, &iface.id, ctx);
     write_type_parameters_field::<{ at!("TSInterfaceDeclaration") }>(
         w,
@@ -687,23 +687,23 @@ pub(super) fn write_interface_declaration(
         ctx,
     );
     if !iface.extends.is_empty() {
-        raw!(w, "TSInterfaceDeclaration", ",\"extends\":");
+        keyed!(w, "TSInterfaceDeclaration", ",\"extends\":");
         write_array(w, ctx.view.heritages(iface.extends), |w, h| {
             // Node type "TSExpressionWithTypeArguments"; the expression is an
             // entity name.
             node_header!(w, "TSExpressionWithTypeArguments", h.span, ctx);
-            raw!(w, "TSExpressionWithTypeArguments", ",\"expression\":");
+            keyed!(w, "TSExpressionWithTypeArguments", ",\"expression\":");
             write_entity_name(w, &h.expression, ctx);
             if let Some(ta) = &h.type_arguments {
-                raw!(w, "TSExpressionWithTypeArguments", ",\"typeParameters\":");
+                keyed!(w, "TSExpressionWithTypeArguments", ",\"typeParameters\":");
                 write_type_parameter_instantiation(w, ta, ctx);
             }
             close_node(w, "TSExpressionWithTypeArguments", h.span, ctx);
         });
     }
-    raw!(w, "TSInterfaceDeclaration", ",\"body\":");
+    keyed!(w, "TSInterfaceDeclaration", ",\"body\":");
     node_header!(w, "TSInterfaceBody", iface.body.span, ctx);
-    raw!(w, "TSInterfaceBody", ",\"body\":");
+    keyed!(w, "TSInterfaceBody", ",\"body\":");
     write_array(w, ctx.view.type_members(iface.body.body), |w, m| {
         write_type_element(w, m, ctx);
     });
@@ -725,7 +725,7 @@ pub(super) fn write_declare_function(
     if func.declare {
         raw!(w, "TSDeclareFunction", ",\"declare\":true");
     }
-    raw!(w, "TSDeclareFunction", ",\"id\":");
+    keyed!(w, "TSDeclareFunction", ",\"id\":");
     write_identifier_plain(w, &func.id, ctx);
     write_function_flags_fields::<{ at!("TSDeclareFunction") }>(w, func.generator, func.r#async);
     write_type_parameters_field::<{ at!("TSDeclareFunction") }>(
@@ -733,7 +733,7 @@ pub(super) fn write_declare_function(
         func.type_parameters.as_ref(),
         ctx,
     );
-    raw!(w, "TSDeclareFunction", ",\"params\":");
+    keyed!(w, "TSDeclareFunction", ",\"params\":");
     write_expressions(w, ctx.view.exprs(func.params), ctx);
     super::write_return_type_field::<{ at!("TSDeclareFunction") }>(
         w,
@@ -759,18 +759,18 @@ pub(super) fn write_enum_declaration(
     if enum_decl.declare {
         raw!(w, "TSEnumDeclaration", ",\"declare\":true");
     }
-    raw!(w, "TSEnumDeclaration", ",\"id\":");
+    keyed!(w, "TSEnumDeclaration", ",\"id\":");
     write_identifier_plain(w, &enum_decl.id, ctx);
-    raw!(w, "TSEnumDeclaration", ",\"members\":");
+    keyed!(w, "TSEnumDeclaration", ",\"members\":");
     write_array(w, ctx.view.enum_members(enum_decl.members), |w, member| {
         node_header!(w, "TSEnumMember", member.span, ctx);
-        raw!(w, "TSEnumMember", ",\"id\":");
+        keyed!(w, "TSEnumMember", ",\"id\":");
         match &member.id {
             ast::TSEnumMemberId::Identifier(id) => write_identifier_plain(w, id, ctx),
             ast::TSEnumMemberId::String(lit) => write_literal(w, lit, ctx),
         }
         if let Some(init) = ctx.view.opt_expr(member.initializer) {
-            raw!(w, "TSEnumMember", ",\"initializer\":");
+            keyed!(w, "TSEnumMember", ",\"initializer\":");
             write_expression(w, init, ctx);
         }
         close_node(w, "TSEnumMember", member.span, ctx);

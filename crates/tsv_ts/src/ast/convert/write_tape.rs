@@ -31,8 +31,9 @@ macro_rules! copy_pick {
 /// A run-time entry argument (`ent!`): the entry's id.
 type Ent = u16;
 
-/// A spine link's child key (`child_key!`): the link's entry and the key literal's ops.
-type ChildKey = (u16, &'static [tsv_lang::tape::LitOp]);
+/// A spine link's child key (`child_key!`): the link's entry and its stated key's presence bit
+/// (the key's field is a record's).
+type ChildKey = (u16, u8);
 
 #[path = "bigint.rs"]
 #[expect(
@@ -73,7 +74,7 @@ fn write_array<T>(
 }
 
 /// A nullable child: the item through `f`, or the `null` its field holds — `tsv_lang::
-/// write_or_null` on the tape.
+/// write_or_null` on the tape, after a `raw!` key or a stated one (`keyed!`).
 #[inline]
 fn write_or_null<T>(
     w: &mut TapeWriter<'_>,
@@ -82,7 +83,7 @@ fn write_or_null<T>(
 ) {
     match item {
         Some(v) => f(w, v),
-        None => w.null(),
+        None => w.null_or_record(),
     }
 }
 

@@ -46,7 +46,7 @@ pub(super) fn write_arrow_function_expression(
         "false,\"params\":"
     );
     write_expressions(w, ctx.view.exprs(arrow.params), ctx);
-    raw!(w, "ArrowFunctionExpression", ",\"body\":");
+    keyed!(w, "ArrowFunctionExpression", ",\"body\":");
     write_arrow_body(w, &arrow.body, ctx);
     write_type_parameters_field::<{ at!("ArrowFunctionExpression") }>(
         w,
@@ -75,7 +75,7 @@ pub(super) fn write_function_expression(
     ctx: &Ctx<'_>,
 ) {
     node_header!(w, "FunctionExpression", func.span, ctx);
-    raw!(w, "FunctionExpression", ",\"id\":");
+    keyed!(w, "FunctionExpression", ",\"id\":");
     write_or_null(w, func.id.as_ref(), |w, id| {
         write_identifier_with_optional(w, id, ctx);
     });
@@ -85,10 +85,10 @@ pub(super) fn write_function_expression(
         func.type_parameters.as_ref(),
         ctx,
     );
-    raw!(w, "FunctionExpression", ",\"params\":");
+    keyed!(w, "FunctionExpression", ",\"params\":");
     write_expressions(w, ctx.view.exprs(func.params), ctx);
     write_return_type_field::<{ at!("FunctionExpression") }>(w, func.return_type.as_ref(), ctx);
-    raw!(w, "FunctionExpression", ",\"body\":");
+    keyed!(w, "FunctionExpression", ",\"body\":");
     write_block_statement(w, &func.body, ctx);
     close_node(w, "FunctionExpression", func.span, ctx);
 }
@@ -103,14 +103,14 @@ pub(super) fn write_new_expression(
     ctx: &Ctx<'_>,
 ) {
     node_header!(w, "NewExpression", span, ctx);
-    raw!(w, "NewExpression", ",\"callee\":");
+    keyed!(w, "NewExpression", ",\"callee\":");
     write_expression(w, ctx.view.expr(new_expr.callee), ctx);
     write_type_arguments_field::<{ at!("NewExpression") }>(
         w,
         new_expr.type_arguments(ctx.view),
         ctx,
     );
-    raw!(w, "NewExpression", ",\"arguments\":");
+    keyed!(w, "NewExpression", ",\"arguments\":");
     write_expressions(
         w,
         ctx.view
@@ -153,7 +153,7 @@ pub(super) fn write_call_expression_tail(
     force_optional: bool,
     strip_optional: bool,
 ) {
-    raw!(w, "CallExpression", ",\"arguments\":");
+    keyed!(w, "CallExpression", ",\"arguments\":");
     write_expressions(
         w,
         ctx.view
@@ -207,7 +207,7 @@ pub(super) fn write_member_expression_tail(
     force_optional: bool,
     strip_optional: bool,
 ) {
-    raw!(w, "MemberExpression", ",\"property\":");
+    keyed!(w, "MemberExpression", ",\"property\":");
     write_expression(w, ctx.view.expr(member.property), ctx);
     // One literal per value, `optional` folded in where it is written: both
     // flags are nearly always `false`, so each branch predicts at its site.
@@ -249,11 +249,11 @@ pub(super) fn write_conditional_expression(
     ctx: &Ctx<'_>,
 ) {
     node_header!(w, "ConditionalExpression", span, ctx);
-    raw!(w, "ConditionalExpression", ",\"test\":");
+    keyed!(w, "ConditionalExpression", ",\"test\":");
     write_expression(w, ctx.view.expr(cond.test), ctx);
-    raw!(w, "ConditionalExpression", ",\"consequent\":");
+    keyed!(w, "ConditionalExpression", ",\"consequent\":");
     write_expression(w, ctx.view.expr(cond.consequent), ctx);
-    raw!(w, "ConditionalExpression", ",\"alternate\":");
+    keyed!(w, "ConditionalExpression", ",\"alternate\":");
     write_expression(w, ctx.view.expr(cond.alternate), ctx);
     close_node(w, "ConditionalExpression", span, ctx);
 }
@@ -266,7 +266,7 @@ pub(super) fn write_await_expression(
     ctx: &Ctx<'_>,
 ) {
     node_header!(w, "AwaitExpression", span, ctx);
-    raw!(w, "AwaitExpression", ",\"argument\":");
+    keyed!(w, "AwaitExpression", ",\"argument\":");
     write_expression(w, ctx.view.expr(await_expr.argument), ctx);
     close_node(w, "AwaitExpression", span, ctx);
 }
@@ -282,7 +282,7 @@ pub(super) fn write_yield_expression(
     node_header!(w, "YieldExpression", span, ctx);
     raw!(w, "YieldExpression", ",\"delegate\":");
     w.bool(yield_expr.delegate);
-    raw!(w, "YieldExpression", ",\"argument\":");
+    keyed!(w, "YieldExpression", ",\"argument\":");
     write_or_null(w, yield_expr.argument.as_ref(), |w, e| {
         write_expression(w, ctx.view.expr(*e), ctx);
     });

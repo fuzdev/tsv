@@ -22,7 +22,7 @@ mod literal;
 #[cfg(feature = "_json")]
 mod sink;
 #[cfg(feature = "_tape_literals")]
-pub use literal::{LitOp, literal_len, literal_ops};
+pub use literal::{LitOp, literal_len, literal_ops, stated_key, stated_keyword, stated_vocab};
 #[cfg(feature = "_json")]
 pub use sink::{SinkError, TapeSink, TapeWriter};
 

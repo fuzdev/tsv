@@ -99,6 +99,70 @@ pub const fn literal_len(lit: &'static str) -> usize {
     scan(None, lit, &mut [], false)
 }
 
+/// The field of the one key literal `lit` holds, of entry `entry` — a stated key's
+/// (`TapeWriter::t_key_stated`): a key whose value the next data call writes in its own
+/// encoding (a record or a list it opens, a ref), so the tape states the key's presence bit with
+/// no field pending. A literal that is not exactly one key, or a key of any other encoding,
+/// fails the build — a keyword key's among them: its index's vocabulary must be the key's, which
+/// only [`stated_keyword`] (`keyword!` / `keyword_key!`) ties, so a keyword key stated without it
+/// is refused.
+#[must_use]
+#[expect(
+    clippy::panic,
+    reason = "a compile-time reader: evaluated in a `const`, the panic is a build error"
+)]
+pub const fn stated_key(entry: u16, lit: &'static str) -> Field {
+    let field = one_key(entry, lit);
+    match field.enc {
+        Enc::Record | Enc::List | Enc::Ref => field,
+        Enc::Keyword => panic!(
+            "a keyword key is stated through `keyword!` (`stated_keyword`), which ties its index's vocabulary to the key"
+        ),
+        _ => panic!("a stated key's value writes its own encoding"),
+    }
+}
+
+/// The field of the one keyword key literal `lit` holds, of entry `entry` — a stated key whose
+/// value is a keyword index (`TapeWriter::t_keyword_id`), in the vocabulary [`stated_vocab`]
+/// reads from the same literal: the path a keyword key is stated through (`keyword!` /
+/// `keyword_key!`), so the key and its index's vocabulary are one build-time fact. A literal
+/// that is not exactly one key, or a key of any other encoding, fails the build.
+#[must_use]
+#[expect(
+    clippy::panic,
+    reason = "a compile-time reader: evaluated in a `const`, the panic is a build error"
+)]
+pub const fn stated_keyword(entry: u16, lit: &'static str) -> Field {
+    let field = one_key(entry, lit);
+    match field.enc {
+        Enc::Keyword => field,
+        _ => panic!("a stated keyword key's field is a keyword field"),
+    }
+}
+
+/// The vocabulary of the one keyword key literal `lit` holds, of entry `entry`
+/// ([`stated_keyword`]'s field's): the site takes its keyword index's vocabulary from the key it
+/// states, so the two cannot disagree. A literal that is not exactly one key, or a key of any
+/// other encoding, fails the build.
+#[must_use]
+pub const fn stated_vocab(entry: u16, lit: &'static str) -> u16 {
+    stated_keyword(entry, lit).aux
+}
+
+/// The field of the one key literal `lit` holds, of entry `entry`.
+#[expect(
+    clippy::panic,
+    reason = "a compile-time reader: evaluated in a `const`, the panic is a build error"
+)]
+const fn one_key(entry: u16, lit: &'static str) -> Field {
+    assert!(literal_len(lit) == 1, "a stated key's literal is one key");
+    let ops: [LitOp; 1] = literal_ops(Some(entry), lit);
+    match ops[0] {
+        LitOp::Key { field, .. } => field,
+        _ => panic!("a stated key's literal is one key"),
+    }
+}
+
 /// `lit[from..to]`, borrowed for `'static` (the literal is ASCII-checked by [`scan`]).
 #[expect(
     clippy::panic,

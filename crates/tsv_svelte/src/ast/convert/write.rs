@@ -463,23 +463,23 @@ fn write_root(w: &mut Sink<'_>, root: &ast::Root, ctx: &Ctx<'_>) {
     );
     raw!(w, "Root", ",\"type\":\"Root\",\"fragment\":");
     write_fragment(w, root.fragment, ctx);
-    raw!(w, "Root", ",\"options\":");
+    keyed!(w, "Root", ",\"options\":");
     write_or_null(w, root.options.as_ref(), |w, opts| {
         write_svelte_options(w, opts, ctx);
     });
-    raw!(w, "Root", ",\"comments\":");
+    keyed!(w, "Root", ",\"comments\":");
     write_array(w, root.comments.iter(), |w, c| {
         write_root_comment(w, c, ctx);
     });
     // Svelte assigns `module` before `instance` on the root.
     if let Some(script) = &root.module {
         let comment = find_preceding_comment(script.span.start);
-        raw!(w, "Root", ",\"module\":");
+        keyed!(w, "Root", ",\"module\":");
         write_script(w, script, comment, ctx);
     }
     if let Some(script) = &root.instance {
         let comment = find_preceding_comment(script.span.start);
-        raw!(w, "Root", ",\"instance\":");
+        keyed!(w, "Root", ",\"instance\":");
         write_script(w, script, comment, ctx);
     }
     close!(w);
@@ -682,12 +682,12 @@ fn write_special_element(w: &mut Sink<'_>, elem: &ast::SpecialElement, ctx: &Ctx
     // expression parse, so no template comment can attach — emit it fused.
     // Every other `this={…}` is a braced island keyed on its own `{…}` span.
     if let Some(tag) = elem.kind.tag() {
-        raw!(w, "SvelteElement", ",\"tag\":");
+        keyed!(w, "SvelteElement", ",\"tag\":");
         write_special_tag(w, tag, ctx);
     }
     // `<svelte:component this={…}>` expression — a generic island.
     if let Some(tag) = elem.kind.expression() {
-        raw!(w, "SvelteComponent", ",\"expression\":");
+        keyed!(w, "SvelteComponent", ",\"expression\":");
         write_braced_island(w, ctx.view.expr(tag.expression), tag.span, ctx);
     }
     close!(w);
@@ -744,9 +744,9 @@ fn write_special_tag(w: &mut Sink<'_>, this: &ast::SpecialThis, ctx: &Ctx<'_>) {
                 span.end,
                 ctx
             );
-            raw!(w, "Literal/SvelteFusedLiteral", ",\"value\":");
+            keyed!(w, "Literal/SvelteFusedLiteral", ",\"value\":");
             w.string(&content);
-            raw!(w, "Literal/SvelteFusedLiteral", ",\"raw\":");
+            keyed!(w, "Literal/SvelteFusedLiteral", ",\"raw\":");
             // Svelte reports the raw as a single-quoted string regardless of source.
             w.string(&format!("'{content}'"));
             close!(w);
@@ -767,7 +767,7 @@ fn write_expression_tag(w: &mut Sink<'_>, tag: &ast::ExpressionTag, ctx: &Ctx<'_
         tag.span.end,
         ctx
     );
-    raw!(w, "ExpressionTag", ",\"expression\":");
+    keyed!(w, "ExpressionTag", ",\"expression\":");
     write_braced_island(w, ctx.view.expr(tag.expression), tag.span, ctx);
     close!(w);
 }
@@ -785,7 +785,7 @@ fn write_shorthand_expression_tag(w: &mut Sink<'_>, tag: &ast::ExpressionTag, ct
         tag.span.end,
         ctx
     );
-    raw!(w, "ExpressionTag", ",\"expression\":");
+    keyed!(w, "ExpressionTag", ",\"expression\":");
     write_identifier_expression_with_character(
         w,
         ctx.view.expr(tag.expression),
@@ -816,7 +816,7 @@ fn write_html_comment(w: &mut Sink<'_>, comment: &ast::HtmlComment, ctx: &Ctx<'_
         comment.span.end,
         ctx
     );
-    raw!(w, "Comment", ",\"data\":");
+    keyed!(w, "Comment", ",\"data\":");
     w.string(comment.content(ctx.source));
     close!(w);
 }
@@ -840,7 +840,7 @@ fn write_if_block(w: &mut Sink<'_>, block: &ast::IfBlock, ctx: &Ctx<'_>) {
         ctx
     );
     let range_end = fragment_first_start(ctx.svelte, block.consequent).unwrap_or(block.span.end);
-    raw!(w, "IfBlock", ",\"test\":");
+    keyed!(w, "IfBlock", ",\"test\":");
     write_generic_island(
         w,
         ctx.view.expr(block.test),
@@ -848,9 +848,9 @@ fn write_if_block(w: &mut Sink<'_>, block: &ast::IfBlock, ctx: &Ctx<'_>) {
         range_end,
         ctx,
     );
-    raw!(w, "IfBlock", ",\"consequent\":");
+    keyed!(w, "IfBlock", ",\"consequent\":");
     write_fragment(w, block.consequent, ctx);
-    raw!(w, "IfBlock", ",\"alternate\":");
+    keyed!(w, "IfBlock", ",\"alternate\":");
     write_optional_fragment(w, block.alternate.as_ref(), ctx);
     close!(w);
 }
@@ -868,7 +868,7 @@ fn write_each_block(w: &mut Sink<'_>, block: &ast::EachBlock, ctx: &Ctx<'_>) {
         ctx
     );
     let range_end = fragment_first_start(ctx.svelte, block.body).unwrap_or(block.span.end);
-    raw!(w, "EachBlock", ",\"expression\":");
+    keyed!(w, "EachBlock", ",\"expression\":");
     write_generic_island(
         w,
         ctx.view.expr(block.expression),
@@ -876,18 +876,18 @@ fn write_each_block(w: &mut Sink<'_>, block: &ast::EachBlock, ctx: &Ctx<'_>) {
         range_end,
         ctx,
     );
-    raw!(w, "EachBlock", ",\"body\":");
+    keyed!(w, "EachBlock", ",\"body\":");
     write_fragment(w, block.body, ctx);
-    raw!(w, "EachBlock", ",\"context\":");
+    keyed!(w, "EachBlock", ",\"context\":");
     write_or_null(w, block.context.as_ref(), |w, c| {
         write_pattern_island(w, ctx.view.expr(*c), ctx);
     });
     if let Some(index) = block.index {
-        raw!(w, "EachBlock", ",\"index\":");
+        keyed!(w, "EachBlock", ",\"index\":");
         w.string(index.extract(ctx.source));
     }
     if let Some(key) = &block.key {
-        raw!(w, "EachBlock", ",\"key\":");
+        keyed!(w, "EachBlock", ",\"key\":");
         // The key's window is INSIDE its own parens, not at the block's `{#` — canonical
         // filters each parse's comments to `start >= index`, and the key's
         // `read_expression` begins after the `(` (only whitespace can sit between).
@@ -904,7 +904,7 @@ fn write_each_block(w: &mut Sink<'_>, block: &ast::EachBlock, ctx: &Ctx<'_>) {
         );
     }
     if let Some(fallback) = &block.fallback {
-        raw!(w, "EachBlock", ",\"fallback\":");
+        keyed!(w, "EachBlock", ",\"fallback\":");
         write_fragment(w, *fallback, ctx);
     }
     close!(w);
@@ -931,7 +931,7 @@ fn write_await_block(w: &mut Sink<'_>, block: &ast::AwaitBlock, ctx: &Ctx<'_>) {
     .filter_map(|fragment| fragment_first_start(ctx.svelte, *fragment))
     .min()
     .unwrap_or(block.span.end);
-    raw!(w, "AwaitBlock", ",\"expression\":");
+    keyed!(w, "AwaitBlock", ",\"expression\":");
     write_generic_island(
         w,
         ctx.view.expr(block.expression),
@@ -939,11 +939,11 @@ fn write_await_block(w: &mut Sink<'_>, block: &ast::AwaitBlock, ctx: &Ctx<'_>) {
         range_end,
         ctx,
     );
-    raw!(w, "AwaitBlock", ",\"value\":");
+    keyed!(w, "AwaitBlock", ",\"value\":");
     write_or_null(w, block.value.as_ref(), |w, v| {
         write_pattern_island(w, ctx.view.expr(*v), ctx);
     });
-    raw!(w, "AwaitBlock", ",\"error\":");
+    keyed!(w, "AwaitBlock", ",\"error\":");
     write_or_null(w, block.error.as_ref(), |w, e| {
         write_pattern_island(w, ctx.view.expr(*e), ctx);
     });
@@ -957,9 +957,9 @@ fn write_await_block(w: &mut Sink<'_>, block: &ast::AwaitBlock, ctx: &Ctx<'_>) {
         None if block.pending_block => write_fragment(w, ast::Fragment { nodes: Run::EMPTY }, ctx),
         None => raw!(w, "null"),
     }
-    raw!(w, "AwaitBlock", ",\"then\":");
+    keyed!(w, "AwaitBlock", ",\"then\":");
     write_optional_fragment(w, block.then.as_ref(), ctx);
-    raw!(w, "AwaitBlock", ",\"catch\":");
+    keyed!(w, "AwaitBlock", ",\"catch\":");
     write_optional_fragment(w, block.catch.as_ref(), ctx);
     close!(w);
 }
@@ -975,7 +975,7 @@ fn write_key_block(w: &mut Sink<'_>, block: &ast::KeyBlock, ctx: &Ctx<'_>) {
         ctx
     );
     let range_end = fragment_first_start(ctx.svelte, block.fragment).unwrap_or(block.span.end);
-    raw!(w, "KeyBlock", ",\"expression\":");
+    keyed!(w, "KeyBlock", ",\"expression\":");
     write_generic_island(
         w,
         ctx.view.expr(block.expression),
@@ -983,7 +983,7 @@ fn write_key_block(w: &mut Sink<'_>, block: &ast::KeyBlock, ctx: &Ctx<'_>) {
         range_end,
         ctx,
     );
-    raw!(w, "KeyBlock", ",\"fragment\":");
+    keyed!(w, "KeyBlock", ",\"fragment\":");
     write_fragment(w, block.fragment, ctx);
     close!(w);
 }
@@ -1001,7 +1001,7 @@ fn write_snippet_block(w: &mut Sink<'_>, block: &ast::SnippetBlock, ctx: &Ctx<'_
         ctx
     );
     let range_end = fragment_first_start(ctx.svelte, block.body).unwrap_or(block.span.end);
-    raw!(w, "SnippetBlock", ",\"expression\":");
+    keyed!(w, "SnippetBlock", ",\"expression\":");
     write_snippet_name(
         w,
         ctx.view.expr(block.expression),
@@ -1010,10 +1010,10 @@ fn write_snippet_block(w: &mut Sink<'_>, block: &ast::SnippetBlock, ctx: &Ctx<'_
         ctx,
     );
     if let Some(type_params) = block.type_params_raw {
-        raw!(w, "SnippetBlock", ",\"typeParams\":");
+        keyed!(w, "SnippetBlock", ",\"typeParams\":");
         w.string(ctx.svelte.text(type_params));
     }
-    raw!(w, "SnippetBlock", ",\"parameters\":");
+    keyed!(w, "SnippetBlock", ",\"parameters\":");
     write_snippet_parameters(
         w,
         ctx.snippet_wire_parameters(block.span.start)
@@ -1022,7 +1022,7 @@ fn write_snippet_block(w: &mut Sink<'_>, block: &ast::SnippetBlock, ctx: &Ctx<'_
         range_end,
         ctx,
     );
-    raw!(w, "SnippetBlock", ",\"body\":");
+    keyed!(w, "SnippetBlock", ",\"body\":");
     write_fragment(w, block.body, ctx);
     close!(w);
 }
@@ -1087,7 +1087,7 @@ fn write_html_tag(w: &mut Sink<'_>, tag: &ast::HtmlTag, ctx: &Ctx<'_>) {
         tag.span.end,
         ctx
     );
-    raw!(w, "HtmlTag", ",\"expression\":");
+    keyed!(w, "HtmlTag", ",\"expression\":");
     write_braced_island(w, ctx.view.expr(tag.expression), tag.span, ctx);
     close!(w);
 }
@@ -1102,7 +1102,7 @@ fn write_render_tag(w: &mut Sink<'_>, tag: &ast::RenderTag, ctx: &Ctx<'_>) {
         tag.span.end,
         ctx
     );
-    raw!(w, "RenderTag", ",\"expression\":");
+    keyed!(w, "RenderTag", ",\"expression\":");
     write_braced_island(w, ctx.view.expr(tag.expression), tag.span, ctx);
     close!(w);
 }
@@ -1123,7 +1123,7 @@ fn write_debug_tag(w: &mut Sink<'_>, tag: &ast::DebugTag, ctx: &Ctx<'_>) {
         tag.span.end,
         ctx
     );
-    raw!(w, "DebugTag", ",\"identifiers\":");
+    keyed!(w, "DebugTag", ",\"identifiers\":");
     // The internal entries keep what the author wrote — a JSDoc cast around the
     // whole comma list (`{@debug /** @type {B} */ (b, c)}`) is ONE entry so the
     // printer can reproduce the cast — but the wire is the canonical parse,
@@ -1237,7 +1237,7 @@ fn write_const_tag(w: &mut Sink<'_>, tag: &ast::ConstTag, ctx: &Ctx<'_>) {
         tag.span.end,
         ctx
     );
-    raw!(w, "ConstTag", ",\"declaration\":");
+    keyed!(w, "ConstTag", ",\"declaration\":");
     // The declaration `end` is always `tag.span.end - 1` — canonical Svelte
     // hard-codes `parser.index - 1` (the byte before the closing `}`).
     let decl_end = tag.span.end - 1;
@@ -1352,13 +1352,13 @@ fn write_const_declaration(
         declarator_end,
         ctx
     );
-    raw!(w, "VariableDeclarator", ",\"id\":");
+    keyed!(w, "VariableDeclarator", ",\"id\":");
     write_pattern_embedded(
         w,
         ctx.view.expr(tag.id),
         ctx.embed_pattern(id_mode, id_annotation_mode),
     );
-    raw!(w, "VariableDeclarator", ",\"init\":");
+    keyed!(w, "VariableDeclarator", ",\"init\":");
     write_expression_embedded(w, ctx.view.expr(tag.init), ctx.embed(init_mode));
     raw!(w, "VariableDeclaration", "}],\"kind\":\"const\"}");
 }
@@ -1382,7 +1382,7 @@ fn write_declaration_tag(w: &mut Sink<'_>, tag: &ast::DeclarationTag, ctx: &Ctx<
         tag.span.end,
         ctx
     );
-    raw!(w, "DeclarationTag", ",\"declaration\":");
+    keyed!(w, "DeclarationTag", ",\"declaration\":");
     // Scoped comment pre-check (see `write_const_tag`): no comment inside this
     // tag's span means the attach queue is empty, so fuse directly.
     if !ctx.any_comment_in(tag.span.start, tag.span.end) {
@@ -1488,7 +1488,7 @@ fn write_spread_attribute(w: &mut Sink<'_>, spread: &ast::SpreadAttribute, ctx: 
         spread.span.end,
         ctx
     );
-    raw!(w, "SpreadAttribute", ",\"expression\":");
+    keyed!(w, "SpreadAttribute", ",\"expression\":");
     write_braced_island(w, ctx.view.expr(spread.expression), spread.span, ctx);
     close!(w);
 }
@@ -1503,7 +1503,7 @@ fn write_attach_tag(w: &mut Sink<'_>, tag: &ast::AttachTag, ctx: &Ctx<'_>) {
         tag.span.end,
         ctx
     );
-    raw!(w, "AttachTag", ",\"expression\":");
+    keyed!(w, "AttachTag", ",\"expression\":");
     write_braced_island(w, ctx.view.expr(tag.expression), tag.span, ctx);
     close!(w);
 }
@@ -1537,7 +1537,7 @@ fn write_directive_head<const E: u16>(
         #[cfg(not(debug_assertions))]
         let _ = node_type;
     }
-    raw!(w, @E, "\",\"name\":");
+    keyed!(w, @E, "\",\"name\":");
     w.string(name_span.extract(ctx.source));
     if let Some(lines) = ctx.positions.lines() {
         write_name_loc_field(w, head_span, lines);
@@ -1579,7 +1579,7 @@ macro_rules! expression_directive_writer {
                 d.head_span,
                 ctx,
             );
-            raw!(w, $e, ",\"expression\":");
+            keyed!(w, $e, ",\"expression\":");
             write_optional_directive_expression(w, ctx.view.opt_expr(d.expression), d.span, ctx);
             raw!(w, $e, ",\"modifiers\":");
             write_modifiers(w, ctx.svelte.modifiers(d.modifiers), ctx.source);
@@ -1606,7 +1606,7 @@ fn write_transition_directive(w: &mut Sink<'_>, d: &ast::TransitionDirective, ct
         d.head_span,
         ctx,
     );
-    raw!(w, "TransitionDirective", ",\"expression\":");
+    keyed!(w, "TransitionDirective", ",\"expression\":");
     write_optional_directive_expression(w, ctx.view.opt_expr(d.expression), d.span, ctx);
     raw!(w, "TransitionDirective", ",\"modifiers\":");
     write_modifiers(w, ctx.svelte.modifiers(d.modifiers), ctx.source);
@@ -1645,7 +1645,7 @@ fn write_directive_value_expression(
             id.span.end,
             ctx
         );
-        raw!(w, "Identifier", ",\"name\":");
+        keyed!(w, "Identifier", ",\"name\":");
         w.string(id.name(ctx.source, ctx.view));
         close!(w);
     }
@@ -1660,7 +1660,7 @@ fn write_bind_directive(w: &mut Sink<'_>, d: &ast::BindDirective, ctx: &Ctx<'_>)
         d.head_span,
         ctx,
     );
-    raw!(w, "BindDirective", ",\"expression\":");
+    keyed!(w, "BindDirective", ",\"expression\":");
     write_directive_value_expression(
         w,
         ctx.view.expr(d.expression),
@@ -1682,7 +1682,7 @@ fn write_class_directive(w: &mut Sink<'_>, d: &ast::ClassDirective, ctx: &Ctx<'_
         d.head_span,
         ctx,
     );
-    raw!(w, "ClassDirective", ",\"expression\":");
+    keyed!(w, "ClassDirective", ",\"expression\":");
     write_directive_value_expression(
         w,
         ctx.view.expr(d.expression),
@@ -1758,11 +1758,11 @@ fn write_style_sheet(
         style.span.end,
         ctx
     );
-    raw!(w, "css:StyleSheet", ",\"attributes\":");
+    keyed!(w, "css:StyleSheet", ",\"attributes\":");
     write_value_attributes(w, ctx.svelte.attributes(style.attributes), ctx);
-    raw!(w, "css:StyleSheet", ",\"children\":");
+    keyed!(w, "css:StyleSheet", ",\"children\":");
     let css_comments = write_css_children(w, style.css_parsed(ctx.css), ctx.source, ctx.positions);
-    raw!(w, "css:StyleSheet", ",\"comments\":");
+    keyed!(w, "css:StyleSheet", ",\"comments\":");
     write_css_comments(w, &css_comments, ctx.source, ctx.positions);
     keys_span!(
         w,
@@ -1774,7 +1774,7 @@ fn write_style_sheet(
     );
     raw!(w, "~StyleContent", ",\"styles\":");
     w.string(style.content_span.extract(ctx.source));
-    raw!(w, "~StyleContent", ",\"comment\":");
+    keyed!(w, "~StyleContent", ",\"comment\":");
     // Same `{type:"Comment", start, end, data}` shape as a fragment HTML comment.
     write_or_null(w, preceding_comment, |w, c| write_html_comment(w, c, ctx));
     raw!(w, "}}");
@@ -1810,16 +1810,16 @@ fn write_script(
         script.span.end,
         ctx
     );
-    raw!(w, "Script", ",\"context\":");
     // Escape-free `&'static str` (`default` / `module`) → skip the escape scan; on the tape
     // the word's index, resolved at build time.
     keyword!(
         w,
+        "Script",
+        ",\"context\":",
         script.context => as_str,
-        ast::ScriptContext => [Default, Module],
-        "Script"."context"
+        ast::ScriptContext => [Default, Module]
     );
-    raw!(w, "Script", ",\"content\":");
+    keyed!(w, "Script", ",\"content\":");
     // A script whose `Program` carries comments (its own or a preceding HTML
     // comment) needs acorn's leading/trailing attach, which runs online off this
     // emit's own node opens and closes. The common case (no comments) fuses with
@@ -1838,7 +1838,7 @@ fn write_script(
         .as_ref()
         .map_or(CommentMode::Off, CommentAttach::mode);
     write_program_embedded(w, &script.content, ctx.embed(mode));
-    raw!(w, "Script", ",\"attributes\":");
+    keyed!(w, "Script", ",\"attributes\":");
     write_value_attributes(w, ctx.svelte.attributes(script.attributes), ctx);
     close!(w);
 }
@@ -1855,7 +1855,7 @@ fn write_svelte_options(w: &mut Sink<'_>, options: &ast::SvelteOptions, ctx: &Ct
         options.span.end,
         ctx
     );
-    raw!(w, "~SvelteOptions", ",\"attributes\":");
+    keyed!(w, "~SvelteOptions", ",\"attributes\":");
     write_value_attributes(w, attrs, ctx);
     if let Some(runes) = bool_option(ctx.svelte, attrs, "runes", ctx.source) {
         raw!(w, "~SvelteOptions", ",\"runes\":");
@@ -1868,7 +1868,7 @@ fn write_svelte_options(w: &mut Sink<'_>, options: &ast::SvelteOptions, ctx: &Ct
     if let Some(css) = find_option_values(ctx.svelte, attrs, "css", ctx.source)
         .and_then(|v| text_value(v, ctx.source))
     {
-        raw!(w, "~SvelteOptions", ",\"css\":");
+        keyed!(w, "~SvelteOptions", ",\"css\":");
         w.string(&css);
     }
     if let Some(accessors) = bool_option(ctx.svelte, attrs, "accessors", ctx.source) {
@@ -1884,7 +1884,7 @@ fn write_svelte_options(w: &mut Sink<'_>, options: &ast::SvelteOptions, ctx: &Ct
     if let Some(namespace) = find_option_values(ctx.svelte, attrs, "namespace", ctx.source)
         .and_then(|v| text_value(v, ctx.source))
     {
-        raw!(w, "~SvelteOptions", ",\"namespace\":");
+        keyed!(w, "~SvelteOptions", ",\"namespace\":");
         w.string(&namespace);
     }
     write_custom_element_field(w, attrs, ctx);

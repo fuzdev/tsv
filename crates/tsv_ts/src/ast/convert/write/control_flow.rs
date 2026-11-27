@@ -16,11 +16,11 @@ pub(super) fn write_if_statement(
     ctx: &Ctx<'_>,
 ) {
     node_header!(w, "IfStatement", span, ctx);
-    raw!(w, "IfStatement", ",\"test\":");
+    keyed!(w, "IfStatement", ",\"test\":");
     write_expression(w, ctx.view.expr(if_stmt.test), ctx);
-    raw!(w, "IfStatement", ",\"consequent\":");
+    keyed!(w, "IfStatement", ",\"consequent\":");
     write_statement(w, ctx.view.stmt(if_stmt.consequent), ctx);
-    raw!(w, "IfStatement", ",\"alternate\":");
+    keyed!(w, "IfStatement", ",\"alternate\":");
     write_or_null(w, ctx.view.opt_stmt(if_stmt.alternate), |w, alt| {
         write_statement(w, alt, ctx);
     });
@@ -43,15 +43,15 @@ pub(super) fn write_for_statement(
         Some(ast::ForInit::Expression(expr)) => write_expression(w, ctx.view.expr(*expr), ctx),
         None => w.null(),
     }
-    raw!(w, "ForStatement", ",\"test\":");
+    keyed!(w, "ForStatement", ",\"test\":");
     write_or_null(w, for_stmt.test.as_ref(), |w, test| {
         write_expression(w, ctx.view.expr(*test), ctx);
     });
-    raw!(w, "ForStatement", ",\"update\":");
+    keyed!(w, "ForStatement", ",\"update\":");
     write_or_null(w, for_stmt.update.as_ref(), |w, update| {
         write_expression(w, ctx.view.expr(*update), ctx);
     });
-    raw!(w, "ForStatement", ",\"body\":");
+    keyed!(w, "ForStatement", ",\"body\":");
     write_statement(w, ctx.view.stmt(for_stmt.body), ctx);
     close_node(w, "ForStatement", span, ctx);
 }
@@ -74,11 +74,11 @@ pub(super) fn write_for_in_statement(
     ctx: &Ctx<'_>,
 ) {
     node_header!(w, "ForInStatement", span, ctx);
-    raw!(w, "ForInStatement", ",\"left\":");
+    keyed!(w, "ForInStatement", ",\"left\":");
     write_for_in_of_left(w, ctx.view.for_left(for_in.left), ctx);
-    raw!(w, "ForInStatement", ",\"right\":");
+    keyed!(w, "ForInStatement", ",\"right\":");
     write_expression(w, ctx.view.expr(for_in.right), ctx);
-    raw!(w, "ForInStatement", ",\"body\":");
+    keyed!(w, "ForInStatement", ",\"body\":");
     write_statement(w, ctx.view.stmt(for_in.body), ctx);
     close_node(w, "ForInStatement", span, ctx);
 }
@@ -94,11 +94,11 @@ pub(super) fn write_for_of_statement(
     node_header!(w, "ForOfStatement", span, ctx);
     raw!(w, "ForOfStatement", ",\"await\":");
     w.bool(for_of.r#await);
-    raw!(w, "ForOfStatement", ",\"left\":");
+    keyed!(w, "ForOfStatement", ",\"left\":");
     write_for_in_of_left(w, ctx.view.for_left(for_of.left), ctx);
-    raw!(w, "ForOfStatement", ",\"right\":");
+    keyed!(w, "ForOfStatement", ",\"right\":");
     write_expression(w, ctx.view.expr(for_of.right), ctx);
-    raw!(w, "ForOfStatement", ",\"body\":");
+    keyed!(w, "ForOfStatement", ",\"body\":");
     write_statement(w, ctx.view.stmt(for_of.body), ctx);
     close_node(w, "ForOfStatement", span, ctx);
 }
@@ -111,9 +111,9 @@ pub(super) fn write_while_statement(
     ctx: &Ctx<'_>,
 ) {
     node_header!(w, "WhileStatement", span, ctx);
-    raw!(w, "WhileStatement", ",\"test\":");
+    keyed!(w, "WhileStatement", ",\"test\":");
     write_expression(w, ctx.view.expr(while_stmt.test), ctx);
-    raw!(w, "WhileStatement", ",\"body\":");
+    keyed!(w, "WhileStatement", ",\"body\":");
     write_statement(w, ctx.view.stmt(while_stmt.body), ctx);
     close_node(w, "WhileStatement", span, ctx);
 }
@@ -126,9 +126,9 @@ pub(super) fn write_with_statement(
     ctx: &Ctx<'_>,
 ) {
     node_header!(w, "WithStatement", span, ctx);
-    raw!(w, "WithStatement", ",\"object\":");
+    keyed!(w, "WithStatement", ",\"object\":");
     write_expression(w, ctx.view.expr(with_stmt.object), ctx);
-    raw!(w, "WithStatement", ",\"body\":");
+    keyed!(w, "WithStatement", ",\"body\":");
     write_statement(w, ctx.view.stmt(with_stmt.body), ctx);
     close_node(w, "WithStatement", span, ctx);
 }
@@ -141,9 +141,9 @@ pub(super) fn write_do_while_statement(
     ctx: &Ctx<'_>,
 ) {
     node_header!(w, "DoWhileStatement", span, ctx);
-    raw!(w, "DoWhileStatement", ",\"body\":");
+    keyed!(w, "DoWhileStatement", ",\"body\":");
     write_statement(w, ctx.view.stmt(do_while.body), ctx);
-    raw!(w, "DoWhileStatement", ",\"test\":");
+    keyed!(w, "DoWhileStatement", ",\"test\":");
     write_expression(w, ctx.view.expr(do_while.test), ctx);
     close_node(w, "DoWhileStatement", span, ctx);
 }
@@ -156,17 +156,17 @@ pub(super) fn write_switch_statement(
     ctx: &Ctx<'_>,
 ) {
     node_header!(w, "SwitchStatement", span, ctx);
-    raw!(w, "SwitchStatement", ",\"discriminant\":");
+    keyed!(w, "SwitchStatement", ",\"discriminant\":");
     write_expression(w, ctx.view.expr(switch_stmt.discriminant), ctx);
-    raw!(w, "SwitchStatement", ",\"cases\":");
+    keyed!(w, "SwitchStatement", ",\"cases\":");
     // acorn initializes `consequent` before parsing `test`, so it serializes first.
     write_array(w, ctx.view.cases(switch_stmt.cases), |w, case| {
         node_header!(w, "SwitchCase", case.span, ctx);
-        raw!(w, "SwitchCase", ",\"consequent\":");
+        keyed!(w, "SwitchCase", ",\"consequent\":");
         write_array(w, ctx.view.stmt_list(case.consequent), |w, s| {
             write_statement(w, ctx.view.stmt(*s), ctx);
         });
-        raw!(w, "SwitchCase", ",\"test\":");
+        keyed!(w, "SwitchCase", ",\"test\":");
         write_or_null(w, case.test.as_ref(), |w, t| {
             write_expression(w, ctx.view.expr(*t), ctx);
         });
@@ -184,18 +184,18 @@ pub(super) fn write_try_statement(
     ctx: &Ctx<'_>,
 ) {
     node_header!(w, "TryStatement", span, ctx);
-    raw!(w, "TryStatement", ",\"block\":");
+    keyed!(w, "TryStatement", ",\"block\":");
     write_block_statement(w, &try_stmt.block, ctx);
-    raw!(w, "TryStatement", ",\"handler\":");
+    keyed!(w, "TryStatement", ",\"handler\":");
     write_or_null(w, ctx.view.opt_catch(try_stmt.handler), |w, clause| {
         node_header!(w, "CatchClause", clause.span, ctx);
-        raw!(w, "CatchClause", ",\"param\":");
+        keyed!(w, "CatchClause", ",\"param\":");
         write_or_null(w, clause.param.as_ref(), |w, p| write_expression(w, p, ctx));
-        raw!(w, "CatchClause", ",\"body\":");
+        keyed!(w, "CatchClause", ",\"body\":");
         write_block_statement(w, &clause.body, ctx);
         close_node(w, "CatchClause", clause.span, ctx);
     });
-    raw!(w, "TryStatement", ",\"finalizer\":");
+    keyed!(w, "TryStatement", ",\"finalizer\":");
     write_or_null(w, try_stmt.finalizer.as_ref(), |w, f| {
         write_block_statement(w, f, ctx);
     });
@@ -210,7 +210,7 @@ pub(super) fn write_throw_statement(
     ctx: &Ctx<'_>,
 ) {
     node_header!(w, "ThrowStatement", span, ctx);
-    raw!(w, "ThrowStatement", ",\"argument\":");
+    keyed!(w, "ThrowStatement", ",\"argument\":");
     write_expression(w, ctx.view.expr(throw_stmt.argument), ctx);
     close_node(w, "ThrowStatement", span, ctx);
 }
@@ -223,7 +223,7 @@ pub(super) fn write_break_statement(
     ctx: &Ctx<'_>,
 ) {
     node_header!(w, "BreakStatement", span, ctx);
-    raw!(w, "BreakStatement", ",\"label\":");
+    keyed!(w, "BreakStatement", ",\"label\":");
     write_or_null(w, break_stmt.label.as_ref(), |w, id| {
         write_identifier_plain(w, id, ctx);
     });
@@ -238,7 +238,7 @@ pub(super) fn write_continue_statement(
     ctx: &Ctx<'_>,
 ) {
     node_header!(w, "ContinueStatement", span, ctx);
-    raw!(w, "ContinueStatement", ",\"label\":");
+    keyed!(w, "ContinueStatement", ",\"label\":");
     write_or_null(w, continue_stmt.label.as_ref(), |w, id| {
         write_identifier_plain(w, id, ctx);
     });
@@ -254,9 +254,9 @@ pub(super) fn write_labeled_statement(
 ) {
     node_header!(w, "LabeledStatement", span, ctx);
     // acorn assigns `body` before `label`, so it serializes first.
-    raw!(w, "LabeledStatement", ",\"body\":");
+    keyed!(w, "LabeledStatement", ",\"body\":");
     write_statement(w, ctx.view.stmt(labeled.body), ctx);
-    raw!(w, "LabeledStatement", ",\"label\":");
+    keyed!(w, "LabeledStatement", ",\"label\":");
     write_identifier_plain(w, &labeled.label, ctx);
     close_node(w, "LabeledStatement", span, ctx);
 }

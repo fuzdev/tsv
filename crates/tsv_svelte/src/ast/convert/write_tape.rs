@@ -107,7 +107,7 @@ fn write_value_array<T>(
 }
 
 /// A nullable child: the item through `f`, or the `null` its field holds — `tsv_lang::
-/// write_or_null` on the tape.
+/// write_or_null` on the tape, after a `raw!` key or a stated one (`keyed!`).
 #[inline]
 fn write_or_null<T>(
     w: &mut TapeWriter<'_>,
@@ -116,7 +116,7 @@ fn write_or_null<T>(
 ) {
     match item {
         Some(v) => f(w, v),
-        None => w.null(),
+        None => w.null_or_record(),
     }
 }
 
