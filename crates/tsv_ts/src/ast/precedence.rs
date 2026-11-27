@@ -64,13 +64,6 @@ pub(crate) fn get_precedence(op: BinaryOperator) -> PrecedenceLevel {
     }
 }
 
-/// Returns true if the operator is right-associative
-// TODO: no printer path asks it — delete it with its test, or give the binary printer a use.
-#[cfg(test)]
-fn is_right_associative(op: BinaryOperator) -> bool {
-    matches!(op, BinaryOperator::StarStar)
-}
-
 /// Check if operators can be written together without parens
 ///
 /// Based on prettier's `shouldFlatten` (`utilities/should-flatten.js`).
@@ -331,14 +324,6 @@ mod tests {
     }
 
     #[test]
-    fn test_right_associative() {
-        // Only ** is right-associative
-        assert!(is_right_associative(BinaryOperator::StarStar));
-        assert!(!is_right_associative(BinaryOperator::Plus));
-        assert!(!is_right_associative(BinaryOperator::Star));
-    }
-
-    #[test]
     fn test_relational_and_logical_dont_flatten() {
         // a < b && c > d → no parens needed (different precedence)
         assert!(!should_flatten(
@@ -373,20 +358,5 @@ mod tests {
             BinaryOperator::UnsignedRightShift,
             BinaryOperator::RightShift
         ));
-    }
-
-    #[test]
-    fn test_right_associative_negatives() {
-        // Only ** is right-associative; pin a representative spread of the rest.
-        for op in [
-            BinaryOperator::PipePipe,
-            BinaryOperator::AmpersandAmpersand,
-            BinaryOperator::LeftShift,
-            BinaryOperator::Percent,
-            BinaryOperator::Slash,
-            BinaryOperator::EqualsEqualsEquals,
-        ] {
-            assert!(!is_right_associative(op));
-        }
     }
 }
