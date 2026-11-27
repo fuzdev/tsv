@@ -1841,20 +1841,15 @@ export interface TSTypeQuery {
 // CSS AST
 //
 
-/**
- * Parsed CSS — content of a `<style>` tag in a Svelte component.
- *
- * Children and attributes are emitted as opaque JSON values that follow
- * Svelte's `parseCss` output; their precise shape is not currently
- * mirrored in this file.
- */
+/** Parsed CSS — content of a `<style>` tag in a Svelte component. */
 export interface StyleSheet {
 	type: 'StyleSheet';
 	start: number;
 	end: number;
 	loc?: SourceLocation;
-	attributes: unknown[];
-	children: unknown[];
+	/** The `<style>` tag's attributes. */
+	attributes: AttributeNode[];
+	children: (CSSAtrule | CSSRule)[];
 	comments: CSSComment[];
 	content: StyleContent;
 }
@@ -1869,7 +1864,7 @@ export interface StyleSheetFile {
 	start: number;
 	end: number;
 	loc?: SourceLocation;
-	children: unknown[];
+	children: (CSSAtrule | CSSRule)[];
 	comments: CSSComment[];
 }
 
@@ -1902,6 +1897,238 @@ export interface StyleContent {
 	styles: string;
 	/** A leading block comment ahead of the stylesheet body; `null` when absent. */
 	comment: Comment | null;
+}
+
+/** An at-rule: `@media …`, `@import …;`. */
+export interface CSSAtrule {
+	type: 'Atrule';
+	start: number;
+	end: number;
+	loc?: SourceLocation;
+	name: string;
+	prelude: string;
+	/** `null` for a statement at-rule (`@import …;`). */
+	block: CSSBlock | null;
+}
+
+/** An attribute selector: `[a]`, `[a=b i]`. */
+export interface CSSAttributeSelector {
+	type: 'AttributeSelector';
+	start: number;
+	end: number;
+	loc?: SourceLocation;
+	name: string;
+	/** `null` for a bare `[a]`. */
+	matcher: '=' | '~=' | '|=' | '^=' | '$=' | '*=' | null;
+	/** The value token, a string's quotes stripped, escapes still encoded. */
+	value: string | null;
+	flags: string | null;
+	/** The `[ns|attr]` prefix — tsv only: Svelte rejects attribute namespaces. */
+	namespace?: string;
+}
+
+/** The `{ … }` of a rule or at-rule. */
+export interface CSSBlock {
+	type: 'Block';
+	start: number;
+	end: number;
+	loc?: SourceLocation;
+	children: (CSSAtrule | CSSDeclaration | CSSRule)[];
+}
+
+export interface CSSClassSelector {
+	type: 'ClassSelector';
+	name: string;
+	start: number;
+	end: number;
+	loc?: SourceLocation;
+}
+
+export interface CSSCombinator {
+	type: 'Combinator';
+	/** One space for any whitespace run between compound selectors. */
+	name: ' ' | '>' | '+' | '~' | '||';
+	start: number;
+	end: number;
+	loc?: SourceLocation;
+}
+
+/** A complex selector: `a > b c`. */
+export interface CSSComplexSelector {
+	type: 'ComplexSelector';
+	start: number;
+	end: number;
+	loc?: SourceLocation;
+	children: CSSRelativeSelector[];
+	/** `parseCss`'s constant analysis seed; present in `parse_css` output only. */
+	metadata?: CSSComplexSelectorMetadata;
+}
+
+/** A declaration: `color: red`. */
+export interface CSSDeclaration {
+	type: 'Declaration';
+	start: number;
+	end: number;
+	loc?: SourceLocation;
+	property: string;
+	value: string;
+}
+
+export interface CSSIdSelector {
+	type: 'IdSelector';
+	name: string;
+	start: number;
+	end: number;
+	loc?: SourceLocation;
+}
+
+/** The nesting selector `&`. */
+export interface CSSNestingSelector {
+	type: 'NestingSelector';
+	name: '&';
+	start: number;
+	end: number;
+	loc?: SourceLocation;
+}
+
+/** An `An+B` term: the `2n + 1` in `:nth-child(2n + 1 of .a)`. */
+export interface CSSNth {
+	type: 'Nth';
+	value: string;
+	start: number;
+	end: number;
+	loc?: SourceLocation;
+	/** The `of S` list — tsv only: Svelte reads the `of` into `value` and flattens `S`. */
+	selector?: CSSSelectorList;
+}
+
+/** A keyframe selector: `50%`. */
+export interface CSSPercentage {
+	type: 'Percentage';
+	value: string;
+	start: number;
+	end: number;
+	loc?: SourceLocation;
+}
+
+export interface CSSPseudoClassSelector {
+	type: 'PseudoClassSelector';
+	name: string;
+	args: CSSSelectorList | null;
+	start: number;
+	end: number;
+	loc?: SourceLocation;
+}
+
+export interface CSSPseudoElementSelector {
+	type: 'PseudoElementSelector';
+	name: string;
+	start: number;
+	end: number;
+	loc?: SourceLocation;
+	args?: CSSSelectorList;
+}
+
+/** A compound selector and the combinator before it: the `> b` in `a > b`. */
+export interface CSSRelativeSelector {
+	type: 'RelativeSelector';
+	/**
+	 * `null` where none is written: a selector's first compound, unless it opens with one
+	 * (`:has(> img)`).
+	 */
+	combinator: CSSCombinator | null;
+	selectors: CSSSimpleSelector[];
+	start: number;
+	end: number;
+	loc?: SourceLocation;
+	/** `parseCss`'s constant analysis seed; present in `parse_css` output only. */
+	metadata?: CSSRelativeSelectorMetadata;
+}
+
+/** A style rule: a selector list and its block. */
+export interface CSSRule {
+	type: 'Rule';
+	prelude: CSSSelectorList;
+	block: CSSBlock;
+	start: number;
+	end: number;
+	loc?: SourceLocation;
+	/** `parseCss`'s constant analysis seed; present in `parse_css` output only. */
+	metadata?: CSSRuleMetadata;
+}
+
+/** A list of selectors: `a, b, c`. */
+export interface CSSSelectorList {
+	type: 'SelectorList';
+	start: number;
+	end: number;
+	loc?: SourceLocation;
+	children: CSSComplexSelector[];
+}
+
+/** A type or universal selector: `a`, `*`, `svg|a`. */
+export interface CSSTypeSelector {
+	type: 'TypeSelector';
+	name: string;
+	/**
+	 * The `<ns-prefix>` as written: `svg|a` → `"svg"`, `*|a` → `"*"`, `|a` → `""` (the empty
+	 * prefix tsv only, extending Svelte's field); absent for a bare `a`.
+	 */
+	namespace?: string;
+	start: number;
+	end: number;
+	loc?: SourceLocation;
+}
+
+/** A selector a compound selector is built of (Svelte's `SimpleSelector`). */
+export type CSSSimpleSelector =
+	| CSSTypeSelector
+	| CSSIdSelector
+	| CSSClassSelector
+	| CSSAttributeSelector
+	| CSSPseudoElementSelector
+	| CSSPseudoClassSelector
+	| CSSPercentage
+	| CSSNth
+	| CSSNestingSelector;
+
+/** Every node of the CSS tree. */
+export type CSSNode =
+	| StyleSheet
+	| StyleSheetFile
+	| CSSRule
+	| CSSAtrule
+	| CSSSelectorList
+	| CSSBlock
+	| CSSComplexSelector
+	| CSSRelativeSelector
+	| CSSCombinator
+	| CSSSimpleSelector
+	| CSSDeclaration
+	| CSSComment;
+
+/** Always this constant on the wire: the parse seeds it, Svelte's analysis fills it. */
+export interface CSSRuleMetadata {
+	/** Always `null` at parse time. */
+	parent_rule: null;
+	has_local_selectors: boolean;
+	has_global_selectors: boolean;
+	is_global_block: boolean;
+}
+
+/** Always this constant on the wire: the parse seeds it, Svelte's analysis fills it. */
+export interface CSSComplexSelectorMetadata {
+	/** Always `null` at parse time. */
+	rule: null;
+	is_global: boolean;
+	used: boolean;
+}
+
+/** Always this constant on the wire: the parse seeds it, Svelte's analysis fills it. */
+export interface CSSRelativeSelectorMetadata {
+	is_global: boolean;
+	is_global_like: boolean;
+	scoped: boolean;
 }
 
 //

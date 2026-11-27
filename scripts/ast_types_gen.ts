@@ -7,8 +7,7 @@
  * order. Entries sharing an `interface` merge into one declaration — the `type` member becomes
  * the union of their discriminators, a member some entry lacks or emits only conditionally
  * becomes optional (`T?`), and one emitted with a `null` fallback keeps the `T | null` its
- * `ts` spells. An `opaque` entry generates nothing (the region above it types it
- * `unknown`); a field with no `ts` is declared elsewhere (the attached-comment keys, through
+ * `ts` spells. A field with no `ts` is declared elsewhere (the attached-comment keys, through
  * `AcornCommentAttachment`).
  *
  * The text is laid out the way `tsv format` lays it out, so `format:audit` holds the generated
@@ -50,6 +49,95 @@ function is_required(field: AstSchemaField): boolean {
 		field.presence === undefined &&
 		(field.vanilla_acorn === undefined || field.vanilla_acorn === 'always')
 	);
+}
+
+/**
+ * Calls `visit` with each index of `ts` outside a quoted literal and the bracket depth after
+ * its character (`()`, `<>`, `[]`, `{}`; the `>` of an arrow's `=>` closes nothing), stopping
+ * at the first `visit` that returns `false`.
+ */
+function scan_depth(ts: string, visit: (i: number, depth: number) => boolean | void): void {
+	let depth = 0;
+	let quote: string | null = null;
+	for (let i = 0; i < ts.length; i++) {
+		const c = ts[i]!;
+		if (quote !== null) {
+			if (c === '\\') i++;
+			else if (c === quote) quote = null;
+			continue;
+		}
+		if (c === "'" || c === '"') quote = c;
+		else if ('(<[{'.includes(c)) depth++;
+		else if (')]}'.includes(c) || (c === '>' && ts[i - 1] !== '=')) depth--;
+		if (visit(i, depth) === false) return;
+	}
+}
+
+/**
+ * The ` | ` alternatives of a type at its top level: a `|` inside a bracket pair or a quoted
+ * literal is part of its alternative (`(A | B)[]`, `'|='`), never a split point.
+ */
+export function split_top_level_union(ts: string): string[] {
+	const out: string[] = [];
+	let from = 0;
+	scan_depth(ts, (i, depth) => {
+		if (depth !== 0) return true;
+		// An arrow's return type runs to the end: `(a: A) => B | C` is one function type.
+		if (ts[i] === '>' && ts[i - 1] === '=') return false;
+		if (i >= from && ts.startsWith(' | ', i)) {
+			out.push(ts.slice(from, i));
+			from = i + 3;
+		}
+		return true;
+	});
+	out.push(ts.slice(from));
+	return out;
+}
+
+/** Whether `ts` is one parenthesized group: its opening `(` closes at its last character. */
+function is_one_group(ts: string): boolean {
+	if (!ts.startsWith('(')) return false;
+	let closes_at = -1;
+	scan_depth(ts, (i, depth) => {
+		if (depth !== 0) return true;
+		closes_at = i;
+		return false;
+	});
+	return closes_at === ts.length - 1;
+}
+
+/** Whether `ts` holds a pair `tsv format` could break inside (an array's `[]` holds none). */
+const is_breakable = (ts: string): boolean =>
+	/[(<[{]/.test(ts.replace(/'(?:[^'\\]|\\.)*'/g, '').replaceAll('[]', ''));
+
+/**
+ * An interface member's lines as `tsv format` lays them out: on one line when it fits; a
+ * too-wide union broken one alternative a line; a too-wide `(A | B)[]` broken inside its
+ * parentheses. A shape it has no layout for (an alternative that is itself too wide to sit on
+ * its line and could break) is refused with a reason rather than emitted unformatted.
+ */
+function member_lines(head: string, ts: string): string[] | string {
+	const line = `${head} ${ts};`;
+	if (width(line) <= PRINT_WIDTH) return [line];
+	const alternatives = split_top_level_union(ts);
+	if (alternatives.length > 1) {
+		const lines = alternatives.map(
+			(alt, i) => `\t\t| ${alt}${i === alternatives.length - 1 ? ';' : ''}`
+		);
+		const wide = lines.find((l) => width(l) > PRINT_WIDTH && is_breakable(l));
+		return wide === undefined
+			? [head, ...lines]
+			: `no layout for the too-wide alternative \`${wide.trim()}\``;
+	}
+	if (ts.endsWith(')[]') && is_one_group(ts.slice(0, -2))) {
+		const inner = split_top_level_union(ts.slice(1, -3));
+		const lines = inner.map((alt) => `\t\t| ${alt}`);
+		if (inner.length > 1 && lines.every((l) => width(l) <= PRINT_WIDTH || !is_breakable(l))) {
+			return [`${head} (`, ...lines, '\t)[];'];
+		}
+	}
+	if (!is_breakable(ts)) return [line];
+	return `no layout for the too-wide type \`${ts}\``;
 }
 
 interface Member {
@@ -112,15 +200,9 @@ function merge_interface(name: string, entries: AstSchemaEntry[], errors: string
 	for (const member of members) {
 		out.push(...doc_block(member.doc, '\t'));
 		const head = `\t${member.key}${member.optional ? '?' : ''}:`;
-		const line = `${head} ${member.ts};`;
-		const alternatives = member.ts.split(' | ');
-		if (width(line) <= PRINT_WIDTH || alternatives.length === 1) out.push(line);
-		else {
-			out.push(head);
-			alternatives.forEach((alt, i) =>
-				out.push(`\t\t| ${alt}${i === alternatives.length - 1 ? ';' : ''}`)
-			);
-		}
+		const laid = member_lines(head, member.ts);
+		if (typeof laid === 'string') errors.push(`${name}.${member.key}: ${laid}`);
+		else out.push(...laid);
 	}
 	out.push('}');
 	return out;
@@ -160,7 +242,7 @@ export function generate_ast_types(schema: AstSchema): string | { errors: string
 	const by_interface = new Map<string, AstSchemaEntry[]>();
 	for (const section of schema.sections) {
 		for (const item of section.entries) {
-			if (is_alias(item) || item.opaque) continue;
+			if (is_alias(item)) continue;
 			if (item.interface === undefined) {
 				errors.push(`${item.type ?? '?'}: a declared entry with no \`interface\``);
 				continue;
@@ -179,7 +261,7 @@ export function generate_ast_types(schema: AstSchema): string | { errors: string
 				declarations.push(print_alias(item).join('\n'));
 				continue;
 			}
-			if (item.opaque || item.interface === undefined || printed.has(item.interface)) continue;
+			if (item.interface === undefined || printed.has(item.interface)) continue;
 			printed.add(item.interface);
 			declarations.push(
 				merge_interface(item.interface, by_interface.get(item.interface)!, errors).join('\n')

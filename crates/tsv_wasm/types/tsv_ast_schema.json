@@ -3636,20 +3636,19 @@
 					"type": "StyleSheet",
 					"interface": "StyleSheet",
 					"css": true,
-					"doc": [
-						"Parsed CSS — content of a `<style>` tag in a Svelte component.",
-						"",
-						"Children and attributes are emitted as opaque JSON values that follow",
-						"Svelte's `parseCss` output; their precise shape is not currently",
-						"mirrored in this file."
-					],
+					"doc": ["Parsed CSS — content of a `<style>` tag in a Svelte component."],
 					"fields": [
 						{"key": "type", "kind": "type"},
 						{"key": "start", "kind": "offset", "ts": "number"},
 						{"key": "end", "kind": "offset", "ts": "number"},
 						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
-						{"key": "attributes", "kind": "list", "ts": "unknown[]"},
-						{"key": "children", "kind": "list", "ts": "unknown[]"},
+						{
+							"key": "attributes",
+							"kind": "list",
+							"ts": "AttributeNode[]",
+							"doc": ["The `<style>` tag's attributes."]
+						},
+						{"key": "children", "kind": "list", "ts": "(CSSAtrule | CSSRule)[]"},
 						{"key": "comments", "kind": "list", "ts": "CSSComment[]"},
 						{"key": "content", "kind": "object", "entry": "StyleContent"}
 					]
@@ -3668,7 +3667,7 @@
 						{"key": "start", "kind": "offset", "ts": "number"},
 						{"key": "end", "kind": "offset", "ts": "number"},
 						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
-						{"key": "children", "kind": "list", "ts": "unknown[]"},
+						{"key": "children", "kind": "list", "ts": "(CSSAtrule | CSSRule)[]"},
 						{"key": "comments", "kind": "list", "ts": "CSSComment[]"}
 					]
 				},
@@ -3724,43 +3723,76 @@
 					"type": "Atrule",
 					"interface": "CSSAtrule",
 					"css": true,
-					"opaque": true,
+					"doc": ["An at-rule: `@media …`, `@import …;`."],
 					"fields": [
 						{"key": "type", "kind": "type"},
-						{"key": "start", "kind": "offset"},
-						{"key": "end", "kind": "offset"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
 						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
-						{"key": "name", "kind": "string", "string": "cooked"},
-						{"key": "prelude", "kind": "string", "string": "cooked"},
-						{"key": "block", "kind": "child", "ts": "CSSBlock | null", "nullable": true}
+						{"key": "name", "kind": "string", "ts": "string", "string": "cooked"},
+						{"key": "prelude", "kind": "string", "ts": "string", "string": "cooked"},
+						{
+							"key": "block",
+							"kind": "child",
+							"ts": "CSSBlock | null",
+							"nullable": true,
+							"doc": ["`null` for a statement at-rule (`@import …;`)."]
+						}
 					]
 				},
 				{
 					"type": "AttributeSelector",
 					"interface": "CSSAttributeSelector",
 					"css": true,
-					"opaque": true,
+					"doc": ["An attribute selector: `[a]`, `[a=b i]`."],
 					"fields": [
 						{"key": "type", "kind": "type"},
-						{"key": "start", "kind": "offset"},
-						{"key": "end", "kind": "offset"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
 						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
-						{"key": "name", "kind": "string", "string": "cooked"},
-						{"key": "matcher", "kind": "string", "nullable": true, "string": "cooked"},
-						{"key": "value", "kind": "string", "nullable": true, "string": "slice"},
-						{"key": "flags", "kind": "string", "nullable": true, "string": "slice"},
-						{"key": "namespace", "kind": "string", "presence": "optional", "string": "cooked"}
+						{"key": "name", "kind": "string", "ts": "string", "string": "cooked"},
+						{
+							"key": "matcher",
+							"kind": "string",
+							"ts": "'=' | '~=' | '|=' | '^=' | '$=' | '*=' | null",
+							"nullable": true,
+							"string": "cooked",
+							"doc": ["`null` for a bare `[a]`."]
+						},
+						{
+							"key": "value",
+							"kind": "string",
+							"ts": "string | null",
+							"nullable": true,
+							"string": "slice",
+							"doc": ["The value token, a string's quotes stripped, escapes still encoded."]
+						},
+						{
+							"key": "flags",
+							"kind": "string",
+							"ts": "string | null",
+							"nullable": true,
+							"string": "slice"
+						},
+						{
+							"key": "namespace",
+							"kind": "string",
+							"ts": "string",
+							"presence": "optional",
+							"string": "cooked",
+							"doc": ["The `[ns|attr]` prefix — tsv only: Svelte rejects attribute namespaces."]
+						}
 					]
 				},
 				{
 					"type": "Block",
 					"interface": "CSSBlock",
 					"css": true,
-					"opaque": true,
+					"doc": ["The `{ … }` of a rule or at-rule."],
 					"fields": [
 						{"key": "type", "kind": "type"},
-						{"key": "start", "kind": "offset"},
-						{"key": "end", "kind": "offset"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
 						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
 						{"key": "children", "kind": "list", "ts": "(CSSAtrule | CSSDeclaration | CSSRule)[]"}
 					]
@@ -3769,12 +3801,11 @@
 					"type": "ClassSelector",
 					"interface": "CSSClassSelector",
 					"css": true,
-					"opaque": true,
 					"fields": [
 						{"key": "type", "kind": "type"},
-						{"key": "name", "kind": "string", "string": "cooked"},
-						{"key": "start", "kind": "offset"},
-						{"key": "end", "kind": "offset"},
+						{"key": "name", "kind": "string", "ts": "string", "string": "cooked"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
 						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"}
 					]
 				},
@@ -3782,20 +3813,21 @@
 					"type": "Combinator",
 					"interface": "CSSCombinator",
 					"css": true,
-					"opaque": true,
 					"fields": [
 						{"key": "type", "kind": "type"},
 						{
 							"key": "name",
 							"kind": "string",
+							"ts": "' ' | '>' | '+' | '~' | '||'",
 							"string": "keyword",
 							"values": [" ", ">", "+", "~", "||"],
+							"doc": ["One space for any whitespace run between compound selectors."],
 							"note": [
 								"The oracle writes one space for any whitespace run between compound selectors."
 							]
 						},
-						{"key": "start", "kind": "offset"},
-						{"key": "end", "kind": "offset"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
 						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"}
 					]
 				},
@@ -3803,18 +3835,19 @@
 					"type": "ComplexSelector",
 					"interface": "CSSComplexSelector",
 					"css": true,
-					"opaque": true,
+					"doc": ["A complex selector: `a > b c`."],
 					"fields": [
 						{"key": "type", "kind": "type"},
-						{"key": "start", "kind": "offset"},
-						{"key": "end", "kind": "offset"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
 						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
 						{"key": "children", "kind": "list", "ts": "CSSRelativeSelector[]"},
 						{
 							"key": "metadata",
 							"kind": "object",
 							"entry": "CSSComplexSelectorMetadata",
-							"presence": "optional"
+							"presence": "optional",
+							"doc": ["`parseCss`'s constant analysis seed; present in `parse_css` output only."]
 						}
 					]
 				},
@@ -3822,26 +3855,25 @@
 					"type": "Declaration",
 					"interface": "CSSDeclaration",
 					"css": true,
-					"opaque": true,
+					"doc": ["A declaration: `color: red`."],
 					"fields": [
 						{"key": "type", "kind": "type"},
-						{"key": "start", "kind": "offset"},
-						{"key": "end", "kind": "offset"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
 						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
-						{"key": "property", "kind": "string", "string": "slice"},
-						{"key": "value", "kind": "string", "string": "cooked"}
+						{"key": "property", "kind": "string", "ts": "string", "string": "slice"},
+						{"key": "value", "kind": "string", "ts": "string", "string": "cooked"}
 					]
 				},
 				{
 					"type": "IdSelector",
 					"interface": "CSSIdSelector",
 					"css": true,
-					"opaque": true,
 					"fields": [
 						{"key": "type", "kind": "type"},
-						{"key": "name", "kind": "string", "string": "cooked"},
-						{"key": "start", "kind": "offset"},
-						{"key": "end", "kind": "offset"},
+						{"key": "name", "kind": "string", "ts": "string", "string": "cooked"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
 						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"}
 					]
 				},
@@ -3849,12 +3881,12 @@
 					"type": "NestingSelector",
 					"interface": "CSSNestingSelector",
 					"css": true,
-					"opaque": true,
+					"doc": ["The nesting selector `&`."],
 					"fields": [
 						{"key": "type", "kind": "type"},
-						{"key": "name", "kind": "string", "string": "own"},
-						{"key": "start", "kind": "offset"},
-						{"key": "end", "kind": "offset"},
+						{"key": "name", "kind": "string", "ts": "'&'", "string": "own"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
 						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"}
 					]
 				},
@@ -3862,26 +3894,34 @@
 					"type": "Nth",
 					"interface": "CSSNth",
 					"css": true,
-					"opaque": true,
+					"doc": ["An `An+B` term: the `2n + 1` in `:nth-child(2n + 1 of .a)`."],
 					"fields": [
 						{"key": "type", "kind": "type"},
-						{"key": "value", "kind": "string", "string": "slice"},
-						{"key": "start", "kind": "offset"},
-						{"key": "end", "kind": "offset"},
+						{"key": "value", "kind": "string", "ts": "string", "string": "slice"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
 						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
-						{"key": "selector", "kind": "child", "ts": "CSSSelectorList", "presence": "optional"}
+						{
+							"key": "selector",
+							"kind": "child",
+							"ts": "CSSSelectorList",
+							"presence": "optional",
+							"doc": [
+								"The `of S` list — tsv only: Svelte reads the `of` into `value` and flattens `S`."
+							]
+						}
 					]
 				},
 				{
 					"type": "Percentage",
 					"interface": "CSSPercentage",
 					"css": true,
-					"opaque": true,
+					"doc": ["A keyframe selector: `50%`."],
 					"fields": [
 						{"key": "type", "kind": "type"},
-						{"key": "value", "kind": "string", "string": "own"},
-						{"key": "start", "kind": "offset"},
-						{"key": "end", "kind": "offset"},
+						{"key": "value", "kind": "string", "ts": "string", "string": "own"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
 						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"}
 					]
 				},
@@ -3889,13 +3929,12 @@
 					"type": "PseudoClassSelector",
 					"interface": "CSSPseudoClassSelector",
 					"css": true,
-					"opaque": true,
 					"fields": [
 						{"key": "type", "kind": "type"},
-						{"key": "name", "kind": "string", "string": "cooked"},
+						{"key": "name", "kind": "string", "ts": "string", "string": "cooked"},
 						{"key": "args", "kind": "child", "ts": "CSSSelectorList | null", "nullable": true},
-						{"key": "start", "kind": "offset"},
-						{"key": "end", "kind": "offset"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
 						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"}
 					]
 				},
@@ -3903,12 +3942,11 @@
 					"type": "PseudoElementSelector",
 					"interface": "CSSPseudoElementSelector",
 					"css": true,
-					"opaque": true,
 					"fields": [
 						{"key": "type", "kind": "type"},
-						{"key": "name", "kind": "string", "string": "cooked"},
-						{"key": "start", "kind": "offset"},
-						{"key": "end", "kind": "offset"},
+						{"key": "name", "kind": "string", "ts": "string", "string": "cooked"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
 						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
 						{"key": "args", "kind": "child", "ts": "CSSSelectorList", "presence": "optional"}
 					]
@@ -3917,23 +3955,29 @@
 					"type": "RelativeSelector",
 					"interface": "CSSRelativeSelector",
 					"css": true,
-					"opaque": true,
+					"doc": ["A compound selector and the combinator before it: the `> b` in `a > b`."],
 					"fields": [
 						{"key": "type", "kind": "type"},
-						{"key": "combinator", "kind": "child", "ts": "CSSCombinator | null", "nullable": true},
 						{
-							"key": "selectors",
-							"kind": "list",
-							"ts": "(CSSAttributeSelector | CSSClassSelector | CSSIdSelector | CSSNestingSelector | CSSNth | CSSPercentage | CSSPseudoClassSelector | CSSPseudoElementSelector | CSSTypeSelector)[]"
+							"key": "combinator",
+							"kind": "child",
+							"ts": "CSSCombinator | null",
+							"nullable": true,
+							"doc": [
+								"`null` where none is written: a selector's first compound, unless it opens with one",
+								"(`:has(> img)`)."
+							]
 						},
-						{"key": "start", "kind": "offset"},
-						{"key": "end", "kind": "offset"},
+						{"key": "selectors", "kind": "list", "ts": "CSSSimpleSelector[]"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
 						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
 						{
 							"key": "metadata",
 							"kind": "object",
 							"entry": "CSSRelativeSelectorMetadata",
-							"presence": "optional"
+							"presence": "optional",
+							"doc": ["`parseCss`'s constant analysis seed; present in `parse_css` output only."]
 						}
 					]
 				},
@@ -3941,19 +3985,20 @@
 					"type": "Rule",
 					"interface": "CSSRule",
 					"css": true,
-					"opaque": true,
+					"doc": ["A style rule: a selector list and its block."],
 					"fields": [
 						{"key": "type", "kind": "type"},
 						{"key": "prelude", "kind": "child", "ts": "CSSSelectorList"},
 						{"key": "block", "kind": "child", "ts": "CSSBlock"},
-						{"key": "start", "kind": "offset"},
-						{"key": "end", "kind": "offset"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
 						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
 						{
 							"key": "metadata",
 							"kind": "object",
 							"entry": "CSSRuleMetadata",
-							"presence": "optional"
+							"presence": "optional",
+							"doc": ["`parseCss`'s constant analysis seed; present in `parse_css` output only."]
 						}
 					]
 				},
@@ -3961,11 +4006,11 @@
 					"type": "SelectorList",
 					"interface": "CSSSelectorList",
 					"css": true,
-					"opaque": true,
+					"doc": ["A list of selectors: `a, b, c`."],
 					"fields": [
 						{"key": "type", "kind": "type"},
-						{"key": "start", "kind": "offset"},
-						{"key": "end", "kind": "offset"},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
 						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"},
 						{"key": "children", "kind": "list", "ts": "CSSComplexSelector[]"}
 					]
@@ -3974,45 +4019,104 @@
 					"type": "TypeSelector",
 					"interface": "CSSTypeSelector",
 					"css": true,
-					"opaque": true,
+					"doc": ["A type or universal selector: `a`, `*`, `svg|a`."],
 					"fields": [
 						{"key": "type", "kind": "type"},
-						{"key": "name", "kind": "string", "string": "cooked"},
-						{"key": "namespace", "kind": "string", "presence": "optional", "string": "cooked"},
-						{"key": "start", "kind": "offset"},
-						{"key": "end", "kind": "offset"},
+						{"key": "name", "kind": "string", "ts": "string", "string": "cooked"},
+						{
+							"key": "namespace",
+							"kind": "string",
+							"ts": "string",
+							"presence": "optional",
+							"string": "cooked",
+							"doc": [
+								"The `<ns-prefix>` as written: `svg|a` → `\"svg\"`, `*|a` → `\"*\"`, `|a` → `\"\"` (the empty",
+								"prefix tsv only, extending Svelte's field); absent for a bare `a`."
+							]
+						},
+						{"key": "start", "kind": "offset", "ts": "number"},
+						{"key": "end", "kind": "offset", "ts": "number"},
 						{"key": "loc", "kind": "loc", "entry": "SourceLocation", "presence": "locations"}
+					]
+				},
+				{
+					"alias": "CSSSimpleSelector",
+					"doc": ["A selector a compound selector is built of (Svelte's `SimpleSelector`)."],
+					"union": [
+						"CSSTypeSelector",
+						"CSSIdSelector",
+						"CSSClassSelector",
+						"CSSAttributeSelector",
+						"CSSPseudoElementSelector",
+						"CSSPseudoClassSelector",
+						"CSSPercentage",
+						"CSSNth",
+						"CSSNestingSelector"
+					]
+				},
+				{
+					"alias": "CSSNode",
+					"doc": ["Every node of the CSS tree."],
+					"union": [
+						"StyleSheet",
+						"StyleSheetFile",
+						"CSSRule",
+						"CSSAtrule",
+						"CSSSelectorList",
+						"CSSBlock",
+						"CSSComplexSelector",
+						"CSSRelativeSelector",
+						"CSSCombinator",
+						"CSSSimpleSelector",
+						"CSSDeclaration",
+						"CSSComment"
 					]
 				},
 				{
 					"interface": "CSSRuleMetadata",
 					"css": true,
-					"opaque": true,
+					"doc": [
+						"Always this constant on the wire: the parse seeds it, Svelte's analysis fills it."
+					],
 					"fields": [
-						{"key": "parent_rule", "kind": "null"},
-						{"key": "has_local_selectors", "kind": "boolean"},
-						{"key": "has_global_selectors", "kind": "boolean"},
-						{"key": "is_global_block", "kind": "boolean"}
+						{
+							"key": "parent_rule",
+							"kind": "null",
+							"ts": "null",
+							"doc": ["Always `null` at parse time."]
+						},
+						{"key": "has_local_selectors", "kind": "boolean", "ts": "boolean"},
+						{"key": "has_global_selectors", "kind": "boolean", "ts": "boolean"},
+						{"key": "is_global_block", "kind": "boolean", "ts": "boolean"}
 					]
 				},
 				{
 					"interface": "CSSComplexSelectorMetadata",
 					"css": true,
-					"opaque": true,
+					"doc": [
+						"Always this constant on the wire: the parse seeds it, Svelte's analysis fills it."
+					],
 					"fields": [
-						{"key": "rule", "kind": "null"},
-						{"key": "is_global", "kind": "boolean"},
-						{"key": "used", "kind": "boolean"}
+						{
+							"key": "rule",
+							"kind": "null",
+							"ts": "null",
+							"doc": ["Always `null` at parse time."]
+						},
+						{"key": "is_global", "kind": "boolean", "ts": "boolean"},
+						{"key": "used", "kind": "boolean", "ts": "boolean"}
 					]
 				},
 				{
 					"interface": "CSSRelativeSelectorMetadata",
 					"css": true,
-					"opaque": true,
+					"doc": [
+						"Always this constant on the wire: the parse seeds it, Svelte's analysis fills it."
+					],
 					"fields": [
-						{"key": "is_global", "kind": "boolean"},
-						{"key": "is_global_like", "kind": "boolean"},
-						{"key": "scoped", "kind": "boolean"}
+						{"key": "is_global", "kind": "boolean", "ts": "boolean"},
+						{"key": "is_global_like", "kind": "boolean", "ts": "boolean"},
+						{"key": "scoped", "kind": "boolean", "ts": "boolean"}
 					]
 				}
 			]

@@ -728,13 +728,11 @@ item:
   element's `value`, `<svelte:options>`). `interface` names the `.d.ts` interface it generates:
   entries sharing one merge into it — the `type` member the union of their discriminators, a
   member some entry lacks or emits only conditionally optional. `css` marks a node of the CSS
-  tree (below a stylesheet root, keyed apart from a JS namesake); `opaque` an entry the
-  `.d.ts` leaves undeclared (the CSS node vocabulary below `StyleSheet.children: unknown[]`,
-  whose fields still carry a `ts` naming the CSS entries they hold, for the audit alone);
-  `positions` the parent slots (`Type.key`) an entry may stand in where its interface admits
-  more (the preceding-HTML comment, `Program.leadingComments` alone);
-  `mixin` the comment-attachment interface no wire object is graded against; `extends`,
-  `doc` (published, one string per line) and `note` (maintainer rationale, never published).
+  tree (below a stylesheet root, keyed apart from a JS namesake); `positions` the parent slots
+  (`Type.key`) an entry may stand in where its interface admits more (the preceding-HTML
+  comment, `Program.leadingComments` alone); `mixin` the comment-attachment interface no wire
+  object is graded against; `extends`, `doc` (published, one string per line) and `note`
+  (maintainer rationale, never published).
 - **Its `fields`, in wire order** — the order the writer emits them in, one order per type.
   Each has a `key`; a `kind` (`type`, `offset`, `loc`, `boolean`, `number`, `string`,
   `strings`, `child`, `list`, `object`, `comments`, `data` for opaque JSON, `null` for a slot
@@ -753,8 +751,8 @@ item:
   way); `values`, a `keyword` field's vocabulary; `ts_only` (a key Svelte's
   `remove_typescript_nodes` deletes, its position tsv's to choose); `character` (a `loc` whose positions may carry `character`); `discriminators` (the
   `type` spellings a `data` field holds as data, not nodes); `doc` and `note`.
-- **An alias** — a `.d.ts` union (`Expression`, `FragmentNode`), `intersect`-ed with the mixin
-  where every member may carry attached comments.
+- **An alias** — a `.d.ts` union (`Expression`, `FragmentNode`, `CSSSimpleSelector`, `CSSNode`),
+  `intersect`-ed with the mixin where every member may carry attached comments.
 
 Maintenance checklist when a writer's emitted shape changes:
 
@@ -777,8 +775,8 @@ Maintenance checklist when a writer's emitted shape changes:
 **(A)** `tsv parse --locations` on curated snippets, each output embedded as a typed literal and
 typechecked by `tsc` — excess-property checking catches drift both ways (missing/added fields,
 discriminator-string mismatches); **(B)** every `type` discriminant the fixture corpus produces
-must name a table entry, declared or deliberately opaque (the CSS node vocabulary plus the
-`customElement` config-data `type:` key, both read from the table); **(C)** a computed minimal cover of every field SLOT
+must name a table entry, or the `customElement` config-data `type:` key a `data` field's
+`discriminators` name (read from the table); **(C)** a computed minimal cover of every field SLOT
 (`ParentType.key -> ChildType`) in the committed `expected*.json`, typed the same way — graded
 against the CANONICAL parser's output (`loc`/`name_loc` stripped) rather than tsv's own, since
 `expected.json` is what `fixtures_update_parsed` regenerates from Svelte / acorn-typescript /

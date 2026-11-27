@@ -1347,12 +1347,12 @@ known properties"), and a field the `.d.ts` requires that the converter does not
   types `loc` / `name_loc`, since the fixture wire is span-only. Grades the LIVE writer, so it
   is the arm that fails the moment a `write_*` changes.
 - **B — wire-type coverage.** Every `type` discriminant present in the committed fixture wire
-  must name a table entry: one the `.d.ts` declares, or one the table marks `opaque` — the CSS
-  node vocabulary, which `StyleSheet.children` types as `unknown[]` by design — or a spelling a
-  `data` field's `discriminators` name: `Boolean`, a DATA key inside the evaluated
+  must name a table entry the `.d.ts` declares, or a spelling a `data` field's
+  `discriminators` name: `Boolean`, a DATA key inside the evaluated
   `<svelte:options customElement>` props config, no node at all. Read where the walk meets each
   object, CSS-keyed as the table keys its CSS entries — no type-checking, and the widest reach of
-  the three. A stale opaque name also fails, so the table cannot quietly outlive its reason.
+  the three. A stale `discriminators` name also fails, so the table cannot quietly outlive its
+  reason.
 - **C — fixture-corpus conformance.** Arm A over inputs nobody curated: a computed minimal cover
   of the corpus's `expected*.json`, typed against the same `.d.ts`. Stronger than arm A in two
   ways, not merely wider — the committed `expected.json` is the CANONICAL parser's output with
@@ -1373,9 +1373,9 @@ wrong twice, both times caught by canarying against a known-real bug rather than
 
 The cost was measured before choosing: ~1 s for positions against ~19 s for slots, on a `check`
 whose total is minutes and whose cost is dominated by build configuration rather than audit
-code. Two things keep the price honest. Slots inside an OPAQUE region (parent or child among the table's
-opaque names, CSS-keyed, so a JS `Block` comment's slots stay in) are excluded from the cover
-target — they type against `unknown`, so covering them graded nothing. The checker keeps no
+code. Two things keep the price honest. Slots inside a `data` field's value (parent or child
+among the table's `discriminators` names) are excluded from the cover target — they type
+against the data's own type, not a node's, so covering them graded nothing. The checker keeps no
 cache, so each run pays the full price, the cover's size being what bounds it. Reverting is a one-line change in
 `wire_field_slots`; the trade it buys is precisely the class of bug this gate exists for. Same
 lesson one level up from the one that motivated arm B, and then again one level up from that.
@@ -1395,13 +1395,12 @@ C keeps reporting truthfully about the `.d.ts`. Oracle freshness is
 **Blind spots.**
 
 - **A position under an `unknown`-typed field is not graded** — arm B covers only the *names*
-  under it. Few such fields remain, and the shape of the list is the point: the CSS tree below
-  the stylesheet root (`StyleSheet.children` / `.attributes`, `StyleSheetFile.children`),
-  opaque by an explicit decision, and two single nodes (a regex `value`, which acorn itself
-  emits as `{}`, and `<svelte:options customElement>`). Everything else is typed. Widening one
-  is how a region gets *behind* the gate rather than merely inside it — typing `Script.content`
-  (`unknown` → `Program`) is what put the `<script>` side of every `.svelte` fixture under arm
-  C at all.
+  under it. Few such fields remain, and the shape of the list is the point: two single nodes (a
+  regex `value`, which acorn itself emits as `{}`, and `<svelte:options customElement>`).
+  Everything else is typed. Widening one is how a region gets *behind* the gate rather than
+  merely inside it — typing `Script.content` (`unknown` → `Program`) is what put the `<script>`
+  side of every `.svelte` fixture under arm C at all, and typing the CSS tree below the
+  stylesheet roots is what put every `<style>` and `.css` fixture there.
 - **It asks only whether the two sides AGREE on a shape arm A reaches** — never whether that
   shape is the one acorn / `parseCss` / Svelte actually produce. Arm C narrows this a long way
   by grading the committed oracle wire, but the parse conformance gates remain the authority.
@@ -2628,8 +2627,7 @@ forms included — `loc_wires`' document set, each at the fixture's goal):
 - **Every object resolves to an entry.** A typed object by its `type` — a node of the CSS tree
   (below a `StyleSheet` or `StyleSheetFile`, a Svelte `StyleSheet`'s `attributes` aside) by
   its CSS entry, since CSS's `Block` and the JS comment `Block` share a name and nothing else —
-  narrowed to the interfaces the parent field's `ts` admits there (the opaque CSS entries carry
-  a `ts` the `.d.ts` never prints, so the CSS tree's slots are checked too) and to the entries
+  narrowed to the interfaces the parent field's `ts` admits there and to the entries
   whose `positions` name the parent slot, where an entry limits them; a `type`-less object by the
   parent field's `entry`. None is `UNDECLARED`.
 - **Every object conforms to one of them**: each key a field of the entry (`EXTRA`), in the field

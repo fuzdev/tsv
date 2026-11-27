@@ -107,7 +107,7 @@ export interface AstSchemaField {
 	key: string;
 	kind: FieldKind | FieldKind[];
 	/** The `.d.ts` member type; absent on a field the `.d.ts` declares elsewhere (the attached
-	 * comment keys, through `AcornCommentAttachment`) or not at all (an opaque entry's). */
+	 * comment keys, through `AcornCommentAttachment`). */
 	ts?: string;
 	/** The `type`-less entry an `object` or `loc` field holds, by its `interface`. */
 	entry?: string;
@@ -144,8 +144,6 @@ export interface AstSchemaEntry {
 	css?: boolean;
 	/** An interface no wire object is graded against: its fields are another entry's by `extends`. */
 	mixin?: boolean;
-	/** The `.d.ts` leaves it undeclared (the region above it types it `unknown`). */
-	opaque?: boolean;
 	/** The parent slots (`Type.key`) it may stand in, where its interface alone admits more. */
 	positions?: string[];
 	extends?: string[];
@@ -189,7 +187,6 @@ const ENTRY_KEYS = [
 	'interface',
 	'css',
 	'mixin',
-	'opaque',
 	'positions',
 	'extends',
 	'doc',
@@ -297,7 +294,7 @@ export function parse_ast_schema(text: string): AstSchema | { errors: string[] }
 				if (key in entry && typeof entry[key] !== 'string')
 					errors.push(`${ew}: \`${key}\` is not a string`);
 			}
-			for (const key of ['css', 'mixin', 'opaque']) flag(ew, entry, key);
+			for (const key of ['css', 'mixin']) flag(ew, entry, key);
 			lines(ew, entry, 'extends');
 			lines(ew, entry, 'positions');
 			lines(ew, entry, 'doc');

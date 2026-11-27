@@ -17,8 +17,8 @@
  *
  * **B — wire-type coverage.** Every `type` discriminant present anywhere in the committed
  * fixture wire must name an entry of the AST schema table (`crates/tsv_wasm/types/tsv_ast_schema.json`,
- * which generates the `.d.ts`): one the `.d.ts` declares, or one the table marks `opaque` —
- * the CSS node vocabulary, and the data a `data` field's `discriminators` name. This is the
+ * which generates the `.d.ts`): one the `.d.ts` declares, or one a `data` field's
+ * `discriminators` name as data rather than a node. This is the
  * cheap arm and the one with the widest reach: a set difference, no type-checking involved. It
  * exists because arm A can only be as right as its samples are broad — `LogicalExpression`
  * (`a && b`, one of the commonest nodes in JS) was absent from the `.d.ts` entirely while this
@@ -337,27 +337,22 @@ const label_of = (type: string, css: boolean): string => (css ? `css:${type}` : 
 const opens_css = (type: unknown): boolean => type === 'StyleSheet' || type === 'StyleSheetFile';
 
 /**
- * The table's discriminants, split by whether the `.d.ts` declares them. OPAQUE are the ones it
- * deliberately does not: the entries the table marks `opaque` (the CSS node vocabulary below the
- * stylesheet roots, which the `.d.ts` types `unknown[]`), and the spellings a `data` field's
- * `discriminators` name (`Boolean`, a DATA key inside Svelte's evaluated
- * `<svelte:options customElement>` props config, which the text of a wire cannot tell from a
- * discriminator). Typing a region is a table edit — the day its entries lose `opaque`, their
- * slots re-enter arm C's cover and their names leave this set.
+ * The table's discriminants: DECLARED, every entry's `type` (CSS-keyed), and DATA, the
+ * spellings a `data` field's `discriminators` name (`Boolean`, a DATA key inside Svelte's
+ * evaluated `<svelte:options customElement>` props config, which the text of a wire cannot
+ * tell from a discriminator) — names the `.d.ts` declares no node for.
  */
-function table_discriminants(schema: AstSchema): { declared: Set<string>; opaque: Set<string> } {
+function table_discriminants(schema: AstSchema): { declared: Set<string>; data: Set<string> } {
 	const declared = new Set<string>();
-	const opaque = new Set<string>();
+	const data = new Set<string>();
 	for (const section of schema.sections) {
 		for (const item of section.entries) {
 			if (is_alias(item)) continue;
-			if (item.type !== undefined) {
-				(item.opaque ? opaque : declared).add(label_of(item.type, item.css === true));
-			}
-			for (const field of item.fields) for (const d of field.discriminators ?? []) opaque.add(d);
+			if (item.type !== undefined) declared.add(label_of(item.type, item.css === true));
+			for (const field of item.fields) for (const d of field.discriminators ?? []) data.add(d);
 		}
 	}
-	return { declared, opaque };
+	return { declared, data };
 }
 
 /**
@@ -402,18 +397,16 @@ interface FixtureWire {
  * `#scalar` / `#empty` / `#obj` stand in where a value has no discriminator of its own, so a
  * scalar-vs-node change at a slot still registers as a distinct slot.
  *
- * Slots inside an OPAQUE region (parent or child among `table_discriminants`' opaque ones) are
- * skipped: the typed side is `unknown` there, so covering them spends `tsc` time grading
- * nothing. The filter keys on the table, so the day a region is typed (its entries lose
- * `opaque`) its slots re-enter the cover automatically. Safe in both directions because every
- * opaque name occurs only inside an `unknown`-typed region — the stale-entry check is what
- * keeps that true, and the CSS-keyed labels keep a JS `Block` comment's slots in the cover.
+ * Slots inside a `data` field's value (parent or child among `table_discriminants`' data names)
+ * are skipped: the typed side is the data's own type there, not a node's, so covering them
+ * spends `tsc` time grading nothing. Safe because every data name occurs only inside such a
+ * value — the stale-name check is what keeps that true.
  *
  * The same walk collects the wire's discriminants (arm B), CSS-keyed like the slots.
  */
 function wire_field_slots(
 	json: unknown,
-	opaque: ReadonlySet<string>
+	data: ReadonlySet<string>
 ): { slots: Set<string>; types: Set<string> } {
 	const out = new Set<string>();
 	const types = new Set<string>();
@@ -426,7 +419,7 @@ function wire_field_slots(
 		return typeof t === 'string' ? label_of(t, css || opens_css(t)) : '#obj';
 	};
 	const add = (parent: string, k: string, child: string): void => {
-		if (opaque.has(parent) || opaque.has(child)) return;
+		if (data.has(parent) || data.has(child)) return;
 		out.add(`${parent}.${k}->${child}`);
 	};
 	const visit = (n: unknown, css: boolean): void => {
@@ -460,7 +453,7 @@ function wire_field_slots(
 /** The fixture wires, or `null` after reporting an unknown input kind. */
 async function collect_fixture_wires(
 	checkout: FsReadDir,
-	opaque: ReadonlySet<string>
+	data: ReadonlySet<string>
 ): Promise<FixtureWire[] | null> {
 	const out: FixtureWire[] = [];
 	let unknown_kind = false;
@@ -491,7 +484,7 @@ async function collect_fixture_wires(
 				const text = await checkout.read_text(path);
 				// A no-oracle marker payload (`{"error": …}`) types nothing.
 				if (!/^\s*\{\s*"error"/.test(text)) {
-					const { slots, types } = wire_field_slots(JSON.parse(text), opaque);
+					const { slots, types } = wire_field_slots(JSON.parse(text), data);
 					out.push({ path, root, bytes: text.length, types, positions: slots });
 				}
 			}
@@ -551,10 +544,10 @@ export async function run_check_ast_types(deps: CheckAstTypesDeps): Promise<numb
 		console.error(`${AST_SCHEMA_PATH} does not read — run \`npm run check:ast-schema\`.`);
 		return 1;
 	}
-	const { declared, opaque } = table_discriminants(schema);
+	const { declared, data } = table_discriminants(schema);
 
 	console.log(`Scanning ${FIXTURES_ROOT} …`);
-	const wires = await collect_fixture_wires(deps.checkout, opaque);
+	const wires = await collect_fixture_wires(deps.checkout, data);
 	if (wires === null) return 1;
 	const corpus_types = new Set<string>();
 	for (const w of wires) for (const t of w.types) corpus_types.add(t);
@@ -574,32 +567,33 @@ export async function run_check_ast_types(deps: CheckAstTypesDeps): Promise<numb
 		return 1;
 	}
 
-	// Arm B — every discriminant the wire produces is declared, or deliberately opaque.
-	const undeclared = [...corpus_types].filter((t) => !declared.has(t) && !opaque.has(t));
+	// Arm B — every discriminant the wire produces is declared, or a data field's.
+	const undeclared = [...corpus_types].filter((t) => !declared.has(t) && !data.has(t));
 	undeclared.sort();
-	const stale_opaque = [...opaque].filter((t) => !corpus_types.has(t));
-	stale_opaque.sort();
-	if (undeclared.length > 0 || stale_opaque.length > 0) {
+	const stale_data = [...data].filter((t) => !corpus_types.has(t));
+	stale_data.sort();
+	if (undeclared.length > 0 || stale_data.length > 0) {
 		console.error('');
 		if (undeclared.length > 0) {
 			console.error(`Wire-type coverage gap — ${undeclared.length} discriminant(s) the fixture`);
 			console.error(`corpus produces but ${AST_SCHEMA_PATH} has no entry for:`);
 			for (const t of undeclared) console.error(`  ${t}`);
 			console.error('');
-			console.error('Add an entry for each one (`opaque` if the region is deliberately untyped),');
-			console.error('then `npm run ast-schema:update`.');
+			console.error('Add an entry for each one, then `npm run ast-schema:update`.');
 		}
-		if (stale_opaque.length > 0) {
-			console.error(`Stale opaque name(s) in the table — no longer produced by the corpus:`);
-			for (const t of stale_opaque) console.error(`  ${t}`);
-			console.error('Remove them; an opaque entry that fires on nothing hides the next one.');
+		if (stale_data.length > 0) {
+			console.error(
+				`Stale \`discriminators\` name(s) in the table — no longer produced by the corpus:`
+			);
+			for (const t of stale_data) console.error(`  ${t}`);
+			console.error('Remove them; a data name that fires on nothing hides the next one.');
 		}
 		return 1;
 	}
 	console.log(
 		`Wire-type coverage: ${corpus_types.size} discriminant(s) across ${wires.length} fixture` +
-			` wire(s) — ${corpus_types.size - opaque.size} declared,` +
-			` ${opaque.size} deliberately opaque.`
+			` wire(s) — ${corpus_types.size - data.size} declared,` +
+			` ${data.size} data.`
 	);
 
 	// Arm C — the minimal cover, typed against the .d.ts alongside the curated samples.
