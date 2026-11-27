@@ -160,7 +160,7 @@ npm run fixtures:audit               # audit _prettier_divergence fixtures (diag
 npm run fixtures:ts-audit            # which input.ts fixtures need .ts vs could be .svelte (= `ts_fixture_audit`)
 npm run compile:fixtures:init        # create/reinit a compile fixture (oracle-compiles + canonicalizes; tests/fixtures_compile)
 npm run compile:fixtures:validate    # compile fixtures: oracle freshness + expected idempotence + ours parity. Preflights
-#                                      `npm run conformance` — the ONLY place oracle freshness is graded
+#                                      `npm run conformance` — the ONLY place compile-fixture oracle freshness is graded
 npm run strip:fixtures:validate      # tsv_ts::strip vs tests/fixtures_strip (= `cargo test --test strip_fixtures_tests`); known
 #                                      failures pinned in a ratchet (`:update` re-pins). tests/fixtures_strip/README.md
 npm run strip:fixtures:update        # regenerate expectations from ts-blank-space, cross-checked against Node's
@@ -258,8 +258,8 @@ npm run conformance:ts-fixtures        # tsv's TS parser vs acorn-typescript's t
 npm run conformance:ts-repo            # tsv's TS parser vs ALL of ../typescript/tests/cases; oracle = tsc's .errors.txt baselines
 #                                        + tsc's LIVE parser. Freshness-checked ledgers (sanctioned = kept, known = to fix); only an
 #                                        UNTRACKED over-rejection fails. ./docs/conformance_tsc.md
-npm run conformance                    # pre-release aggregate: pin- and oracle-freshness preflights (fixtures:validate +
-#                                        compile:fixtures:validate — `check` grades tsv only against the COMMITTED files), the
+npm run conformance                    # pre-release aggregate: pin- and oracle-freshness preflights (fixtures:validate, `check`'s
+#                                        live fixture leg again, + compile:fixtures:validate, the oracle freshness `check` lacks), the
 #                                        svelte-styles harvest, strip:corpus + imports:corpus, then in one Node process the three
 #                                        gates above + corpus:compare:parse/format --all, then render:audit (./docs/tasks.md §`conformance`)
 npm run conformance:test262            # tsv's JS parser vs test262 POSITIVES (pure Rust, `test262 --gate`; exact POSITIVE_PASSED_PIN);

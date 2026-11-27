@@ -65,7 +65,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Import self-check](#import-fixture-self-check-imports_self_check_tests) | `cargo test --test imports_self_check_tests` | `parse_imports` departing from the records an independent ESTree walk reads off the canonical trees the main fixture tree pins | `npm run check` (`cargo test`) |
 | [Import corpus](#import-corpus-differential-importscorpus) | `imports:corpus` | `parse_imports` on real TypeScript, JavaScript or Svelte panicking, rejecting the parse, or departing from oxc-parser's module record outside its named normalizations and a reviewed list | `npm run conformance` (release) |
 | [Depth limits](./cli.md#the-stack-contract) | `test:depth` · `test:depth:napi` · `test:depth:wasm` · `build:pgo`'s addon depth gate | a construct the parse leaves uncounted (an accepted input with a wire path past either limit, whatever its stack); an accepted input whose walks overflow the stack contract's thread; a walk that recurses down a flat chain's spine — every spine shape (far more links than the nesting limit allows levels, under a wire as shallow as the document's frame) runs its walks again, in an optimized build, on a thread a small fraction of the contract's, so a frame per link overflows natively where the contract's thread still fits it; an accepted input whose walks trap or throw a `RangeError` in the WASM engine on a Node main thread (cold or tiered up, under V8's default tiering); an accepted input whose calls overflow the profile-guided N-API addon as it ships, on a worker thread sized to the contract less its margin; an accepted input whose format's output does not parse again or is not its own format (a printer-added pair the parse did not charge); a depth past a limit that is not refused by the depth error. Blind to a grammar position no catalog or sweep shape builds: the gate grades constructed shapes, not the grammar. That includes a recursion a walk reaches only from some positions — a printer that nests a doc level per link leaves the doc walks (`DocArena`'s layout and break walks) recursing only where a group measures that doc, so the flat array, indexed-access and qualified-name type chains are built a second time where one does (a type argument), and the commented non-null run, already measured at an assignment, at a call argument too; a position no shape is built at stays unseen. And blind to a per-link recursion whose frame is a few machine words — under the spine thread's size over the shortest shape's links | `test:depth`: `npm run check` (`corpus` world, `check`'s scope of the sweep); `test:depth:napi`, the shipped binaries' `napi` profile without their profile guidance (which no test build can carry), over the full sweep: publish Step 3, CI `artifacts`; `test:depth:wasm`: publish Step 6, CI `artifacts`; the staged profile-guided addon (`scripts/pgo/addon_depth.ts`), over the full sweep's shapes: `build:pgo`, the release workflow on every platform row |
-| [Fixture validation](./fixture_overview.md) | `fixtures:validate` | a fixture claim no longer holding — parser/formatter parity vs the committed files · the ORACLE itself having moved (freshness, sidecar) | parity in `npm run check` (`cargo test --test fixtures_tests`); freshness in `npm run conformance` (with `bench:pins:suites`, its pin-freshness preflight) |
+| [Fixture validation](./fixture_overview.md) | `fixtures:validate` | a fixture claim no longer holding — parser/formatter parity vs the committed files · the ORACLE itself having moved (freshness, sidecar) | both in `npm run check` (`cargo test --test fixtures_tests`, the oracles live through the sidecar); `npm run conformance` runs it again as a preflight (with `bench:pins:suites`, its pin-freshness preflight) |
 
 **How a corpus-walking audit walks.** Every one — the injection audits directly, the
 as-authored ones through the shared pristine sweep — runs its per-file loop on
@@ -1389,8 +1389,8 @@ because they are easy to forget in either direction: arm C **cannot catch a pars
 is `fixtures_tests`' remit, and a parser regression leaves arm C perfectly green), and the
 composition is only as strong as its weaker link — a narrowed `fixtures_tests`, or an
 `expected.json` gone stale against the live oracle, breaks the conclusion about *tsv* while arm
-C keeps reporting truthfully about the `.d.ts`. Oracle freshness is
-[`conformance`'s](../CLAUDE.md#corpus-comparison) job, as always.
+C keeps reporting truthfully about the `.d.ts`. That freshness is `fixtures_tests`' own
+(P1 against the live canonical parser, in `check`).
 
 **Blind spots.**
 
@@ -1686,9 +1686,9 @@ lock, re-run `npm run compile:fixtures:validate`, update the constant, all in on
 - **`LOCKED_TRANSITIVE` names only `esrap`.** Every other transitive dependency is pinned by
   the lock but unreviewed — a regeneration moves them silently unless someone diffs the lock.
 - **It cannot see oracle freshness.** A pin can be perfectly self-consistent and still grade
-  against stale committed expectations. That is `compile:fixtures:validate`'s job — the only
-  check that grades the committed expectations against a LIVE oracle — which is why `npm run
-  conformance` preflights it.
+  against stale committed expectations. For the compile fixtures that is
+  `compile:fixtures:validate`'s job — the only check that grades them against a LIVE compiler —
+  which is why `npm run conformance` preflights it.
 
 **Maintenance counterpart: `npm run pins:lock`** (`scripts/regen_sidecar_lock.ts`), not an
 audit: `npm install --package-lock-only` in the sidecar's directory, which resolves what
@@ -2841,9 +2841,10 @@ edit to an expected file.
 
 **Split gating, and the split is the point.** Checks (b) and (c) — plus "`input.svelte`
 parses" — need no sidecar, so they also run as `tests/compile_fixtures_tests.rs` in every
-`cargo test --workspace`: the offline parity gate inside `npm run check`. Check (a) cannot,
-because it calls the canonical compiler. `npm run conformance` therefore preflights the full
-command, and **that is the only place oracle freshness is graded anywhere.**
+`cargo test --workspace`: the offline parity gate inside `npm run check`. Check (a) calls the
+canonical compiler through the sidecar, which that test never starts. `npm run conformance`
+therefore preflights the full command, and **that is the only place compile-fixture oracle
+freshness is graded anywhere.**
 
 **Why that split is load-bearing.** The sidecar-free slice compares tsv's output against the
 COMMITTED file — both inside the repo. When the oracle itself moves, neither side moves, so the
