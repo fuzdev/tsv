@@ -64,9 +64,10 @@
  * `format_typescript(source)`, and strips through `strip_typescript(source)`, with no bag at
  * all.
  *
- * Why two files: the parse half reconstructs `loc` with `locations.js`, and the
- * format-only package (`@fuzdev/tsv-format-wasm`) ships neither — so this file imports
- * nothing, and that package loads nothing it has no use for. Each entry (`index.js`,
+ * Why two files: the parse half decodes the tape (`tape_engine.js`, `tape_decode.js`,
+ * `locations_core.js`) and ships `locations.js`, and the format-only package
+ * (`@fuzdev/tsv-format-wasm`) ships neither — so this file imports nothing, and that package
+ * loads nothing it has no use for. Each entry (`index.js`,
  * `browser.js`, the napi loader) is a thin adapter: it hands `create_format_api` /
  * `create_parse_api` its engine's functions and re-exports the result by name.
  * `parse_internal_*` (bench-only) never passes through here.

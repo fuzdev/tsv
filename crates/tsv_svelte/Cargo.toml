@@ -30,7 +30,7 @@ locations = ["json", "tsv_lang/_locations", "tsv_ts/locations", "tsv_css/locatio
 # The wire writer's tape copy (`__private::write_tape`): the span-only wire's tape
 # (docs/tape_format.md) written directly by the writer's own walk, composing `tsv_ts`'s and
 # `tsv_css`'s tape copies for the embedded islands. tsv's own plumbing — the underscore keeps it
-# out of the semver surface. No binding enables it yet.
+# out of the semver surface. Enabled by every binding's `parse` feature and by `tsv_debug`.
 _tape = ["json", "tsv_ts/_tape", "tsv_css/_tape", "tsv_lang/_tape_literals"]
 # Opt-in print-once comment ledger (`tsv_lang::comment_ledger`): the format entry points
 # register `Root.comments`, the four JS-comment doc builders record each emit, and the

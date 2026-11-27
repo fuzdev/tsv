@@ -29,7 +29,8 @@ export's words are its language's writer's); over the shipped packages, the pack
 decoded tree, stringified, is the native CLI's span-only wire byte for byte) and
 `npm run engines:audit`'s parse leg (the two engines' `parse_<lang>` equal, over the fixtures and
 the corpus snapshot).
-`npm run check:ast-schema` holds the two generated files to the table and the shape list.
+`npm run check:ast-schema` holds the two generated files (`tape_decode.js`, `shapes.rs`) to the table, the shape list and
+the hot-shape list.
 
 ## The schema
 
@@ -57,7 +58,7 @@ decodes through the entry-generic record. `npm run check:tape` reports the recor
 off the list; an update folds them in.
 
 **`SHAPES_HASH`** is FNV-1a over a canonical text of the format version, every tape entry and
-every fast shape. The transcoder writes it into each tape's header and the decoder refuses a tape
+every fast shape. Every producer writes it into each tape's header and the decoder refuses a tape
 whose hash is not its own, so a tape and a decoder from different tables or shape lists never
 meet silently. **`TAPE_FORMAT_VERSION`** (`scripts/tape_schema.ts`, generated into both outputs)
 moves by hand when this document's rules change.

@@ -651,9 +651,9 @@ node benches/js/roots/wasm_format_probe.ts
 
 Two siblings cover the other WASM axes: `wasm_memory_probe.ts` measures
 peak/high-water linear-memory demand per file (the axis the wall probe can't
-see), and `wasm_json_probe.ts` attributes the WASM-vs-native JSON *parse*
-penalty (parse vs materialization vs the JS-side `JSON.parse`). Both are
-documented in `benches/js/CLAUDE.md`.
+see), and `wasm_json_probe.ts` attributes the WASM-vs-native
+parse-materialization penalty (pure parse vs the tape route's write, hand-over and decode, with
+`JSON.parse` of the same wire for reference). Both are documented in `benches/js/CLAUDE.md`.
 
 ### 7. `tsv_debug arena_stats` — doc-arena node population
 
@@ -3485,11 +3485,11 @@ report (`benches/js/results/report.<runtime>.md`).
 
 Gzipped numbers come from `gzip -c` (system default level 6), matching
 npm-tarball wire reality and `scripts/patch_npm_package.ts`. The parse feature
-adds the wire-JSON writer (which fuses in the byte→char offset translation); the
+adds the wire writer's tape copy (which fuses in the byte→char offset translation); the
 format feature adds the printers (which the parse-only build drops at link
-time); the AST crosses the JS boundary as a JSON string handed to the engine's
-native `JSON.parse` (no `serde_wasm_bindgen`). All builds run wasm-opt with
-explicit bulk-memory + nontrapping-float-to-int flags.
+time); the AST crosses the JS boundary as the binary tape, a `Uint32Array` view of linear
+memory the generated decoder reads (no `serde_wasm_bindgen`, no JSON text). All builds run
+wasm-opt with explicit bulk-memory + nontrapping-float-to-int flags.
 
 Build all three before running benches so the sizes appear in the report:
 

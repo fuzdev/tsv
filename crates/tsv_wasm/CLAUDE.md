@@ -189,7 +189,7 @@ compile-and-`initSync`-at-import module the root's `index.js` re-exports `wasm_m
 engine calls behind `lazy.js`'s guard — the ready flag, `init` and `init_sync` the root's
 `browser.js` re-exports, so one `init()` serves both); one `parse.d.ts` types both.
 `@fuzdev/tsv-parse-wasm`'s root re-exports its `./parse` entry whole (`export *`), so its root
-API is as before and `./parse` is an alias a consumer can swap package names under.
+carries the whole parse family and `./parse` is an alias a consumer can swap package names under.
 `./worker` stays `browser.js`: in the umbrella it carries no parser, and a Node worker that
 imports `./parse` initializes from that entry (a second compile) rather than the handed module.
 

@@ -526,7 +526,7 @@ Things the published numbers measure that aren't quite what they look like.
     look artificially fast, even beating native oxc.
   - **Regex literals cost the opponents a `RegExp` compile the tsv rows skip.**
     `oxc-parser` and `yuku-parser` both set a regex `Literal`'s `value` to a real
-    `RegExp`; tsv's wire is JSON, so it carries acorn's `"value": {}` beside the
+    `RegExp`; tsv's tree is the JSON wire's, so it carries acorn's `"value": {}` beside the
     `regex: {pattern, flags}` object and a consumer constructs its own.
     `JSON.stringify` normalizes the two to the same bytes, so the payload
     comparison is unaffected — but the opponents do a little work per regex

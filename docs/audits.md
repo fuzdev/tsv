@@ -30,7 +30,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Raw-find scan](#raw-find-scan-audit-scanaudit) | `scan:audit` | new raw substring scans over source (comment-blind delimiter matching) | `npm run check` |
 | [Self-format](#self-format-audit-formataudit) | `format:audit` | tsv failing to format its OWN TS/JS — a would-change file (non-idempotency) or a parse error (over-rejection) | `npm run check` |
 | [Discovery parity](#corpus-discovery-parity-audit-discoveryaudit) | `discovery:audit` | `tsv format --list` over the `../corpora` snapshot naming a different file set than the snapshot's committed tree holds in tsv's extensions — a discovery prune firing on real code, or an extension drift | `npm run check` (when `../corpora` is present) |
-| [Engine parity](#engine-parity-audit-enginesaudit) | `engines:audit` | the WASM engine and the native engine formatting — or type-stripping, collecting the import records of, or parsing — the same file to DIFFERENT bytes (and either engine's tape route parsing a file to another tree than its JSON route) — a wasm32-only divergence every other gate is blind to, since they all grade the native build | CI's `artifacts` job ONLY (needs both packages built; neither `npm run check` nor the publish path compares engines) |
+| [Engine parity](#engine-parity-audit-enginesaudit) | `engines:audit` | the WASM engine and the native engine formatting — or type-stripping, collecting the import records of, or parsing — the same file to DIFFERENT bytes or trees (each engine's `./parse` `parse_<lang>` against the other's) — a wasm32-only divergence every other gate is blind to, since they all grade the native build | CI's `artifacts` job ONLY (needs both packages built; neither `npm run check` nor the publish path compares engines) |
 | [Doc link](#doc-link-audit-docsaudit) | `docs:audit` | a doc-comment `[link]` that no longer resolves — a stale doc | `npm run check` |
 | [docs.rs build](#docsrs-build-audit-docsauditdocsrs) | `docs:audit:docsrs` | a crate meant for docs.rs whose own doc build fails at its docs.rs feature set or at its defaults — a link to an item behind a feature that build leaves off, which the all-features workspace build resolves; a public item's doc linking a private item; a dead render — a link to a hidden item, which resolves but renders a dead `#anchor` or inert bracketed code | `npm run check` |
 | [Published deps](#published-graph-dependency-audit-depsaudit) | `deps:audit` | a crate meant for publishing reaching `serde_json` through a normal or build dependency, at any feature set or target — the workspace entry's features would unify into a consumer's own `serde_json` and change how it deserializes | `npm run check` |
@@ -1576,7 +1576,7 @@ project as published — the MERGED surface, which no other gate types: `check:a
 each package (`@fuzdev/tsv-format-wasm`, `-parse-wasm`, `-wasm`, and the napi loader
 `@fuzdev/tsv`) into a temp consumer's `node_modules` — its `package.json` plus exactly the
 `files` it declares — and compiles lean consumer modules against it through the `exports` map,
-every subpath (the root, `./worker`, `./locations`). What they type:
+every subpath (the root, `./worker`, `./parse`, `./locations`). What they type:
 
 - every facade function's return (`FormatResult` from each formatter,
   `ParseResult<Root>` / `<Program>` / `<StyleSheetFile>` from the parsers, each narrowing on
@@ -1590,7 +1590,7 @@ every subpath (the root, `./worker`, `./locations`). What they type:
   without `wasm_module`;
 - type EQUALITY where an assignment would pass an `any` (`wasm_module` is exactly
   `WebAssembly.Module`, `loc_of` returns exactly `SourceLocation | null`);
-- `// @ts-expect-error` negatives for what must not compile — an unknown option key,
+- `// @ts-expect-error` negatives for what must not compile — the parse family from a root that formats, a formatter from `./parse`, an unknown option key,
   `sourceType` on a goalless export, a function or option type
   from the other single-family package, `Position` from `./locations`, `wasm_module` from
   `./worker` or the browser entry, the WASM lifecycle from the napi loader. An unused directive

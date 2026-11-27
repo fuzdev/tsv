@@ -31,7 +31,7 @@
 import { indexed_text } from './locations_core.js';
 import { decode_tape } from './tape_decode.js';
 
-/** The tape header's length in bytes (`docs/tape_format.md` §The tape). */
+/** The tape header's length in bytes (`docs/tape_format.md` §Layout). */
 const HEADER_BYTES = 32;
 
 /**

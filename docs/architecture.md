@@ -34,6 +34,7 @@ A single AST cannot optimize for both manipulation and serialization.
 Parse → Internal AST → [Format, Lint, Analyze]
                           ↓ (only when serializing)
                        __private::convert_ast_json_bytes() → wire JSON (parse_to_json)
+                       __private::write_tape() → the tape (the bindings; docs/tape_format.md)
 ```
 
 Each language crate separates these cleanly:
@@ -287,7 +288,8 @@ feature gating the writer (`ast::convert`), the public `parse_to_json` /
 format-only WASM build (`@fuzdev/tsv-format-wasm`) declares its language deps
 `default-features = false`, excluding the wire-JSON layer at link time; the
 parse-capable builds (`@fuzdev/tsv-parse-wasm` and the full `@fuzdev/tsv-wasm`) opt
-in via `tsv_wasm/parse`, which forwards to each language crate's `json`.
+in via `tsv_wasm/parse`, which forwards to each language crate's `_tape` (the writer's tape copy, implying `json`); no
+export reaches the JSON copy, so it drops at link time.
 Conversely the parse-only build omits `tsv_wasm/format`, so the `format_*` exports
 and the printers behind them drop at link time. `tsv_wasm` and `tsv_napi` add a
 default-on `strip` feature (the `strip_typescript` export over `tsv_ts::strip`) and a

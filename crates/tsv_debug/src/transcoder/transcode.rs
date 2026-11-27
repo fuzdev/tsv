@@ -561,7 +561,7 @@ impl Transcoder {
         Ok(())
     }
 
-    /// The tape's header words (`docs/tape_format.md` §The tape).
+    /// The tape's header words (`docs/tape_format.md` §Layout).
     fn header(&self) -> Result<[u32; HEADER_WORDS], TapeError> {
         let (words, pool_bytes) = sizes(self.body_words(), self.pool.len(), self.pool_units)?;
         Ok([

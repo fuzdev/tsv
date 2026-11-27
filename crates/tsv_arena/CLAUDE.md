@@ -1,6 +1,6 @@
 # tsv_arena
 
-> The substrate tsv's three bindings share: the goal axis their exports are generated over, and the format path that prints into `tsv_lang`'s per-thread doc arena.
+> The substrate tsv's three bindings share: the goal axis their exports are generated over, and the format path that prints into `tsv_lang`'s per-thread doc arena, and the tape export over the writers' tape copies.
 
 ## Why this crate exists
 
