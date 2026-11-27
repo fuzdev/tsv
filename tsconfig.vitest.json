@@ -91,6 +91,7 @@
 		"scripts/engine_parity_test.ts",
 		"scripts/gzip_size_test.ts",
 		"scripts/import_closure_test.ts",
+		"scripts/locations_test.ts",
 		"scripts/napi_host_test.ts",
 		"scripts/no_package_closure_test.ts",
 		"scripts/npm_api_imports_test.ts",

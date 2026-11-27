@@ -113,7 +113,7 @@ const NON_LF_TERMINATOR = /[\r\u2028\u2029]/;
 
 /**
  * Line-start offsets (UTF-16 units); the rightmost start `<=` an offset gives its
- * line. Built once per source and reused for every `loc_at` lookup. A TypeScript
+ * line. Built once per source and reused for every line lookup. A TypeScript
  * document counts the ECMAScript LineTerminators (`\n`, `\r`, `\r\n` as one, U+2028,
  * U+2029); a Svelte or CSS document counts LF alone.
  *
@@ -158,6 +158,59 @@ function build_line_starts(source, ecmascript) {
 function line_index_at(offset, starts) {
 	let lo = 0;
 	let hi = starts.length - 1;
+	while (lo < hi) {
+		const mid = (lo + hi + 1) >> 1;
+		if (starts[mid] <= offset) lo = mid;
+		else hi = mid - 1;
+	}
+	return lo;
+}
+
+/**
+ * `line_index_at`'s answer, searched outward from `hint` (any index into `starts`) rather
+ * than across the whole table: the line `hint` names and the one after it are checked
+ * first, then the search gallops away from `hint` — steps of 1, 2, 4, … — until it
+ * brackets `offset`, and binary-searches the bracket. The walk's offsets are near-monotone
+ * (a node's `start` is usually on the line of the node visited before it, its `end`
+ * usually on its `start`'s line), so the answer is almost always `hint` or a neighbour,
+ * and a far jump costs about twice the binary search's steps. The answer never depends
+ * on `hint` — only the work does — so a stale or arbitrary hint is safe.
+ * @param {number} offset
+ * @param {number[]} starts
+ * @param {number} hint
+ * @returns {number}
+ */
+function line_index_near(offset, starts, hint) {
+	// `starts[0]` is 0: an offset below it (or NaN) is line 0, as the binary search answers
+	if (!(offset > 0)) return 0;
+	const last = starts.length - 1;
+	let lo;
+	let hi; // exclusive: `starts[hi] > offset`, or `hi` is past the table
+	if (starts[hint] <= offset) {
+		if (hint === last || offset < starts[hint + 1]) return hint;
+		lo = hint + 1;
+		let step = 1;
+		hi = lo + 1;
+		while (hi <= last && starts[hi] <= offset) {
+			lo = hi;
+			step += step;
+			hi = lo + step;
+		}
+		if (hi > last + 1) hi = last + 1;
+	} else {
+		hi = hint;
+		lo = hint - 1;
+		if (starts[lo] <= offset) return lo;
+		let step = 1;
+		while (lo > 0 && starts[lo] > offset) {
+			hi = lo;
+			step += step;
+			lo = hi - step;
+		}
+		if (lo < 0) lo = 0;
+	}
+	// `starts[lo] <= offset < starts[hi]`: the rightmost start `<=` offset in `[lo, hi)`
+	hi--;
 	while (lo < hi) {
 		const mid = (lo + hi + 1) >> 1;
 		if (starts[mid] <= offset) lo = mid;
@@ -322,6 +375,18 @@ function shorthand_identifier_of(node) {
  */
 function name_loc_at(offset, starts) {
 	const i = line_index_at(offset, starts);
+	return { line: i + 1, column: offset - starts[i], character: offset };
+}
+
+/**
+ * `name_loc_at`, its line searched outward from `hint` (`line_index_near`).
+ * @param {number} offset
+ * @param {number[]} starts
+ * @param {number} hint
+ * @returns {{line: number, column: number, character: number}}
+ */
+function name_loc_near(offset, starts, hint) {
+	const i = line_index_near(offset, starts, hint);
 	return { line: i + 1, column: offset - starts[i], character: offset };
 }
 
@@ -544,7 +609,10 @@ function delimited_by_expression(source, c, { by_end, by_start }) {
  *
  * The `character`-bearing identifiers Svelte stamps are re-stamped after the walk
  * (`stamp_character_locs`, per collected `STAMP_HOSTS` node), once the plain shape the
- * walk writes every object has landed on them. Nothing reads the visit order.
+ * walk writes every object has landed on them. No answer depends on the visit order, but the
+ * lookup's cost does: children go onto the stack reversed, so they pop in key order — a
+ * pre-order in source order, where each `start` usually sits on the line of the one before it
+ * and `line_index_near` answers from its hint.
  * @param {any} root
  * @param {{starts: number[], source: string, is_svelte: boolean}} ctx
  */
@@ -553,29 +621,50 @@ function walk_add_loc(root, ctx) {
 	if (root === null || typeof root !== 'object') return;
 	const stack = [root];
 	const stamp_hosts = is_svelte ? [] : null;
+	// the line of the last `start` looked up — this walk's own, so a nested or concurrent
+	// reconstruction never sees another's
+	let line = 0;
 	while (stack.length > 0) {
 		const value = stack.pop();
 		if (Array.isArray(value)) {
-			for (const v of value) if (v !== null && typeof v === 'object') stack.push(v);
+			// pushed last to first, so they pop in order
+			for (let i = value.length - 1; i >= 0; i--) {
+				const v = value[i];
+				if (v !== null && typeof v === 'object') stack.push(v);
+			}
 			continue;
 		}
-		if (typeof value.start === 'number' && typeof value.end === 'number') {
-			value.loc = { start: loc_at(value.start, starts), end: loc_at(value.end, starts) };
+		const start = value.start;
+		const end = value.end;
+		if (typeof start === 'number' && typeof end === 'number') {
+			line = line_index_near(start, starts, line);
+			const end_line = line_index_near(end, starts, line);
+			value.loc = {
+				start: { line: line + 1, column: start - starts[line] },
+				end: { line: end_line + 1, column: end - starts[end_line] }
+			};
 			if (is_svelte) {
 				const kind = NAME_LOC_KINDS.get(value.type);
 				const span = name_span_of(value, kind, source);
 				if (span) {
 					value.name_loc = {
-						start: name_loc_at(span[0], starts),
-						end: name_loc_at(span[1], starts)
+						start: name_loc_near(span[0], starts, line),
+						end: name_loc_near(span[1], starts, line)
 					};
 				}
 			}
 		}
+		const base = stack.length;
 		for (const key in value) {
 			if (key === 'loc' || key === 'name_loc') continue;
 			const v = value[key];
 			if (v !== null && typeof v === 'object') stack.push(v);
+		}
+		// reverse what this node pushed, so its children pop in key order
+		for (let i = base, j = stack.length - 1; i < j; i++, j--) {
+			const t = stack[i];
+			stack[i] = stack[j];
+			stack[j] = t;
 		}
 		if (stamp_hosts !== null && STAMP_HOSTS.has(value.type)) stamp_hosts.push(value);
 	}
@@ -806,7 +895,13 @@ export function create_locator(source, options) {
 						`(integer offsets from 0 to ${text.length}, start no later than end)`
 				);
 			}
-			return { start: loc_at(start + 0, starts), end: loc_at(end + 0, starts) };
+			const start_line = line_index_at(start, starts);
+			const end_line = line_index_near(end, starts, start_line);
+			// `+ 0` folds a `-0` offset, as in `position_at`
+			return {
+				start: { line: start_line + 1, column: start + 0 - starts[start_line] },
+				end: { line: end_line + 1, column: end + 0 - starts[end_line] }
+			};
 		},
 		reconstruct(ast) {
 			return reconstruct_in(ast, starts, text, is_svelte);
