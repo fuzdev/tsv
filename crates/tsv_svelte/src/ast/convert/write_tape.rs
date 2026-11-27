@@ -124,7 +124,7 @@ fn write_or_null<T>(
 /// the entry, which the element's key literals name.
 #[inline]
 fn write_element_header(w: &mut TapeWriter<'_>, elem: &ast::Element, ctx: &Ctx<'_>) -> u16 {
-    const {
+    const _: () = {
         assert_positional_span(entry!("Component"));
         assert_positional_span(entry!("RegularElement"));
     };
@@ -140,7 +140,7 @@ fn write_element_header(w: &mut TapeWriter<'_>, elem: &ast::Element, ctx: &Ctx<'
 /// An attribute's head: its record and its offsets.
 #[inline]
 fn write_attribute_header(w: &mut TapeWriter<'_>, attr: &ast::Attribute, ctx: &Ctx<'_>) {
-    const { assert_positional_span(entry!("Attribute")) };
+    const _: () = assert_positional_span(entry!("Attribute"));
     w.t_open(entry!("Attribute"));
     w.span_start_end(ctx.positions, attr.span.start, attr.span.end);
 }
@@ -149,7 +149,7 @@ fn write_attribute_header(w: &mut TapeWriter<'_>, attr: &ast::Attribute, ctx: &C
 /// tape carries as no words).
 #[inline]
 fn write_text_header(w: &mut TapeWriter<'_>, text: &ast::Text, ctx: &Ctx<'_>) {
-    const { assert_positional_span(entry!("Text")) };
+    const _: () = assert_positional_span(entry!("Text"));
     w.t_open(entry!("Text"));
     w.span_start_end(ctx.positions, text.span.start, text.span.end);
 }
@@ -157,7 +157,7 @@ fn write_text_header(w: &mut TapeWriter<'_>, text: &ast::Text, ctx: &Ctx<'_>) {
 /// An element's `name`: the source slice it occupies.
 #[inline]
 fn write_element_name_field(w: &mut TapeWriter<'_>, elem: &ast::Element, ctx: &Ctx<'_>) {
-    const {
+    const _: () = {
         assert_positional_field(entry!("Component"), "name", Enc::Ref);
         assert_positional_field(entry!("RegularElement"), "name", Enc::Ref);
     };
@@ -167,7 +167,7 @@ fn write_element_name_field(w: &mut TapeWriter<'_>, elem: &ast::Element, ctx: &C
 /// An attribute's or a component's `name`: the source slice it occupies.
 #[inline]
 fn write_scanned_name_field(w: &mut TapeWriter<'_>, name: &[u8]) {
-    const {
+    const _: () = {
         assert_positional_field(entry!("Attribute"), "name", Enc::Ref);
         assert_positional_field(entry!("Component"), "name", Enc::Ref);
     };
@@ -183,7 +183,7 @@ fn write_name_loc_field(_: &mut TapeWriter<'_>, _: Span, _: LocationMapper<'_>) 
 /// pooled.
 #[inline]
 fn write_raw_then_data(w: &mut TapeWriter<'_>, text: &ast::Text, ctx: &Ctx<'_>) {
-    const {
+    const _: () = {
         assert_positional_field(entry!("Text"), "raw", Enc::Own);
         assert_positional_field(entry!("Text"), "data", Enc::Ref);
     };
@@ -201,7 +201,7 @@ fn write_raw_then_data(w: &mut TapeWriter<'_>, text: &ast::Text, ctx: &Ctx<'_>) 
 
 /// A root-level comment: a `Block` or `Line` record, its `value` and offsets.
 fn write_root_comment(w: &mut TapeWriter<'_>, comment: &Comment, ctx: &Ctx<'_>) {
-    const {
+    const _: () = {
         assert_positional_field(entry!("Block"), "value", Enc::Ref);
         assert_positional_field(entry!("Line"), "value", Enc::Ref);
         assert_positional_span(entry!("Block"));

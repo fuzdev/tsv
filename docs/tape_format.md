@@ -247,11 +247,13 @@ Every count a tape carries (a list's items, a self-describing record's keys, a `
 strings) is the sink's count of what the writer wrote through the counted forms (`t_object_key`,
 `t_list_ref`), never a number the writer hands in. What the sink cannot see is a field written
 positionally (a head's `start` and `end`, an element's `name`) whose place the schema moved, which
-the Svelte writer's tape copy checks against the schema at build time, a self-describing record's
-string or number value or embedded expression written with no key ahead of it (the sink writes it
-as plain words, which the decoder reads in a key's place) or a `null` value with none (the sink
-writes nothing), and a key or a string of a `strings` field written as a plain ref where its
-counted form belongs — which only the roundtrip gates catch.
+the Svelte writer's tape copy checks against the schema at build time (`cargo check` and clippy
+included, but for the const-generic directive head's check, which only a codegen build
+evaluates), a self-describing record's string or number value or embedded expression written
+with no key ahead of it (the sink writes it as plain words, which the decoder reads in a key's
+place) or a `null` value with none (the sink writes nothing), and a key or a string of a
+`strings` field written as a plain ref where its counted form belongs — which only the roundtrip
+gates catch.
 
 ### Grading a direct tape
 

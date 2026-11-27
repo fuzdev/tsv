@@ -131,7 +131,7 @@ macro_rules! raw {
 macro_rules! head {
     ($w:ident, $e:literal, $s:literal, $start:expr, $end:expr, $ctx:expr) => {{
         tape! {
-            const { $crate::ast::convert::write_macros::assert_positional_span(entry!($e)) };
+            const _: () = $crate::ast::convert::write_macros::assert_positional_span(entry!($e));
             $w.t_open(entry!($e));
             head!(@keys $w, $e, $crate::ast::convert::write_macros::tape_head(entry!($e), $s));
         }
@@ -142,7 +142,7 @@ macro_rules! head {
         $ctx:expr) => {{
         let b: bool = $b;
         tape! {
-            const { $crate::ast::convert::write_macros::assert_positional_span(entry!($e)) };
+            const _: () = $crate::ast::convert::write_macros::assert_positional_span(entry!($e));
             $w.t_open(entry!($e));
             if b {
                 head!(@keys $w, $e, $crate::ast::convert::write_macros::tape_head(entry!($e), $t));
@@ -171,10 +171,10 @@ macro_rules! keys_span {
         tape! {
             let ops = lit_ops!($e, $crate::ast::convert::write_macros::tape_keys($s));
             // the offsets are the record the literal leaves open, positionally
-            const { $crate::ast::convert::write_macros::assert_positional_span($crate::ast::convert::write_macros::open_entry(
+            const _: () = $crate::ast::convert::write_macros::assert_positional_span($crate::ast::convert::write_macros::open_entry(
                 entry!($e),
                 lit_ops!($e, $crate::ast::convert::write_macros::tape_keys($s)),
-            )) };
+            ));
             $w.t_lit(ops);
         }
         json_only! { $w.raw($s); }
@@ -200,13 +200,15 @@ macro_rules! open_keys {
 macro_rules! head_object {
     ($w:ident, $e:literal, $start:expr, $end:expr, $ctx:expr) => {{
         tape! {
-            const { $crate::ast::convert::write_macros::assert_positional_span(entry!($e)) };
+            const _: () = $crate::ast::convert::write_macros::assert_positional_span(entry!($e));
             $w.t_open(entry!($e));
         }
         head_object!(@span $w, $start, $end, $ctx);
     }};
     ($w:ident, @ $g:ident, $start:expr, $end:expr, $ctx:expr) => {{
         tape! {
+            // `$g` is a const generic, so this assert is evaluated where the generic is
+            // instantiated for codegen (any build or test), not under `cargo check` or clippy
             const { $crate::ast::convert::write_macros::assert_positional_span($g) };
             $w.t_open($g);
         }
@@ -301,7 +303,9 @@ pub(super) const fn lit_array<const N: usize>(s: &str) -> [u8; N] {
 /// The record of entry `e` takes its `start` and `end` positionally — the offsets a head's data
 /// call writes with no key declared: both must be offsets every record of the entry carries,
 /// `end` the field right after `start`. A schema edit that breaks this fails the tape copy's
-/// build rather than shifting the record's words.
+/// build rather than shifting the record's words. Each site asserts it in a `const _` item, so
+/// `cargo check` and clippy evaluate it too; only the const-generic form (`head_object!`'s
+/// `@ E`) asserts in an inline `const` block, which only a codegen build evaluates.
 #[cfg(feature = "_tape")]
 #[expect(
     clippy::panic,
