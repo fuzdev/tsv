@@ -1,0 +1,201 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 149,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": {
+		"start": 0,
+		"end": 148,
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 17,
+				"end": 145,
+				"name": "customElement",
+				"value": {
+					"type": "ExpressionTag",
+					"start": 31,
+					"end": 145,
+					"expression": {
+						"type": "ObjectExpression",
+						"start": 32,
+						"end": 144,
+						"properties": [
+							{
+								"type": "Property",
+								"start": 36,
+								"end": 46,
+								"method": false,
+								"shorthand": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 36,
+									"end": 39,
+									"name": "tag"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 41,
+									"end": 46,
+									"value": "a-b",
+									"raw": "'a-b'"
+								},
+								"kind": "init"
+							},
+							{
+								"type": "Property",
+								"start": 50,
+								"end": 64,
+								"method": false,
+								"shorthand": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 50,
+									"end": 56,
+									"name": "shadow"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 58,
+									"end": 64,
+									"value": "none",
+									"raw": "'none'"
+								},
+								"kind": "init"
+							},
+							{
+								"type": "Property",
+								"start": 68,
+								"end": 141,
+								"method": false,
+								"shorthand": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 68,
+									"end": 73,
+									"name": "props"
+								},
+								"value": {
+									"type": "ObjectExpression",
+									"start": 75,
+									"end": 141,
+									"properties": [
+										{
+											"type": "Property",
+											"start": 77,
+											"end": 139,
+											"method": false,
+											"shorthand": false,
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 77,
+												"end": 82,
+												"name": "prop1"
+											},
+											"value": {
+												"type": "ObjectExpression",
+												"start": 84,
+												"end": 139,
+												"properties": [
+													{
+														"type": "Property",
+														"start": 86,
+														"end": 101,
+														"method": false,
+														"shorthand": false,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 86,
+															"end": 90,
+															"name": "type"
+														},
+														"value": {
+															"type": "Literal",
+															"start": 92,
+															"end": 101,
+															"value": "Boolean",
+															"raw": "'Boolean'"
+														},
+														"kind": "init"
+													},
+													{
+														"type": "Property",
+														"start": 103,
+														"end": 117,
+														"method": false,
+														"shorthand": false,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 103,
+															"end": 110,
+															"name": "reflect"
+														},
+														"value": {
+															"type": "Literal",
+															"start": 112,
+															"end": 117,
+															"value": false,
+															"raw": "false"
+														},
+														"kind": "init"
+													},
+													{
+														"type": "Property",
+														"start": 119,
+														"end": 137,
+														"method": false,
+														"shorthand": false,
+														"computed": false,
+														"key": {
+															"type": "Identifier",
+															"start": 119,
+															"end": 128,
+															"name": "attribute"
+														},
+														"value": {
+															"type": "Literal",
+															"start": 130,
+															"end": 137,
+															"value": "attr1",
+															"raw": "'attr1'"
+														},
+														"kind": "init"
+													}
+												]
+											},
+											"kind": "init"
+										}
+									]
+								},
+								"kind": "init"
+							}
+						]
+					}
+				}
+			}
+		],
+		"customElement": {
+			"tag": "a-b",
+			"props": {
+				"prop1": {
+					"type": "Boolean",
+					"reflect": false,
+					"attribute": "attr1"
+				}
+			},
+			"shadow": "none"
+		}
+	},
+	"comments": []
+}

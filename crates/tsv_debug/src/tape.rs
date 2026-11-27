@@ -521,6 +521,25 @@ pub fn grade_ts_direct_tape(
     grade_direct_tape(sink, wire_source("typescript", source), json, transcoder)
 }
 
+/// The Svelte wire writer's DIRECT tape of `source` (`tsv_svelte::__private::write_tape`, the
+/// writer's tape copy, composing `tsv_ts`'s and `tsv_css`'s for the embedded islands), graded
+/// against `json`, the same parse's span-only wire, by the two checks [`grade_css_direct_tape`]
+/// makes. `Ok` is the direct tape; `Err` names the failure.
+///
+/// # Errors
+///
+/// A message when the source does not parse, the sink refuses the tape, or either check fails.
+pub fn grade_svelte_direct_tape(
+    source: &str,
+    json: &[u8],
+    transcoder: &mut tsv_arena::tape::Transcoder,
+    sink: &mut tsv_lang::tape::TapeSink,
+) -> Result<Vec<u8>, String> {
+    let ast = tsv_svelte::__private::parse(source).map_err(|e| format!("parse: {e:#}"))?;
+    tsv_svelte::__private::write_tape(&ast, source, sink);
+    grade_direct_tape(sink, wire_source("svelte", source), json, transcoder)
+}
+
 /// The checks every direct tape is graded by, over the tape `sink` just took: it prints back
 /// to `json` byte for byte over `text` (the wire's source), and the transcoder makes the same
 /// tape of that printback as of `json`.

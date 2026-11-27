@@ -1497,7 +1497,7 @@ key order and `-0` included; so does its iterative interpreter alone, the path a
 overflow falls back to; and so does the decoder over the same wire written with every typed
 record entry-generic, so every entry's descriptors are read by the interpreter that serves the
 masks no fast shape covers. It also refuses a committed decoder generated from another table or
-shape list. For a CSS or TypeScript document it grades the **direct** tape as well — the one its
+shape list. For every document it grades the **direct** tape as well — the one its
 wire writer writes itself, its refs true offsets (tape_format.md §A direct writer): the Rust half
 holds it to the wire (it prints back byte for byte, and the transcoder canonicalizes that
 printback to the transcoded tape — a failure fails the run), and both decoder paths read it back
@@ -1509,12 +1509,14 @@ mask is off the fast-shape list; that is no failure (the entry-generic record ca
 and `tape-shapes:update` folds them in. Beside it in `check`, `tests/tape_roundtrip.rs` prints
 every transcoded tape back to its wire byte for byte (`tsv_debug::tape::tape_to_json`), and
 `tests/depth_limit.rs` transcodes and prints every depth-limit shape on the contract's stack and
-grades the TypeScript and CSS writers' direct tapes there too; `tests/tape_roundtrip.rs` also
-grades the CSS direct tape over every `<style>` body of the fixture tree, read as a stylesheet of
-its own — the CSS `check:tape` sees is the few `.css` inputs alone — and the TypeScript one over
-every `.ts` input at its goal and again at the other where it parses, over every `<script>` body
-read as a module of its own, and over expression islands written under a comment attach, the one
-path the TypeScript writer emits comments on.
+grades every writer's direct tape there too; `tests/tape_roundtrip.rs` also grades the
+Svelte direct tape over every Svelte document of the fixture tree (its `<script>`s, template
+islands — the comment attach included — and `<style>`, written through the TypeScript and CSS
+writers' tape copies into the one tape), the CSS one over every `<style>` body of the fixture
+tree, read as a stylesheet of its own — the CSS `check:tape` sees standalone is the few `.css`
+inputs alone — and the TypeScript one over every `.ts` input at its goal and again at the other
+where it parses, over every `<script>` body read as a module of its own, and over expression
+islands written under a comment attach outside any Svelte host.
 
 **Blind spots.**
 
@@ -1524,10 +1526,8 @@ path the TypeScript writer emits comments on.
   integer-like key; a wire with any of them still decodes right, but the two tapes may differ.
 - **The boundary a tape crosses** (a WASM view, an N-API buffer) is the package suites' and
   `engines:audit`'s to grade, not this gate's.
-- **The direct tape is CSS's and TypeScript's alone, and standalone documents'**: the Svelte
-  writer has no tape copy yet, so an embedded `<style>`'s or `<script>`'s direct tape, and a
-  template island's (the comment attach included) outside `tests/tape_roundtrip.rs`'s hand-written
-  islands, exists nowhere.
+- **The direct tape is graded through the writers, not the bindings**: no binding writes one yet,
+  so the packages' `parse_<lang>` still decode the transcoder's tape.
 
 ## Tape Corpus Leg (`tape:corpus`)
 
@@ -1541,9 +1541,9 @@ panic, a transcoder refusal, a byte difference between the producers, a decoded 
 `JSON.parse`'s, an empty corpus, or a run that graded no file fails it, and so does any parse
 error but one: a TypeScript file tsv rejects at the module goal yet parses at the script goal (a
 sloppy script) has no wire at the parse's goal and is counted, not graded (its verdict is
-`corpus:compare:parse`'s). A CSS or TypeScript file's direct tape is graded as `check:tape` grades it, a
+`corpus:compare:parse`'s). Every file's direct tape is graded as `check:tape` grades it, a
 Rust-side failure answering `direct: …`; a run whose direct tapes number fewer than its graded
-files of either language fails. No pinned count: it grades a property of every file it reaches. A
+files of any language fails. No pinned count: it grades a property of every file it reaches. A
 `npm run conformance` leg.
 
 ## Package-Declaration Check (`typecheck:packages`)
@@ -2377,8 +2377,8 @@ Three more legs ride every attempt, over entry points the format leg never reach
   attributes span inside its record's, and every specifier decoding (the writer's
   `specifier_value`, which panics on one that does not). A parse error is a verdict, not a
   finding;
-- **the direct tape** — every TypeScript-family and CSS input the parser accepts is written
-  through its wire writer's tape copy (TypeScript at the goal the unset-goal fallback takes)
+- **the direct tape** — every input the parser accepts is written through its wire writer's
+  tape copy (TypeScript at the goal the unset-goal fallback takes)
   and graded as `check:tape` grades a direct tape: it prints back to the same parse's span-only
   wire, and the transcoder canonicalizes the printback to the wire's tape
   (`tsv_debug::tape::grade_direct_tape`). A difference is a `tape_direct` finding.
@@ -2387,7 +2387,7 @@ All four ride the pristine pass too, so the `fuzz --iterations 0` of `idempotenc
 `audit:corpus` grades them over real code. Each leg's graded count is floored after the
 report: zero inputs written through the `locations` wire, zero stripped when the run had
 TypeScript seeds, zero collected by the imports leg when it had TypeScript or Svelte seeds, or
-zero direct tapes when it had TypeScript or CSS seeds, fails the run as vacuous. Every TypeScript-family seed is stripped — a `.js`
+zero direct tapes, fails the run as vacuous. Every TypeScript-family seed is stripped — a `.js`
 file and an `--embedded ts` body (a `<script>` without `lang="ts"` included) alike, since the
 strip API takes any string and type-free JS strips to itself.
 
@@ -2452,7 +2452,7 @@ report/dump.
 
 ## F1 Idempotency Sweep (`idempotency:sweep`)
 
-The fuzzer's pristine pass, pointed at the `robustness` corpus view (the WHOLE `../corpora` snapshot — every collection it vendors, placed or not, since the sweep grades an invariant rather than a pinned count — plus the `svelte_styles` harvest cache and the live diff: the files of this machine's working trees of the `own` repos that differ from, or are absent in, the snapshot — `lib/corpus.ts` `corpus_robustness_seeds` / `live_diff_files`) — `format(format(x)) == format(x)` on every real file, plus the pass's four other legs: the `locations` wire of every file tsv parses (no panic), the type strip of every TypeScript-family file (no panic, the position contract, idempotence), the import records of every TypeScript-family and Svelte file (no panic, the records' contract) and the direct tape of every TypeScript-family and CSS file tsv parses (it prints back to its wire — [the fuzzer's extra legs](#seeded-mutational-fuzzer-fuzzaudit)). NOT in `npm run check`: the corpus is machine-dependent checkouts and the sweep is minutes, not seconds. It is a different risk surface from the fixtures — a formatter can be idempotent on every curated fixture and still reflow a real component on pass 2. Run at conformance cadence, or after any printer change.
+The fuzzer's pristine pass, pointed at the `robustness` corpus view (the WHOLE `../corpora` snapshot — every collection it vendors, placed or not, since the sweep grades an invariant rather than a pinned count — plus the `svelte_styles` harvest cache and the live diff: the files of this machine's working trees of the `own` repos that differ from, or are absent in, the snapshot — `lib/corpus.ts` `corpus_robustness_seeds` / `live_diff_files`) — `format(format(x)) == format(x)` on every real file, plus the pass's four other legs: the `locations` wire of every file tsv parses (no panic), the type strip of every TypeScript-family file (no panic, the position contract, idempotence), the import records of every TypeScript-family and Svelte file (no panic, the records' contract) and the direct tape of every file tsv parses (it prints back to its wire — [the fuzzer's extra legs](#seeded-mutational-fuzzer-fuzzaudit)). NOT in `npm run check`: the corpus is machine-dependent checkouts and the sweep is minutes, not seconds. It is a different risk surface from the fixtures — a formatter can be idempotent on every curated fixture and still reflow a real component on pass 2. Run at conformance cadence, or after any printer change.
 
 ```bash
 npm run idempotency:sweep

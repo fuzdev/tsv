@@ -16,7 +16,7 @@
  *   every typed record entry-generic, so every entry's field descriptors are read by the
  *   interpreter that serves the records no fast shape covers.
  *
- * A CSS or TypeScript document also carries its **direct** tape — the one its wire writer writes itself,
+ * Every document also carries its **direct** tape — the one its wire writer writes itself,
  * its strings true-offset refs, which the Rust half has already graded against the wire (it
  * prints back to it, and the transcoder canonicalizes it to the transcoded tape). This half
  * decodes it by both decoder paths too (`grade_direct_tape`), so the decoder is held to the
@@ -84,7 +84,7 @@ interface TapeRecord {
 	source: string;
 	span: unknown;
 	tape: string;
-	/** A CSS or TypeScript document's direct tape (base64), from its wire writer itself. */
+	/** The document's direct tape (base64), from its wire writer itself. */
 	direct?: string;
 }
 
@@ -264,7 +264,7 @@ export async function run_check_tape(
 	const outside = new Set<string>();
 	let outside_records = 0;
 	const stats = { fast: 0, generic: 0, escape: 0 };
-	const direct = { typescript: 0, css: 0 };
+	const direct = { svelte: 0, typescript: 0, css: 0 };
 	const failed: string[] = [];
 	for await (const line of lines_of(child.stdout!)) {
 		if (line === '') continue;
@@ -292,7 +292,7 @@ export async function run_check_tape(
 			schema
 		);
 		if (record.direct !== undefined) {
-			if (record.language !== 'svelte') direct[record.language]++;
+			direct[record.language]++;
 			problems.push(
 				...grade_direct_tape(record.span, source, Buffer.from(record.direct, 'base64'))
 			);
@@ -319,7 +319,7 @@ export async function run_check_tape(
 		return 1;
 	}
 	console.log(
-		`tape: ${total} documents (${graded.svelte} svelte, ${graded.typescript} typescript, ${graded.css} css) in ${seconds}s — ${stats.fast} fast-shape, ${stats.generic} entry-generic, ${stats.escape} self-describing records; ${direct.typescript} typescript + ${direct.css} css direct tapes decoded`
+		`tape: ${total} documents (${graded.svelte} svelte, ${graded.typescript} typescript, ${graded.css} css) in ${seconds}s — ${stats.fast} fast-shape, ${stats.generic} entry-generic, ${stats.escape} self-describing records; ${direct.svelte} svelte + ${direct.typescript} typescript + ${direct.css} css direct tapes decoded`
 	);
 	if (outside.size > 0) {
 		console.log(

@@ -51,9 +51,10 @@
 //!   import inside another's argument), every span in bounds and on character boundaries,
 //!   a specifier or attributes span inside its record's, and every specifier decoding (the
 //!   writer's `specifier_value`, which panics on one that does not).
-//! - **The direct tape.** Every TypeScript-family and CSS input the parser accepts is also
-//!   written through its wire writer's tape copy (`tsv_ts::__private::write_tape`, at the
-//!   goal the parse took; `tsv_css::__private::write_tape`) and graded against the same
+//! - **The direct tape.** Every input the parser accepts is also written through its wire
+//!   writer's tape copy (`tsv_ts::__private::write_tape`, at the goal the parse took;
+//!   `tsv_css::__private::write_tape`; `tsv_svelte::__private::write_tape`) and graded against
+//!   the same
 //!   parse's span-only wire (`tsv_debug::tape::grade_direct_tape`: it prints back to the
 //!   wire, and the transcoder canonicalizes the printback to the wire's tape) — a
 //!   `tape_direct` finding when it does not.
@@ -61,8 +62,7 @@
 //! Each leg's graded count is floored: a run whose locations leg graded nothing, whose
 //! strip leg stripped nothing although it had TypeScript seeds, whose imports leg
 //! collected nothing although it had TypeScript or Svelte seeds, or whose tape leg wrote
-//! nothing although it had TypeScript or CSS seeds, fails rather than reporting a clean run
-//! it never made.
+//! nothing although it had seeds, fails rather than reporting a clean run it never made.
 //!
 //! **`--embedded css|ts`** reseeds the run from the `<style>` / `<script>` bodies of the
 //! Svelte seeds (plus the standalone files of that language), so the CSS parser and
@@ -481,7 +481,7 @@ enum Leg {
     Strip,
     /// `parse_imports` and its JSON writer on a TypeScript-family or Svelte input.
     Imports,
-    /// A wire writer's tape copy on an accepted TypeScript-family or CSS input.
+    /// A wire writer's tape copy on an accepted input.
     Tape,
 }
 
@@ -574,7 +574,7 @@ fn attempt(src: &str, parser: ParserType, render: bool, last: &mut LastInput) ->
                 return (Outcome::ImportsContract, Some(detail));
             }
         }
-        if f1 != F1Outcome::Rejected && parser != ParserType::Svelte {
+        if f1 != F1Outcome::Rejected {
             leg = Leg::Tape;
             let (graded, broken) = tape_check(src, parser);
             taped = graded;
@@ -596,7 +596,7 @@ fn attempt(src: &str, parser: ParserType, render: bool, last: &mut LastInput) ->
 }
 
 /// Write `src`'s direct tape (its wire writer's tape copy — TypeScript at the goal the
-/// unset-goal fallback takes, as the strip; CSS) and grade it against the same parse's
+/// unset-goal fallback takes, as the strip; CSS; Svelte) and grade it against the same parse's
 /// span-only wire. Returns whether it was written (the input parsed), and why it failed.
 fn tape_check(src: &str, parser: ParserType) -> (bool, Option<String>) {
     let mut transcoder = tsv_arena::tape::Transcoder::new();
@@ -622,7 +622,13 @@ fn tape_check(src: &str, parser: ParserType) -> (bool, Option<String>) {
             let json = tsv_css::__private::convert_ast_json_bytes(&ast, src);
             crate::tape::grade_css_direct_tape(src, &json, &mut transcoder, &mut sink)
         }
-        ParserType::Svelte => return (false, None),
+        ParserType::Svelte => {
+            let Ok(ast) = tsv_svelte::__private::parse(src) else {
+                return (false, None);
+            };
+            let json = tsv_svelte::__private::convert_ast_json_bytes(&ast, src);
+            crate::tape::grade_svelte_direct_tape(src, &json, &mut transcoder, &mut sink)
+        }
     };
     (true, graded.err())
 }
@@ -1065,7 +1071,6 @@ impl FuzzCommand {
         check_graded_nonzero(seeds.len(), "readable non-empty seed files")?;
         let has_ts_seeds = seeds.iter().any(|s| s.parser == ParserType::TypeScript);
         let has_imports_seeds = seeds.iter().any(|s| s.parser != ParserType::Css);
-        let has_tape_seeds = seeds.iter().any(|s| s.parser != ParserType::Svelte);
 
         if let Some(dir) = &self.dump_dir
             && let Err(e) = std::fs::create_dir_all(dir)
@@ -1251,12 +1256,7 @@ impl FuzzCommand {
                 "TypeScript and Svelte inputs whose import records were collected",
             )?;
         }
-        if has_tape_seeds {
-            check_graded_nonzero(
-                stats.legs.taped,
-                "TypeScript and CSS inputs whose direct tape was written",
-            )?;
-        }
+        check_graded_nonzero(stats.legs.taped, "inputs whose direct tape was written")?;
         Ok(())
     }
 

@@ -10,10 +10,9 @@
 //!   the path each repetition and the count does not see — fails here, whether or not its
 //!   walks happen to fit the stack ([`check_wire`]);
 //! - the deepest accepted input runs **parse, both wire writers (span-only and `loc`), the
-//!   span-only wire's tape transcode and its print back, the writers' direct tape (TypeScript
-//!   and CSS), format, the imports walk (TypeScript
-//!   and Svelte) and the type strip (TypeScript)** on
-//!   a thread nine tenths of the contract's size ([`GATE_STACK`]), which it must survive: a
+//!   span-only wire's tape transcode and its print back, the writers' direct tape, format, the
+//!   imports walk (TypeScript and Svelte) and the type strip (TypeScript)** on a thread nine
+//!   tenths of the contract's size ([`GATE_STACK`]), which it must survive: a
 //!   stack overflow aborts this test binary, which fails the gate;
 //! - in an optimized build, a **spine shape** — a flat chain, thousands of links under a
 //!   shallow wire — runs the same walks again on a thread a small fraction of the
@@ -634,6 +633,15 @@ fn run_walks_on(name: String, stack: usize, lang: Lang, source: String) {
                 let root = tsv_svelte::__private::parse(&source).expect("parses");
                 let span = tsv_svelte::__private::convert_ast_json_bytes(&root, &source);
                 assert_tape(&name, "svelte", &span, &source);
+                assert_direct_tape(
+                    &name,
+                    tsv_debug::tape::grade_svelte_direct_tape(
+                        &source,
+                        &span,
+                        &mut tsv_arena::tape::Transcoder::new(),
+                        &mut tsv_lang::tape::TapeSink::new(),
+                    ),
+                );
                 assert!(
                     !tsv_svelte::__private::convert_ast_json_bytes_with_locations(&root, &source)
                         .is_empty()
@@ -684,7 +692,7 @@ fn assert_tape(name: &str, language: &str, span: &[u8], source: &str) {
 
 /// The wire writer's own tape (its tape copy, the walk the JSON wire's writer recurses through
 /// a second time) is written on the walks' thread and graded against the wire
-/// (`tsv_debug::tape::grade_ts_direct_tape` / `grade_css_direct_tape`).
+/// (`tsv_debug::tape::grade_ts_direct_tape` and its CSS and Svelte twins).
 fn assert_direct_tape(name: &str, graded: Result<Vec<u8>, String>) {
     if let Err(e) = graded {
         panic!("{name}: the direct tape: {e}");

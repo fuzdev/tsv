@@ -6,9 +6,10 @@
 //! (`tsv_arena::tape::Transcoder`), and streams one NDJSON record per document to stdout —
 //! `{"path", "language", "source", "span", "tape", "direct"?}`, the wire embedded verbatim, the
 //! tapes in base64 — so the JS half can encode the same wire with the offline encoder, compare
-//! the two tapes byte for byte, and decode them. `direct` is a CSS document's tape as the CSS
-//! wire writer writes it itself (`tsv_debug::tape::grade_css_direct_tape`, which grades it
-//! against the wire first: a failure there fails the run), for the JS half to decode too.
+//! the two tapes byte for byte, and decode them. `direct` is the document's tape as its wire
+//! writer writes it itself (`tsv_debug::tape::grade_css_direct_tape` and its TypeScript and
+//! Svelte twins, which grade it against the wire first: a failure there fails the run), for
+//! the JS half to decode too.
 //! `source` is the exact string parsed, a leading BOM included; the tape is written against the
 //! text the wire's offsets index (`tsv_debug::tape::wire_source`). A prettier-side document tsv
 //! rejects is left out (it has no wire; `check:loc` owns that ledger), and one the fixture tree
@@ -22,18 +23,19 @@
 //! by exactly one line on stdout, flushed before the next request is read:
 //!
 //! - `{"span": <wire>, "tape": "<base64>", "direct"?: "<base64>", "transcode_ns"?}` — the
-//!   span-only wire and its tape, a CSS or TypeScript source's direct tape (as above), and
+//!   span-only wire and its tape, its source's direct tape (as above), and
 //!   with `repeat` the fastest of that many transcodes of the wire on a warm transcoder, in
 //!   nanoseconds;
 //! - `{"error": "<message>"}` — tsv rejected the source, the transcoder refused the wire, or a
-//!   CSS or TypeScript source's direct tape failed its grade (`direct: …`);
+//!   source's direct tape failed its grade (`direct: …`);
 //! - `{"panic": "<payload>"}` — tsv panicked (each request runs under `catch_unwind`).
 //!
 //! A malformed request is a harness bug, not a tsv verdict: it ends the process with an error.
 
 use crate::cli::CliError;
 use crate::tape::{
-    base64, fixture_wires, grade_css_direct_tape, grade_ts_direct_tape, wire_source,
+    base64, fixture_wires, grade_css_direct_tape, grade_svelte_direct_tape, grade_ts_direct_tape,
+    wire_source,
 };
 use argh::FromArgs;
 use std::io::Write;
@@ -93,6 +95,12 @@ impl TapeCommand {
                 "typescript" => Some(grade_ts_direct_tape(
                     &doc.source,
                     doc.goal,
+                    &doc.span,
+                    &mut transcoder,
+                    &mut sink,
+                )),
+                "svelte" => Some(grade_svelte_direct_tape(
+                    &doc.source,
                     &doc.span,
                     &mut transcoder,
                     &mut sink,
@@ -227,6 +235,12 @@ fn answer(request: &TapeRequest) -> Result<Vec<u8>, String> {
             "typescript" => Some(grade_ts_direct_tape(
                 source,
                 goal,
+                &span,
+                &mut transcoder,
+                &mut sink,
+            )),
+            "svelte" => Some(grade_svelte_direct_tape(
+                source,
                 &span,
                 &mut transcoder,
                 &mut sink,

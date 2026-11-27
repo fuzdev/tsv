@@ -11,14 +11,18 @@
 //! TypeScript writer's (`tsv_ts::__private::write_tape`) is graded the same way over every
 //! TypeScript document — each `.ts` input at its goal and again at the other where it parses,
 //! and each `<script>` body — and its comment emitter over expression islands carrying every
-//! attachment kind (`tsv_ts::__private::write_expression_island_tape`).
+//! attachment kind (`tsv_ts::__private::write_expression_island_tape`). The Svelte writer's
+//! (`tsv_svelte::__private::write_tape`), which writes each document's `<script>`s, template
+//! expressions and `<style>` through the TypeScript and CSS writers' tape copies into its one
+//! tape, is graded the same way over every Svelte document.
 
 use std::path::Path;
 
 use tsv_arena::tape::Transcoder;
 use tsv_debug::tape::{
     bytes_difference, fixture_wires, grade_css_direct_tape, grade_direct_tape,
-    grade_ts_direct_tape, script_bodies, style_bodies, tape_to_json, wire_source,
+    grade_svelte_direct_tape, grade_ts_direct_tape, script_bodies, style_bodies, tape_to_json,
+    wire_source,
 };
 use tsv_lang::tape::TapeSink;
 
@@ -195,6 +199,42 @@ fn every_fixture_ts_document_writes_its_tape_directly() {
         "{} of {} TypeScript documents:\n{}",
         failures.len(),
         files + other_goal + bodies,
+        failures
+            .iter()
+            .take(20)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n")
+    );
+}
+
+/// The Svelte writer's direct tape over every Svelte document of the fixture tree — the template,
+/// every embedded `<script>` and expression island (comment attach included) and every
+/// `<style>`, in one tape per document.
+#[test]
+fn every_fixture_svelte_document_writes_its_tape_directly() {
+    let mut transcoder = Transcoder::new();
+    let mut sink = TapeSink::new();
+    let mut failures = Vec::new();
+    let mut files = 0usize;
+    fixture_wires(Path::new("tests/fixtures"), |doc| {
+        if doc.language != "svelte" {
+            return;
+        }
+        files += 1;
+        if let Err(e) = grade_svelte_direct_tape(&doc.source, &doc.span, &mut transcoder, &mut sink)
+        {
+            failures.push(format!("{}: {e}", doc.path));
+        }
+    })
+    .expect("the fixture tree walks");
+    // a floor well under today's count: a walk that stopped finding Svelte must fail
+    eprintln!("graded {files} Svelte documents");
+    assert!(files >= 1000, "only {files} Svelte documents graded");
+    assert!(
+        failures.is_empty(),
+        "{} of {files} Svelte documents:\n{}",
+        failures.len(),
         failures
             .iter()
             .take(20)
