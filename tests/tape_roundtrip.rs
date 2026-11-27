@@ -274,15 +274,9 @@ fn comment_islands_write_their_tape_directly() {
     for source in islands {
         for html in [None, Some(" h ")] {
             let mut stores = tsv_ts::ast::AstStores::new();
-            let (expr, comments) = tsv_ts::__private::parse_expression_with_comments(
-                source,
-                0,
-                0,
-                &mut stores,
-                "",
-                |_, _| Ok(()),
-            )
-            .unwrap_or_else(|e| panic!("{source:?} parses: {e:#}"));
+            let (expr, comments) =
+                tsv_ts::__private::parse_expression(source, 0, 0, &mut stores, "", |_, _| Ok(()))
+                    .unwrap_or_else(|e| panic!("{source:?} parses: {e:#}"));
             let view = stores.view();
             let comments = view.comments(comments);
             assert!(!comments.is_empty(), "{source:?} carries comments");

@@ -156,7 +156,7 @@ fn plain_identifier_run_matches_the_general_emission() {
 fn plain_identifier_under_a_comment_attach_emits_its_comments() {
     let source = "/* c */ name";
     let mut stores = ast::AstStores::new();
-    let (expression, comments) = crate::__private::parse_expression_with_comments(
+    let (expression, comments) = crate::__private::parse_expression(
         source,
         0,
         0,

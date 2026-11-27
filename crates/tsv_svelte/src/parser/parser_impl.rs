@@ -802,7 +802,7 @@ impl<'a> SvelteParser<'a> {
         host_check: impl Fn(&Self, AstView<'_>, ExprId) -> Result<(), Error>,
     ) -> Result<ExprId, Error> {
         let (expr, comments) = self.with_island_stores(|this, stores| {
-            tsv_ts::__private::parse_expression_with_comments(
+            tsv_ts::__private::parse_expression(
                 source,
                 base_offset,
                 this.island_nesting(),
@@ -840,7 +840,7 @@ impl<'a> SvelteParser<'a> {
         host_check: impl Fn(&Self, AstView<'_>, ExprId, usize) -> Result<(), Error>,
     ) -> Result<(ExprId, usize), Error> {
         let (expr, end_pos, comments) = self.with_island_stores(|this, stores| {
-            tsv_ts::__private::parse_expression_partial_with_comments(
+            tsv_ts::__private::parse_expression_partial(
                 source,
                 base_offset,
                 this.island_nesting(),

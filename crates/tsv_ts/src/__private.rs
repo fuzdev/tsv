@@ -343,7 +343,7 @@ pub fn parse_embedded_preserve_parens(
 /// host fills its context. A refusal `host_check` returns fails the parse it judged like
 /// any other error, so it is reported only where no list was given up to tsc's comparison;
 /// otherwise the acorn re-read decides, as at [`parse_embedded`].
-pub fn parse_expression_with_comments(
+pub fn parse_expression(
     source: &str,
     base_offset: usize,
     host_nesting: u32,
@@ -484,7 +484,7 @@ fn assert_slice_parse_builds_island(
         String::from_utf8(w.into_bytes()).expect("the wire is UTF-8")
     };
     let mut scratch = AstStores::default();
-    let (parsed, parsed_comments) = parse_expression_with_comments(
+    let (parsed, parsed_comments) = parse_expression(
         &source[start..close],
         start,
         host_nesting,
@@ -509,8 +509,8 @@ fn assert_slice_parse_builds_island(
 
 /// A host's expression island that is exactly one plain name or a `.`-chain of them (`{x}`,
 /// `{user.name}`), optionally called with no arguments (`{f()}`, `{a.b?.()}`), pushed onto
-/// `stores` as the rows [`parse_expression_with_comments`] would build for it — or `None`,
-/// and nothing pushed, for every other island, which takes that parse.
+/// `stores` as the rows [`parse_expression`] would build for it — or `None`, and nothing
+/// pushed, for every other island, which takes that parse.
 ///
 /// Most expression islands in a Svelte template are a name or a short member path
 /// (`{count}`, `value={form.email}`), and each would otherwise construct and drop a whole
@@ -800,7 +800,7 @@ fn assert_parse_builds_tree(
     expr: ExprId,
 ) {
     let mut scratch = AstStores::default();
-    let (parsed, _) = parse_expression_with_comments(
+    let (parsed, _) = parse_expression(
         source,
         base_offset,
         host_nesting,
@@ -1132,7 +1132,7 @@ pub fn parse_type_annotation_partial(
 ///
 /// `host_check` judges the expression and where the parse stopped — whether the head
 /// continues there as its grammar requires (`as`, `then`, `, index`, the tag's end) —
-/// as part of the parse, as [`parse_expression_with_comments`]'s does.
+/// as part of the parse, as [`parse_expression`]'s does.
 ///
 /// # Errors
 ///
@@ -1140,7 +1140,7 @@ pub fn parse_type_annotation_partial(
 /// host fills its context. A refusal `host_check` returns fails the parse it judged like
 /// any other error, so it is reported only where no list was given up to tsc's comparison;
 /// otherwise the acorn re-read decides, as at [`parse_embedded`].
-pub fn parse_expression_partial_with_comments(
+pub fn parse_expression_partial(
     source: &str,
     base_offset: usize,
     host_nesting: u32,
@@ -1208,7 +1208,7 @@ pub fn parse_type_extent(
 ///
 /// `host_check` judges the statement — the declaration tags' "a declaration, every
 /// `const` initialized, nothing after it" — as part of the parse, as
-/// [`parse_expression_with_comments`]'s does.
+/// [`parse_expression`]'s does.
 ///
 /// # Errors
 ///

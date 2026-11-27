@@ -503,7 +503,7 @@ element.rs         — Element parsing
 attribute.rs       — Attribute and directive parsing
 block.rs           — Control flow blocks ({#if}, {#each}, {#await}, {#key})
 tag.rs             — Template tags ({@html}, {@const}, {@debug}, {@render}, {const}/{let})
-expression_tag.rs  — {expr} → tsv_ts::__private::parse_expression_with_comments()
+expression_tag.rs  — {expr} → tsv_ts::__private::parse_expression()
 script.rs          — <script> → tsv_ts::__private::parse_embedded()
 style.rs           — <style> → tsv_css::__private::parse_embedded()
 ```

@@ -771,15 +771,11 @@ mod tests {
     /// view of the stores it was parsed into.
     fn with_parsed<R>(src: &str, f: impl for<'a> FnOnce(AstView<'a>, &'a Expression) -> R) -> R {
         let mut stores = ast::AstStores::new();
-        let (id, _) = crate::__private::parse_expression_with_comments(
-            src,
-            0,
-            0,
-            &mut stores,
-            "end of input",
-            |_, _| Ok(()),
-        )
-        .expect("expression should parse");
+        let (id, _) =
+            crate::__private::parse_expression(src, 0, 0, &mut stores, "end of input", |_, _| {
+                Ok(())
+            })
+            .expect("expression should parse");
         let view = stores.view();
         f(view, view.expr(id))
     }

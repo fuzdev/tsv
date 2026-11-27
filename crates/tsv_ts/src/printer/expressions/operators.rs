@@ -3568,16 +3568,12 @@ mod tests {
     /// Run `should_group_binary_continuation` on a parsed binary expression.
     fn group(src: &str) -> bool {
         let mut stores = ast::AstStores::new();
-        let id = crate::__private::parse_expression_with_comments(
-            src,
-            0,
-            0,
-            &mut stores,
-            "end of input",
-            |_, _| Ok(()),
-        )
-        .expect("expression should parse")
-        .0;
+        let id =
+            crate::__private::parse_expression(src, 0, 0, &mut stores, "end of input", |_, _| {
+                Ok(())
+            })
+            .expect("expression should parse")
+            .0;
         let view = stores.view();
         match view.expr(id) {
             Expression {

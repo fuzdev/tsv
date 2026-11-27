@@ -552,7 +552,7 @@ fn when_both_readings_fail_the_error_that_reached_further_is_reported() {
 fn an_embedded_parse_reports_the_further_error_too() {
     // An expression island's parser is built by another constructor than a document's.
     let source = "fn(a < b, c + d > (e)";
-    let error = tsv_ts::__private::parse_expression_with_comments(
+    let error = tsv_ts::__private::parse_expression(
         source,
         100,
         0,
