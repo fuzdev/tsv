@@ -355,8 +355,8 @@ nothing in between, which is what each binding's hand-over relies on:
   the call. The tape's exact length is its header's (`32 + 4 × words + pool bytes`), which the
   adapter views before decoding. Each binding turns on the language crates' `_tape` features
   from its `parse` feature alone, so the format-only builds compile no tape copy.
-- **N-API** (`tsv_napi`): a `Vec<u32>` copy of exactly the tape's words, copied into a
-  `Uint32Array` the engine owns (napi-rs's `Uint32ArraySlice::copy_from`). Not an external
+- **N-API** (`tsv_napi`): exactly the tape's words, lent from the parked sink and copied once
+  into a `Uint32Array` the engine owns (napi-rs's `Uint32ArraySlice::copy_from`). Not an external
   arraybuffer over the addon's allocation: its napi finalizer runs only once the event loop
   turns, so a synchronous loop of parses would hold every tape it made until it yielded, beyond
   the garbage collector's reach.

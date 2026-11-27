@@ -321,23 +321,34 @@ macro_rules! lang_bindings {
                 parse_internal!($goalness, $lang, source, goal, |e| { Failure::parse(&e) })
             }
 
-            /// The tape (`docs/tape_format.md`): the span-only wire as words, a buffer holding
-            /// exactly the tape (padded to a whole word), which the export copies to its host.
+            /// The tape (`docs/tape_format.md`): the span-only wire as words — exactly the tape,
+            /// padded to a whole word — lent to `take` while they sit in the thread's parked
+            /// sink, so the export copies them to its host once, with no buffer between.
             #[cfg(feature = "parse")]
-            pub(super) fn parse_tape(
+            pub(super) fn parse_tape_with<R>(
                 source: &str,
                 source_type: Option<String>,
-            ) -> Result<Vec<u32>, Failure> {
+                take: impl FnOnce(&[u32]) -> R,
+            ) -> Result<R, Failure> {
                 let goal = napi_source_type(source_type, goal_allowed!($goalness), Family::Parse)?;
                 parse_tape!(
                     $goalness,
                     $lang,
                     source,
                     goal,
-                    |words: &[u32], _len: usize| words.to_vec(),
+                    |words: &[u32], _len: usize| take(words),
                     |e| Failure::parse(&e),
                     tape_failure
                 )
+            }
+
+            /// [`parse_tape_with`]'s words as an owned buffer, for the tests.
+            #[cfg(all(test, feature = "parse"))]
+            pub(super) fn parse_tape(
+                source: &str,
+                source_type: Option<String>,
+            ) -> Result<Vec<u32>, Failure> {
+                parse_tape_with(source, source_type, <[u32]>::to_vec)
             }
 
             /// The formatted source.
@@ -378,10 +389,11 @@ macro_rules! lang_bindings {
             source_type: Option<String>,
         ) -> napi::Result<Either<Unknown<'_>, Object<'_>>> {
             engine_export(env, || {
-                let words = $engine::parse_tape(&source, source_type)?;
-                Uint32ArraySlice::copy_from(env, &words)
-                    .map(|tape| tape.to_unknown())
-                    .map_err(|e| Failure::Plain(e.to_string()))
+                $engine::parse_tape_with(&source, source_type, |words| {
+                    Uint32ArraySlice::copy_from(env, words)
+                })?
+                .map(|tape| tape.to_unknown())
+                .map_err(|e| Failure::Plain(e.to_string()))
             })
         }
 
