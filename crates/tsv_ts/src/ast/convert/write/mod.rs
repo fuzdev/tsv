@@ -767,6 +767,7 @@ pub(super) fn write_identifier_parts_with_character(
         type_annotation.map_or(span.end, |ta| ta.span.end),
         ctx,
     );
+    tape! { w.t_open(entry!("Identifier")); }
     node_header_impl::<true>(w, "Identifier", span, ctx);
     write_identifier_fields(w, span, name, optional, type_annotation, decorators, ctx);
 }

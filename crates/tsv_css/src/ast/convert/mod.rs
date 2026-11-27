@@ -68,6 +68,8 @@ pub(crate) use write::write_stylesheet_file_bytes;
 pub use write::{write_css_children, write_css_comments};
 #[cfg(feature = "_tape")]
 pub(crate) use write_tape::write_stylesheet_file_tape;
+#[cfg(feature = "_tape")]
+pub use write_tape::{CssCommentsTape, write_css_children_tape, write_css_comments_tape};
 
 /// Trim a wire STRING the way `parseCss` does.
 ///

@@ -305,39 +305,39 @@ json_only! {
         write_stylesheet_file(&mut w, parsed.stylesheet, &ctx);
         w.into_bytes()
     }
+}
 
-    /// Emit an embedded-`<style>` stylesheet's `children` array (no `metadata`) into
-    /// a caller-owned writer, handing back the `comments` run the same walk gathered
-    /// — the composition entry the Svelte writer uses for a `<style>` element, whose
-    /// wire puts those two arrays side by side. `positions` must be the host
-    /// document's (spans are in host-file coordinates, and the line table is the
-    /// Svelte document's).
-    pub fn write_css_children<'a>(
-        w: &mut JsonWriter,
-        stylesheet: impl Into<ast::CssParsedRef<'a>>,
-        source: &str,
-        positions: WirePositions<'_>,
-    ) -> CssComments {
-        let parsed = stylesheet.into();
-        let ctx = Ctx {
-            source,
-            view: parsed.view,
-            positions,
-            has_metadata: false,
-        };
-        write_children(w, parsed.stylesheet, &ctx)
-    }
+/// Emit an embedded-`<style>` stylesheet's `children` array (no `metadata`) into
+/// a caller-owned writer, handing back the `comments` run the same walk gathered
+/// — the composition entry the Svelte writer uses for a `<style>` element, whose
+/// wire puts those two arrays side by side. `positions` must be the host
+/// document's (spans are in host-file coordinates, and the line table is the
+/// Svelte document's).
+pub fn write_css_children<'a>(
+    w: &mut Sink<'_>,
+    stylesheet: impl Into<ast::CssParsedRef<'a>>,
+    source: &str,
+    positions: WirePositions<'_>,
+) -> CssComments {
+    let parsed = stylesheet.into();
+    let ctx = Ctx {
+        source,
+        view: parsed.view,
+        positions,
+        has_metadata: false,
+    };
+    write_children(w, parsed.stylesheet, &ctx)
+}
 
-    /// Emit the `comments` array `write_css_children` collected. Split from it
-    /// because the wire writes `children` first and the two are separate keys.
-    pub fn write_css_comments(
-        w: &mut JsonWriter,
-        comments: &CssComments,
-        source: &str,
-        positions: WirePositions<'_>,
-    ) {
-        write_comments(w, comments, source, positions);
-    }
+/// Emit the `comments` array `write_css_children` collected. Split from it
+/// because the wire writes `children` first and the two are separate keys.
+pub fn write_css_comments(
+    w: &mut Sink<'_>,
+    comments: &CssComments,
+    source: &str,
+    positions: WirePositions<'_>,
+) {
+    write_comments(w, comments, source, positions);
 }
 
 json_only! {

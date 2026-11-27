@@ -1751,6 +1751,14 @@ pub use crate::ast::convert::{
     write_identifier_expression_with_character, write_pattern_embedded, write_program_embedded,
     write_variable_declaration_embedded,
 };
+/// The embedded writers' tape twins — the same entry points in the writer's tape copy, writing
+/// into a `tsv_lang::tape::TapeWriter` — which `tsv_svelte`'s tape copy composes.
+#[cfg(feature = "_tape")]
+pub use crate::ast::convert::{
+    write_expression_embedded_tape, write_identifier_expression_with_character_tape,
+    write_pattern_embedded_tape, write_program_embedded_tape,
+    write_variable_declaration_embedded_tape,
+};
 
 /// Format a TypeScript AST back to source code — the hidden, AST-taking primitive beneath [`format()`], which
 /// is the public one-shot (parse and format a `&str`). Unlike [`format()`] it does no fold.
@@ -1954,8 +1962,7 @@ pub fn write_tape<'a>(
 
 /// The TAPE of an embedded expression island written under `env` — the tape twin of
 /// `write_expression_embedded`, its comment attach included (a template island's shape) — for
-/// the tape gates, which grade the comment emitter through it. No host composes it yet: the
-/// Svelte writer still writes JSON.
+/// the tape gates, which grade the comment emitter through it apart from a Svelte host.
 #[cfg(feature = "_tape")]
 pub fn write_expression_island_tape(
     expr: &Expression,

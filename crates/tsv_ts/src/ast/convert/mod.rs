@@ -57,4 +57,10 @@ pub use write::{
     write_program_embedded, write_variable_declaration_embedded,
 };
 #[cfg(feature = "_tape")]
+pub use write_tape::{
+    write_expression_embedded_tape, write_identifier_expression_with_character_tape,
+    write_pattern_embedded_tape, write_program_embedded_tape,
+    write_variable_declaration_embedded_tape,
+};
+#[cfg(feature = "_tape")]
 pub(crate) use write_tape::{write_expression_island_tape, write_program_tape};

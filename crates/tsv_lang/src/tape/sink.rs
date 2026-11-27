@@ -18,7 +18,9 @@
 //! byte for byte against the transcoder's own.
 //!
 //! A writer bug the sink can see — a keyword field's value written as a word, a key of an entry
-//! other than the open record's, a record or list left open or closed twice — is recorded as
+//! other than the open record's, a record, list or self-describing record left open or closed
+//! twice (a self-describing record's key count and a list's item count are the frame's own
+//! count of what was written, never a number the writer hands in) — is recorded as
 //! the first [`SinkError`] and refuses
 //! the tape at [`TapeSink::finish_words`] / [`TapeSink::finish_bytes`], in every build: a tape
 //! that would decode to another tree is never handed out.
@@ -40,24 +42,36 @@ pub enum SinkError {
     /// A key written for an entry other than the open record's, or a field the open record's
     /// entry lacks.
     Name,
-    /// A record or list closed with none open, left open at the finish, a field key or a mask
-    /// bit with no record open on top, or a JSON-only path taken on the tape.
+    /// A record, list or self-describing record closed with none open, left open at the
+    /// finish, a field key or a mask bit with no record open on top, an object key with no
+    /// self-describing record open, a `strings` field's ref outside its list or a record
+    /// inside one, or a JSON-only path taken on the tape.
     Unbalanced,
 }
 
 /// [`Frame::entry`] of a list frame.
 const LIST: u16 = u16::MAX;
 
+/// [`Frame::entry`] of a self-describing record's frame (`TapeWriter::t_object_open`). Every
+/// entry id is below it, so `entry < OBJECT` is "a typed record".
+const OBJECT: u16 = u16::MAX - 1;
+const _: () = assert!(shapes::ENTRIES.len() < OBJECT as usize);
+
+/// [`Frame::mask`] of a list frame opened for a `strings` field, whose items are counted refs
+/// ([`TapeWriter::t_list_ref`]) and never records.
+#[cfg(feature = "_tape_literals")]
+const STRINGS_LIST: u32 = 1;
+
 /// An open record or list.
 #[derive(Clone, Copy)]
 struct Frame {
     /// The header slot (a record) or the count slot (a list).
     slot: u32,
-    /// The record's entry, or [`LIST`].
+    /// The record's entry, or [`LIST`], or [`OBJECT`].
     entry: u16,
-    /// The record's presence mask so far.
+    /// The record's presence mask so far (a list's: `STRINGS_LIST` for a `strings` field's).
     mask: u32,
-    /// The list's items so far.
+    /// The list's items so far (a self-describing record's: its keys).
     count: u32,
 }
 
@@ -260,14 +274,27 @@ impl TapeWriter<'_> {
         self.sink.tape.extend_from_slice(&[a, b]);
     }
 
-    /// Counts an item opening under a list frame.
+    /// Counts an item opening under a list frame (a `strings` field's list holds refs alone,
+    /// so a record there refuses the tape).
     #[inline]
     fn count_item(&mut self) {
         if let Some(f) = self.sink.frames.last_mut()
             && f.entry == LIST
         {
             f.count += 1;
+            #[cfg(feature = "_tape_literals")]
+            if f.mask == STRINGS_LIST {
+                self.record_in_strings();
+            }
         }
+    }
+
+    /// A record opened inside a `strings` field's list.
+    #[cfg(feature = "_tape_literals")]
+    #[cold]
+    #[inline(never)]
+    fn record_in_strings(&mut self) {
+        self.fail(SinkError::Unbalanced);
     }
 
     #[inline]
@@ -289,7 +316,7 @@ impl TapeWriter<'_> {
     #[must_use]
     pub fn t_top_field(&self, key: &str) -> Option<Field> {
         match self.sink.frames.last() {
-            Some(f) if f.entry != LIST => shapes::field_named(f.entry, key.as_bytes())
+            Some(f) if f.entry < OBJECT => shapes::field_named(f.entry, key.as_bytes())
                 .map(|i| shapes::ENTRIES[usize::from(f.entry)].fields[usize::from(i)]),
             _ => None,
         }
@@ -300,7 +327,7 @@ impl TapeWriter<'_> {
     #[inline]
     fn top_entry(&self) -> Option<u16> {
         match self.sink.frames.last() {
-            Some(f) if f.entry != LIST => Some(f.entry),
+            Some(f) if f.entry < OBJECT => Some(f.entry),
             _ => None,
         }
     }
@@ -331,7 +358,7 @@ impl TapeWriter<'_> {
             self.fail(SinkError::Unbalanced);
         }
         match self.sink.frames.pop() {
-            Some(f) if f.entry != LIST => {
+            Some(f) if f.entry < OBJECT => {
                 self.sink.tape[f.slot as usize] = header_of(f.entry, f.mask);
             }
             _ => self.fail(SinkError::Unbalanced),
@@ -346,7 +373,7 @@ impl TapeWriter<'_> {
             return;
         }
         if let Some(f) = self.sink.frames.last_mut()
-            && f.entry != LIST
+            && f.entry < OBJECT
         {
             f.mask |= 1 << bit;
             return;
@@ -358,12 +385,19 @@ impl TapeWriter<'_> {
     #[inline]
     pub fn t_list_open(&mut self) {
         #[cfg(feature = "_tape_literals")]
-        if let Some((enc, _)) = self.pending.take()
-            && !matches!(enc, Enc::List | Enc::Strings)
-        {
-            self.fail(SinkError::Unbalanced);
-        }
+        let strings = match self.pending.take() {
+            None | Some((Enc::List, _)) => false,
+            Some((Enc::Strings, _)) => true,
+            Some(_) => {
+                self.fail(SinkError::Unbalanced);
+                false
+            }
+        };
         self.push_frame(LIST);
+        #[cfg(feature = "_tape_literals")]
+        if strings && let Some(f) = self.sink.frames.last_mut() {
+            f.mask = STRINGS_LIST;
+        }
     }
 
     /// A list's `]`: its count.
@@ -540,6 +574,85 @@ impl TapeWriter<'_> {
         match self.pending.take() {
             Some((Enc::Keyword, v)) if v == vocab => self.sink.tape.push(index),
             _ => self.fail(SinkError::Keyword),
+        }
+    }
+
+    /// An array in a tagged-value field (a Svelte attribute's text-and-tag sequence): the
+    /// declared field must be a tagged value, whose array tag and count slot open here. Each
+    /// item is a tagged value the writer leads with its own tag word ([`Self::t_tag`]); a
+    /// record or `null` record item is counted as it opens, and [`Self::t_list_close`] writes
+    /// the count.
+    #[cfg(feature = "_tape_literals")]
+    #[inline]
+    pub fn t_value_list_open(&mut self) {
+        match self.pending.take() {
+            Some((Enc::Value, _)) => {
+                self.t_tag(super::TAG_ARRAY);
+                self.push_frame(LIST);
+            }
+            _ => self.fail(SinkError::Unbalanced),
+        }
+    }
+
+    /// One string of a `strings` field (a Svelte directive's modifiers), inside the list
+    /// [`Self::t_list_open`] opened for that field: counted, then its ref. Anywhere else —
+    /// another list, a record — it refuses the tape.
+    #[cfg(feature = "_tape_literals")]
+    #[inline]
+    pub fn t_list_ref(&mut self, s: &[u8]) {
+        if let Some(f) = self.sink.frames.last_mut()
+            && f.entry == LIST
+            && f.mask == STRINGS_LIST
+        {
+            f.count += 1;
+        } else {
+            self.fail(SinkError::Unbalanced);
+        }
+        self.t_ref(s);
+    }
+
+    /// A self-describing record opens (`docs/tape_format.md` §Records — an object no entry
+    /// holds, `<svelte:options>`'s `customElement` data): its header and its key-count slot,
+    /// under a frame of its own. The writer then writes each key through
+    /// [`Self::t_object_key`] and its tagged value after it, and closes it with
+    /// [`Self::t_object_close`], which writes the count — so a count the writes do not make is
+    /// unrepresentable, and an object left open refuses the tape. Under a declared
+    /// tagged-value field its object tag comes first.
+    #[cfg(feature = "_tape_literals")]
+    #[inline]
+    pub fn t_object_open(&mut self) {
+        self.enter_record();
+        self.count_item();
+        self.sink.tape.push(super::HEADER_ESCAPE);
+        self.push_frame(OBJECT);
+    }
+
+    /// One key of the open self-describing record: counted, then its text's ref. The value
+    /// the writer writes next is a tagged value. With no such record on top it refuses the
+    /// tape.
+    #[cfg(feature = "_tape_literals")]
+    #[inline]
+    pub fn t_object_key(&mut self, key: &[u8]) {
+        if let Some(f) = self.sink.frames.last_mut()
+            && f.entry == OBJECT
+        {
+            f.count += 1;
+        } else {
+            self.fail(SinkError::Unbalanced);
+        }
+        self.t_ref(key);
+    }
+
+    /// The open self-describing record closes: its key count is written.
+    #[cfg(feature = "_tape_literals")]
+    #[inline]
+    pub fn t_object_close(&mut self) {
+        if self.pending.is_some() {
+            self.fail(SinkError::Unbalanced);
+        }
+        match self.sink.frames.pop() {
+            Some(f) if f.entry == OBJECT => self.sink.tape[f.slot as usize] = f.count,
+            _ => self.fail(SinkError::Unbalanced),
         }
     }
 
@@ -1063,6 +1176,42 @@ mod tests {
         );
     }
 
+    /// A self-describing record's key count and a `strings` list's item count are the sink's own
+    /// counts of what was written.
+    #[cfg(feature = "_tape_literals")]
+    #[test]
+    fn object_keys_and_strings_are_counted() {
+        let source = "a";
+        let tables = WireTables::new(source, COORDS, Wire::Span);
+        let mut sink = TapeSink::new();
+        let mut w = sink.writer(source, tables.positions(), LeadingBom::Elided);
+        w.t_object_open();
+        w.t_object_key(b"k");
+        w.t_tag(TAG_TRUE);
+        w.t_object_key(b"l");
+        w.t_tag(TAG_OBJECT);
+        w.t_object_open();
+        w.t_object_close();
+        w.t_object_close();
+        let on = entry_id("OnDirective");
+        w.t_open(on);
+        w.t_key(on, field_of(on, "modifiers"));
+        w.t_list_open();
+        w.t_list_ref(b"m");
+        w.t_list_ref(b"n");
+        w.t_list_close();
+        w.t_close();
+        let tape = sink.finish_bytes().expect("finishes");
+        let body = &words(&tape)[HEADER_WORDS..];
+        // escape header, count, key `k` (two words), its tag, key `l`, its tag, nested record
+        assert_eq!(body[0], super::super::HEADER_ESCAPE);
+        assert_eq!(body[1], 2, "two keys written");
+        assert_eq!(body[8], super::super::HEADER_ESCAPE, "the nested record");
+        assert_eq!(body[9], 0, "no keys written");
+        // the directive's header, then its modifiers' count
+        assert_eq!(body[11], 2, "two modifiers written");
+    }
+
     /// One writer-bug case: its name, the calls that make it, the error it must record.
     type Case = (&'static str, fn(&mut TapeWriter<'_>), SinkError);
 
@@ -1164,6 +1313,61 @@ mod tests {
                     w.t_close();
                 },
                 SinkError::Name,
+            ),
+        ]);
+        #[cfg(feature = "_tape_literals")]
+        cases.extend::<[Case; 6]>([
+            (
+                "a self-describing record left open",
+                |w| w.t_object_open(),
+                SinkError::Unbalanced,
+            ),
+            (
+                "an object key with no self-describing record open",
+                |w| {
+                    w.t_list_open();
+                    w.t_object_key(b"k");
+                    w.t_list_close();
+                },
+                SinkError::Unbalanced,
+            ),
+            (
+                "a self-describing record closed as a record",
+                |w| {
+                    w.t_object_open();
+                    w.t_close();
+                },
+                SinkError::Unbalanced,
+            ),
+            (
+                "a record closed as a self-describing one",
+                |w| {
+                    w.t_open(entry_id("css:Combinator"));
+                    w.t_object_close();
+                },
+                SinkError::Unbalanced,
+            ),
+            (
+                "a strings ref in a list of records",
+                |w| {
+                    w.t_list_open();
+                    w.t_list_ref(b"m");
+                    w.t_list_close();
+                },
+                SinkError::Unbalanced,
+            ),
+            (
+                "a record in a strings list",
+                |w| {
+                    let on = entry_id("OnDirective");
+                    w.t_open(on);
+                    w.t_key(on, field_of(on, "modifiers"));
+                    w.t_list_open();
+                    w.t_null_record();
+                    w.t_list_close();
+                    w.t_close();
+                },
+                SinkError::Unbalanced,
             ),
         ]);
         let mut sink = TapeSink::new();

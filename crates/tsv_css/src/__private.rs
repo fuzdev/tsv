@@ -149,6 +149,10 @@ impl HostBoundaryScan {
     }
 }
 
+/// The composition entries' tape twins — the same two functions in the writer's tape copy,
+/// writing into a `tsv_lang::tape::TapeWriter` — which `tsv_svelte`'s tape copy composes.
+#[cfg(feature = "_tape")]
+pub use crate::ast::convert::{CssCommentsTape, write_css_children_tape, write_css_comments_tape};
 #[cfg(feature = "json")]
 pub use crate::ast::convert::{write_css_children, write_css_comments};
 

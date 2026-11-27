@@ -251,6 +251,21 @@ pub fn convert_ast_json_bytes<'a>(parsed: impl Into<ParsedRootRef<'a>>, source: 
     ast::convert::write_root_bytes(parsed.into(), source, tsv_lang::Wire::Span)
 }
 
+/// The span-only wire's TAPE (`docs/tape_format.md`), written directly into `sink` by the
+/// wire writer's tape copy — the same walk as [`convert_ast_json_bytes`], every embedded
+/// `<script>`, template expression and `<style>` written by `tsv_ts`'s and `tsv_css`'s tape
+/// copies into the one document, its strings true-offset refs into the source less a leading
+/// byte-order mark. Finish it with `sink.finish_words()` / `sink.finish_bytes()`, which refuse a
+/// tape the writer left inconsistent.
+#[cfg(feature = "_tape")]
+pub fn write_tape<'a>(
+    parsed: impl Into<ParsedRootRef<'a>>,
+    source: &str,
+    sink: &mut tsv_lang::tape::TapeSink,
+) {
+    ast::convert::write_root_tape(parsed.into(), source, sink);
+}
+
 /// The `convert_ast_json_bytes` wire plus a `loc` on every object carrying `start`/`end`
 /// (a superset of Svelte's, which gives `loc` to acorn-parsed nodes only) and the
 /// `name_loc` on elements/attributes/directives — line (1-based) and column (0-based,

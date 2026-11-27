@@ -47,14 +47,16 @@ use bigint::bigint_to_decimal;
     clippy::duplicate_mod,
     reason = "the writer's tape copy, mounted beside its JSON copy (`write/mod.rs`'s module doc)"
 )]
-#[expect(
-    dead_code,
-    unreachable_pub,
-    reason = "the embedded entry points `tsv_svelte` composes, which only the JSON copy serves \
-              until the Svelte writer writes a tape"
-)]
 mod write;
+// The embedded entry points `tsv_svelte`'s tape copy composes (`__private`'s `*_tape` names).
 pub(crate) use write::write_program_tape;
+pub use write::{
+    write_expression_embedded as write_expression_embedded_tape,
+    write_identifier_expression_with_character as write_identifier_expression_with_character_tape,
+    write_pattern_embedded as write_pattern_embedded_tape,
+    write_program_embedded as write_program_embedded_tape,
+    write_variable_declaration_embedded as write_variable_declaration_embedded_tape,
+};
 
 /// A list: its count, then its items — `tsv_lang::write_array` on the tape.
 #[inline]
@@ -152,7 +154,8 @@ fn write_chain_any(
 }
 
 /// The tape of an embedded expression island written under `env` (a Svelte template island's
-/// shape — its comment attach included), for the tape gates: no host composes it yet.
+/// shape — its comment attach included), for the tape gates, which grade the comment emitter
+/// through it apart from a Svelte host.
 pub(crate) fn write_expression_island_tape(
     expr: &ast::Expression,
     env: super::EmbedWriter<'_>,

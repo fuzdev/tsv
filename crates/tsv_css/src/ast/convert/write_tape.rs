@@ -45,13 +45,13 @@ use prelude_string::convert_prelude_to_string;
     clippy::duplicate_mod,
     reason = "the writer's tape copy, mounted beside its JSON copy (`write.rs`'s module doc)"
 )]
-#[expect(
-    unreachable_pub,
-    reason = "`CssComments` is `pub` for the JSON copy's Svelte composition entries, which the \
-              tape copy does not compile yet"
-)]
 mod write;
+// The Svelte composition entries `tsv_svelte`'s tape copy calls (`__private`'s `*_tape` names).
 pub(crate) use write::write_stylesheet_file_tape;
+pub use write::{
+    CssComments as CssCommentsTape, write_css_children as write_css_children_tape,
+    write_css_comments as write_css_comments_tape,
+};
 
 /// A string value: its ref (a source slice when the writer borrowed it from there).
 #[inline]
