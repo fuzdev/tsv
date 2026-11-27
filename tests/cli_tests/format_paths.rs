@@ -21,8 +21,10 @@ fn test_format_directory_recursive_in_place() {
     fs::create_dir_all(dir.join("dist")).unwrap();
     fs::write(dir.join("a.ts"), UNFORMATTED_TS).unwrap();
     fs::write(dir.join("sub/b.svelte"), "<div   >hi</div>\n").unwrap();
-    // `{color:red}` is CSS, not a format placeholder
-    #[allow(clippy::literal_string_with_formatting_args)]
+    #[expect(
+        clippy::literal_string_with_formatting_args,
+        reason = "`{color:red}` is CSS, not a format placeholder"
+    )]
     fs::write(dir.join("c.css"), "body{color:red}\n").unwrap();
     fs::write(dir.join("README.md"), "#   hi\n").unwrap();
     fs::write(dir.join("node_modules/x.ts"), UNFORMATTED_TS).unwrap();

@@ -873,7 +873,7 @@ fn or_undefined(value: Option<String>) -> Either<String, Undefined> {
 
 /// Deliberately panic inside the binding — the panic-contract probe.
 ///
-/// Compiled only under the test-only `panic_probe` feature (`deno task
+/// Compiled only under the test-only `panic_probe` feature (`npm run
 /// test:napi` builds with it; published artifacts never carry it).
 /// `scripts/test_napi.ts` drives it to prove the contract end to end: the panic
 /// unwinds into [`catch_panic`], surfaces as a thrown JS error whose message is exactly
@@ -1715,7 +1715,6 @@ mod tests {
     /// status napi-rs's own catch uses (the JS error's `code`), and a body that does not
     /// panic passed through as it returned.
     #[test]
-    #[allow(clippy::panic)] // panicking is the case under test
     fn catch_panic_renders_the_ffi_text() {
         let caught = catch_panic(|| -> napi::Result<()> { panic!("boom inside {}", "the export") })
             .unwrap_err();

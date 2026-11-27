@@ -27,7 +27,10 @@ fn pipe_overflow_tree(name: &str) -> TempTree {
 /// turn, since what has to overflow the buffer is the changed-path report. Test
 /// helper; panicking on IO failure is the desired behavior.
 #[cfg(unix)]
-#[allow(clippy::expect_used)]
+#[expect(
+    clippy::expect_used,
+    reason = "test helper: an IO failure fails the test"
+)]
 fn long_name_tree(name: &str, count: usize) -> TempTree {
     let tree = temp_dir(name);
     let pad = "p".repeat(150);
@@ -59,7 +62,10 @@ struct PipedRun {
 /// tree the run is formatting.
 /// Test helper; panicking on spawn failure is the desired behavior.
 #[cfg(unix)]
-#[allow(clippy::expect_used)]
+#[expect(
+    clippy::expect_used,
+    reason = "test helper: a spawn failure fails the test"
+)]
 fn tsv_piped(dir: &Path, tsv_args: &str, pipeline: &str) -> PipedRun {
     let bin = built_tsv();
     let status_file = dir.with_extension("status");

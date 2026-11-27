@@ -11,7 +11,10 @@ use crate::outside_git_tree::assert_outside_git_tree;
 
 /// Run the tsv binary with the given arguments.
 /// Test helper; panicking on spawn failure is the desired behavior.
-#[allow(clippy::expect_used)]
+#[expect(
+    clippy::expect_used,
+    reason = "test helper: a spawn failure fails the test"
+)]
 pub(crate) fn tsv(args: &[&str]) -> std::process::Output {
     // the binary `built_tsv` built once, not a `cargo run` per call: a cargo
     // invocation per test is slow, and a `cargo run -p tsv_cli` resolves features
@@ -25,7 +28,10 @@ pub(crate) fn tsv(args: &[&str]) -> std::process::Output {
 
 /// Run the tsv binary, piping `input` to its stdin (for `--stdin` mode).
 /// Test helper; panicking on spawn/IO failure is the desired behavior.
-#[allow(clippy::expect_used)]
+#[expect(
+    clippy::expect_used,
+    reason = "test helper: a spawn or IO failure fails the test"
+)]
 pub(crate) fn tsv_stdin(args: &[&str], input: &str) -> std::process::Output {
     use std::io::Write;
     use std::process::Stdio;
@@ -52,7 +58,10 @@ pub(crate) fn tsv_stdin(args: &[&str], input: &str) -> std::process::Output {
 /// scope exit — see that type for why a trailing `remove_dir_all` cleans up the wrong
 /// half of the runs.
 /// Test helper; panicking on IO failure is the desired behavior.
-#[allow(clippy::expect_used)]
+#[expect(
+    clippy::expect_used,
+    reason = "test helper: an IO failure fails the test"
+)]
 pub(crate) fn temp_dir(name: &str) -> TempTree {
     let dir = std::env::temp_dir().join(format!("tsv_cli_tests_{name}_{}", std::process::id()));
     let _ = fs::remove_dir_all(&dir);
@@ -87,7 +96,10 @@ pub(crate) fn to_posix(text: &str) -> String {
 /// strips before printing — through `tsv_cli::cli::discover::strip_verbatim_prefix`, the
 /// CLI's own rule rather than a copy of it, so the two cannot drift.
 /// Test helper; panicking on an unresolvable path is the desired behavior.
-#[allow(clippy::unwrap_used)]
+#[expect(
+    clippy::unwrap_used,
+    reason = "test helper: an unresolvable path fails the test"
+)]
 pub(crate) fn canonical_display(path: &Path) -> String {
     tsv_cli::cli::discover::strip_verbatim_prefix(fs::canonicalize(path).unwrap())
         .display()
@@ -101,7 +113,10 @@ static BUILD: Once = Once::new();
 /// since a test may need the path as a *file* (to copy) and not only as
 /// something to spawn.
 /// Test helper; panicking on build failure is the desired behavior.
-#[allow(clippy::expect_used)]
+#[expect(
+    clippy::expect_used,
+    reason = "test helper: a build failure fails the test"
+)]
 pub(crate) fn built_tsv() -> PathBuf {
     BUILD.call_once(|| {
         let status = Command::new("cargo")
@@ -119,7 +134,10 @@ pub(crate) fn built_tsv() -> PathBuf {
 /// cwd; the format root is then derived from that target, never the cwd itself),
 /// since the `cargo run` helper above always runs in the workspace root.
 /// Test helper; panicking on spawn failure is the desired behavior.
-#[allow(clippy::expect_used)]
+#[expect(
+    clippy::expect_used,
+    reason = "test helper: a spawn failure fails the test"
+)]
 pub(crate) fn tsv_in_dir(cwd: &Path, args: &[&str]) -> std::process::Output {
     Command::new(built_tsv())
         .args(args)
@@ -135,7 +153,10 @@ pub(crate) const FORMATTED_TS: &str = "const x = 1;\n";
 /// is all `find_repo_root` checks for, so this turns on gitignore-aware discovery
 /// without needing a real `git` binary.
 /// Test helper; panicking on IO failure is the desired behavior.
-#[allow(clippy::unwrap_used)]
+#[expect(
+    clippy::unwrap_used,
+    reason = "test helper: an IO failure fails the test"
+)]
 pub(crate) fn git_repo(name: &str) -> TempTree {
     let dir = temp_dir(name);
     fs::create_dir(dir.join(".git")).unwrap();
@@ -187,7 +208,10 @@ impl Drop for TempTree {
 /// otherwise pass vacuously, with the CLI's unreadable-file arm never reached and its
 /// error never produced. Run once per process and remembered.
 #[cfg(unix)]
-#[allow(clippy::expect_used)]
+#[expect(
+    clippy::expect_used,
+    reason = "test helper: an IO failure fails the test"
+)]
 pub(crate) fn mode_bits_are_enforced() -> bool {
     use std::os::unix::fs::PermissionsExt;
 
@@ -222,7 +246,10 @@ impl Drop for ModeGuard {
 /// Where an assertion reads back a file whose mode was taken away, `drop(guard)` ahead
 /// of it — the same point a hand-written restore sat at.
 #[cfg(unix)]
-#[allow(clippy::expect_used)]
+#[expect(
+    clippy::expect_used,
+    reason = "test helper: an IO failure fails the test"
+)]
 pub(crate) fn set_mode(path: &Path, mode: u32) -> ModeGuard {
     use std::os::unix::fs::PermissionsExt;
 

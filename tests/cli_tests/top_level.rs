@@ -128,7 +128,6 @@ fn test_version_flag() {
 /// that dimension on any platform, so the property is provable here rather than
 /// only in a Windows CI leg.
 #[test]
-#[allow(clippy::expect_used)]
 fn test_command_name_is_independent_of_argv0() {
     let dir = temp_dir("argv0_name");
     let renamed = dir.join(format!("tsv_renamed{}", std::env::consts::EXE_SUFFIX));

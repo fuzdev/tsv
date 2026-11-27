@@ -15,7 +15,11 @@
 // table. These are structural invariants of the container stack; a violation is a
 // binder bug (contained by the harness's per-test `catch_unwind`), not a
 // recoverable data error, so the panic points are the honest expression.
-#![allow(clippy::expect_used, clippy::unwrap_used)]
+#![expect(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "a scope kind guarantees its symbol and table; a miss is a binder bug"
+)]
 
 use super::super::symbols::{Decl, SymbolFlags, SymbolId, TableId};
 use crate::diag::{Category, Diagnostic};
