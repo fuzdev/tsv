@@ -6,7 +6,7 @@
  * layer napi-rs generates (the JS string ↔ Rust `String` conversion, the `Env`-built
  * failure object RETURNED in a product's place, and the `napi::Error` → *thrown* JS error
  * path). This script closes that gap: it loads the built cdylib as an N-API addon and
- * asserts a format, a JSON-AST parse, a returned failure and a thrown error across the
+ * asserts a format, a tape parse, a returned failure and a thrown error across the
  * actual JS boundary — the surface a Node/Bun consumer (and the bench's Node runner) hits.
  *
  * Runs under Node (not Deno) on purpose — it validates the addon in the runtime
@@ -37,6 +37,7 @@ import {
 import type { NapiAddon } from '../benches/js/lib/napi.ts';
 import { napi_library_path } from '../benches/js/lib/tsv_artifacts.ts';
 import { create_locator } from '../crates/tsv_wasm/npm/locations.js';
+import { create_tape_parse } from '../crates/tsv_wasm/npm/tape_engine.js';
 
 const lib_path = napi_library_path('napi');
 if (!existsSync(lib_path)) {
@@ -49,6 +50,16 @@ if (!existsSync(lib_path)) {
 const mod: { exports: NapiAddon } = { exports: {} as NapiAddon };
 process.dlopen(mod, lib_path);
 const addon = mod.exports;
+
+/** The addon's TypeScript parse through the tape route the loader's `./parse` entry takes:
+ * the raw tape decoded into the span-only tree. */
+const parse_typescript = (source: string): any => {
+	const result = create_tape_parse({ typescript: addon.parse_tape_typescript }).typescript!(
+		source
+	) as { ok: boolean; ast?: any };
+	assert.equal(result.ok, true);
+	return result.ast;
+};
 
 describe('tsv_napi addon (real N-API JS boundary)', () => {
 	it('format_typescript normalizes across the boundary', () => {
@@ -63,9 +74,8 @@ describe('tsv_napi addon (real N-API JS boundary)', () => {
 		assert.equal(addon.format_svelte('<div   >x</div   >'), '<div>x</div>\n');
 	});
 
-	it('parse_typescript_json returns a JSON AST string the host can JSON.parse', () => {
-		const ast = JSON.parse(addon.parse_typescript_json('const x = 1;') as string);
-		assert.equal(ast.type, 'Program');
+	it('parse_tape_typescript returns a tape the host decodes', () => {
+		assert.equal(parse_typescript('const x = 1;').type, 'Program');
 	});
 
 	it('parse_internal_typescript returns undefined on success', () => {
@@ -77,7 +87,7 @@ describe('tsv_napi addon (real N-API JS boundary)', () => {
 		// same shape the WASM engine builds. The format call's source holds a CRLF: its span
 		// is still the caller's source's
 		const cases: [() => unknown, string, number][] = [
-			[() => addon.parse_typescript_json('let a;\nconst = ;'), 'let a;\nconst = ;', 13],
+			[() => addon.parse_tape_typescript('let a;\nconst = ;'), 'let a;\nconst = ;', 13],
 			[() => addon.parse_internal_typescript('let a;\nconst = ;'), 'let a;\nconst = ;', 13],
 			[() => addon.format_typescript('let a;\r\nconst = ;'), 'let a;\r\nconst = ;', 14]
 		];
@@ -118,7 +128,7 @@ describe('tsv_napi addon (real N-API JS boundary)', () => {
 		// an argument refusal still THROWS, with no own keys (no napi-rs `code`, which the wasm
 		// engine's errors lack too)
 		assert.throws(
-			() => addon.parse_css_json('a {}', 'script'),
+			() => addon.parse_tape_css('a {}', 'script'),
 			(e: any) => e instanceof Error && Object.keys(e).length === 0,
 			'a source type on CSS must throw, with no own keys'
 		);
@@ -177,8 +187,11 @@ describe('tsv_napi addon (real N-API JS boundary)', () => {
 			);
 			// The process survived and the per-thread state recovered: parse (the
 			// stores) and format (the stores + the doc arena) still produce correct output.
-			const ast = JSON.parse(addon.parse_typescript_json('const x = 1;') as string);
-			assert.equal(ast.type, 'Program', 'parse must work after a panic');
+			assert.equal(
+				parse_typescript('const x = 1;').type,
+				'Program',
+				'parse must work after a panic'
+			);
 			assert.equal(
 				addon.format_typescript('const   x=1'),
 				'const x = 1;\n',
@@ -223,7 +236,7 @@ describe('tsv_napi addon (real N-API JS boundary)', () => {
 				`worker ${i} saw more than one format result`
 			);
 			assert.deepEqual(outcome.css, ['a {\n\tcolor: red;\n}\n'], `worker ${i} css result drifted`);
-			assert.deepEqual(outcome.parsed_types, ['Program'], `worker ${i} parse result drifted`);
+			assert.equal(outcome.parsed_types.length, 1, `worker ${i} parse result drifted`);
 			assert.equal(outcome.errors, iterations, `worker ${i} lost the returned-failure path`);
 		}
 	});
@@ -233,6 +246,7 @@ describe('tsv_napi addon (real N-API JS boundary)', () => {
 interface WorkerOutcome {
 	formatted: string[];
 	css: string[];
+	/** each distinct tape of one source, its words joined */
 	parsed_types: string[];
 	errors: number;
 }
@@ -256,7 +270,7 @@ let errors = 0;
 for (let i = 0; i < workerData.iterations; i++) {
 	formatted.add(addon.format_typescript('const   x=1'));
 	css.add(addon.format_css('a{color:red}'));
-	parsed_types.add(JSON.parse(addon.parse_typescript_json('const x = 1;')).type);
+	parsed_types.add(Array.from(addon.parse_tape_typescript('const x = 1;')).join(','));
 	// A failure on every iteration too: the error path leaves through the same
 	// per-thread stores and doc arena, so state the error path fails to park would
 	// surface as a corrupted result on the NEXT iteration rather than as a failure here.

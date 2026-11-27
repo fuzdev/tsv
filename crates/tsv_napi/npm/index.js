@@ -10,9 +10,9 @@
  * the fast native path, that one the universal fallback (browsers + unsupported platforms).
  *
  * Two entries, as in `@fuzdev/tsv-wasm`: this root carries format, the type strip, the import
- * records and `IgnoreStack`; the parse family — `parse_<lang>`, `parse_<lang>_json`, the
- * `locations.js` helpers and the AST types — is the `./parse` entry's (`parse.js`), whose
- * static graph holds the tape decoder, so a process that never parses never loads either.
+ * records and `IgnoreStack`; the parse family — `parse_<lang>`, the `locations.js` helpers and
+ * the AST types — is the `./parse` entry's (`parse.js`), whose static graph holds the tape
+ * decoder, so a process that never parses never loads either.
  * Both import the addon from `addon.js`, so it loads once.
  *
  * What is absent here is only what a WASM engine needs and this one doesn't: `init()` and

@@ -42,9 +42,9 @@ const fake_deps = (
 					'format_typescript',
 					'format_svelte',
 					'format_css',
-					'parse_typescript_json',
-					'parse_svelte_json',
-					'parse_css_json'
+					'parse_tape_typescript',
+					'parse_tape_svelte',
+					'parse_tape_css'
 				].map((name) => [name, call(name)])
 			);
 			return { memory, glue };
@@ -79,10 +79,10 @@ test('the warm high-water spans the list; each cold reading is a fresh instance'
 	const parsed = fake_deps(FILES);
 	await measure_wasm_memory(parsed, 'list.txt', 'parse');
 	deepStrictEqual(parsed.instances[0], [
-		'parse_typescript_json',
-		'parse_typescript_json',
-		'parse_svelte_json',
-		'parse_css_json'
+		'parse_tape_typescript',
+		'parse_tape_typescript',
+		'parse_tape_svelte',
+		'parse_tape_css'
 	]);
 });
 

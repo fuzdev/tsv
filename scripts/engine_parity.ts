@@ -46,9 +46,9 @@
  *
  * **The parse wire** rides it too, over `tests/fixtures` and the snapshot, from each package's
  * `./parse` entry: `parse_<lang>` by extension (`.svelte`, `.css`, the strip's engine extensions
- * for TypeScript) deep-equal on both engines, and on each engine deep-equal to `JSON.parse` of
- * its own `parse_<lang>_json` — the tape route against the JSON route, key order included (the
- * comparison is of the two trees' serializations).
+ * for TypeScript) deep-equal on both engines, key order included (the comparison is of the two
+ * trees' serializations). Each engine's tape is written by the same writers; that the decoded
+ * tree is the JSON wire's is the package suites' and `npm run check:tape`'s to grade.
  *
  * Blind spots. It compares the two CLI **drivers** as well as the two engines, so a driver-only
  * difference reads as a failure here (that is a real finding, just a differently-located one;
@@ -279,23 +279,11 @@ const native = { ...native_root, ...native_parse };
 const wasm = { ...(await import(process.argv[2])), ...(await import(process.argv[3])) };
 const files = JSON.parse(readFileSync(process.argv[4], 'utf8'));
 const differing = [];
-/** A parse export's result with the JSON wire read back as the tree it names. */
-const read_back = (result) => (result.ok ? { ok: true, ast: JSON.parse(result.json) } : result);
 for (const [file, name] of files) {
 	const source = readFileSync(file, 'utf8');
 	const a = JSON.stringify(native[name](source));
 	const b = JSON.stringify(wasm[name](source));
 	if (a !== b) differing.push(file);
-	else if (/^parse_(svelte|typescript|css)$/.test(name)) {
-		// the tape route against the JSON route, on each engine: the decoded tree is the one
-		// JSON.parse makes of the same wire, key order included
-		for (const engine of [native, wasm]) {
-			if (JSON.stringify(read_back(engine[name + '_json'](source))) !== a) {
-				differing.push(file);
-				break;
-			}
-		}
-	}
 }
 process.stdout.write(JSON.stringify({ files: files.length, differing }));
 `;
@@ -603,7 +591,7 @@ export async function run_engine_parity(
 		);
 
 	/** The parse leg over the engines alone: each file's `parse_<lang>` (the tape route) equal
-	 * on both engines, and on each to `JSON.parse` of its own `parse_<lang>_json`. */
+	 * on both engines. */
 	const grade_parse_engines = (root: string): Promise<RootReport> =>
 		grade_engines(root, 'parse_*', [...STRIP_ENGINE_EXTENSIONS, '.svelte', '.css'], (file) => {
 			const extension = extname(file).toLowerCase();

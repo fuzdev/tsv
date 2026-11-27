@@ -1,15 +1,16 @@
 /**
  * Tests for the tape-routing probe (`assert_binding_parses_through_tape`).
  *
- * Pins the directions that matter, since a wrong verdict either times the JSON wire under
+ * Pins the directions that matter, since a wrong verdict either times another route under
  * the tape route's name or stops a healthy run:
  *  - a table that parses through the tape, returning the wire's tree, PASSES;
- *  - a table that parses through the `_json` export instead FAILS on the routing half, and
- *    only where that half is asked (`twin`), since a timed row's process skips it;
+ *  - a table that parses past the tape export FAILS on the routing half, and only where that
+ *    half is asked (`twin`), since a timed row's process skips it;
  *  - a tape export that hands back anything but a `Uint32Array` FAILS;
- *  - a tree whose KEY ORDER differs from the wire's FAILS — what a structural compare misses;
+ *  - a tree whose KEY ORDER differs from the wire's FAILS — what a structural compare misses —
+ *    where the binding emits the JSON wire, and no comparison runs where it emits none;
  *  - a tape the decoder refuses is rethrown naming the artifact and its rebuild;
- *  - a timed row's own process (`twin` null) calls the `_json` export never;
+ *  - a timed row's own process (`twin` null) calls the JSON export never;
  *  - the TIMED table `TsvBinding.bind` builds parses through the tape export alone.
  *
  * Fake engines and a fake publish rather than a real binding, as `locations_probe_test.ts`
@@ -45,15 +46,16 @@ const engine = (tape: () => unknown = () => new Uint32Array(8)): TapeProbeEngine
 	parse_json: per_language(() => () => WIRE)
 });
 
-/** A publish whose `parse_<lang>` calls `via` of the engine it is handed, once. */
+/** A publish whose `parse_<lang>` calls the engine's tape export once (`via: 'parse_tape'`)
+ * or never (`'none'`). */
 const publish_via =
-	(via: 'parse_tape' | 'parse_json'): PublishParse =>
+	(via: 'parse_tape' | 'none'): PublishParse =>
 	(e) =>
 		Object.fromEntries(
 			LANGUAGES.map((language) => [
 				`parse_${language}`,
 				(source: string) => {
-					e[via][language](source);
+					if (via === 'parse_tape') e.parse_tape[language](source);
 					return { ok: true, ast: JSON.parse(WIRE) };
 				}
 			])
@@ -80,7 +82,7 @@ test('a table that parses through the tape, to the wire’s tree, passes', () =>
 	);
 });
 
-test('a table that parses through the _json export fails the routing half, when asked', () => {
+test('a table that parses past the tape export fails the routing half, when asked', () => {
 	throws(
 		() =>
 			assert_binding_parses_through_tape(
@@ -88,9 +90,9 @@ test('a table that parses through the _json export fails the routing half, when 
 				artifact,
 				target(engine()),
 				['css'],
-				publish_via('parse_json')
+				publish_via('none')
 			),
-		/ran the tape export 0 times and the _json export 1/
+		/ran the tape export 0 times/
 	);
 	// a timed row's process skips the routing half and the tree comparison: only the row's
 	// own call runs
@@ -127,7 +129,21 @@ test('a tree whose key order differs from the wire’s fails', () => {
 	);
 });
 
-test('a timed row’s own process makes the row’s call alone: no _json export, no comparison', () => {
+test('a binding that emits no JSON wire is graded on its routing alone', () => {
+	const { parse_json: _, ...tape_only } = engine();
+	// a tree the comparison would refuse, so a comparison that ran would throw
+	doesNotThrow(() =>
+		assert_binding_parses_through_tape(
+			'tsv (probe)',
+			artifact,
+			target(tape_only, () => ({ start: 0, type: 'Program', end: 1 })),
+			LANGUAGES,
+			publish_via('parse_tape')
+		)
+	);
+});
+
+test('a timed row’s own process makes the row’s call alone: no JSON export, no comparison', () => {
 	let wires = 0;
 	const counted: TapeProbeEngine = {
 		...engine(),
@@ -211,7 +227,9 @@ class CountedBinding extends TsvBinding {
 		};
 		this.bind({
 			parse_tape: per_language(() => () => (this.tapes++, failure())) as TsvEngine['parse_tape'],
-			parse_json: per_language(() => () => (this.wires++, failure())) as TsvEngine['parse_json'],
+			parse_json: per_language(() => () => (this.wires++, failure())) as NonNullable<
+				TsvEngine['parse_json']
+			>,
 			format: per_language(() => unused),
 			parse_internal: per_language(() => unused)
 		});
@@ -225,7 +243,7 @@ test('the timed table (TsvBinding.bind) parses through the tape export alone', (
 			const binding = new CountedBinding();
 			throws(() => binding[call]('x', language), TsvRejection);
 			strictEqual(binding.tapes, 1, `${call}[${language}]: tape export calls`);
-			strictEqual(binding.wires, 0, `${call}[${language}]: _json export calls`);
+			strictEqual(binding.wires, 0, `${call}[${language}]: JSON export calls`);
 		}
 	}
 });

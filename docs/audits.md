@@ -1002,10 +1002,10 @@ same result on both engines — the records, or every field of a parse error.
 
 **The parse leg.** The parse wire rides the same child, from each package's `./parse` entry:
 over `tests/fixtures` and the snapshot, `parse_<lang>` (by extension — `.svelte`, `.css`, and
-the strip's engine extensions for TypeScript) must return the same result on both engines, and
-on each engine deep-equal `JSON.parse` of its own `parse_<lang>_json` — the tape route against
-the JSON route ([tape_format.md](./tape_format.md)), compared by the two trees'
-serializations, so key order counts.
+the strip's engine extensions for TypeScript) must return the same result on both engines,
+compared by the two trees' serializations, so key order counts. That a decoded tree is the
+JSON wire's is the tape gates' to grade ([tape_format.md](./tape_format.md)), and the package
+suites' over the native CLI's wire.
 
 The WASM side runs under **node**, the host `cli.js` ships for, not under Deno's compat
 layer — which is not a detail: some `cli.js` bugs exist only on that host. Spawning the
@@ -1529,7 +1529,7 @@ islands written under a comment attach outside any Svelte host.
   `engines:audit`'s to grade, not this gate's.
 - **The direct tape is graded through the writers, not the bindings**: each binding's tape export
   is its language's writer's tape by the bindings' in-crate tests, and what a package hands over
-  decodes to the JSON wire's tree by the package suites.
+  decodes to the native CLI's wire by the package suites.
 
 ## Tape Corpus Leg (`tape:corpus`)
 
@@ -1563,9 +1563,9 @@ each package (`@fuzdev/tsv-format-wasm`, `-parse-wasm`, `-wasm`, and the napi lo
 `files` it declares — and compiles lean consumer modules against it through the `exports` map,
 every subpath (the root, `./worker`, `./locations`). What they type:
 
-- every facade function's return (`FormatResult` from each formatter, `ParseJsonResult` from
-  each `_json` export, `ParseResult<Root>` / `<Program>` / `<StyleSheetFile>` from the object
-  parsers, each narrowing on `ok`) and every option type by name, with a forwarded
+- every facade function's return (`FormatResult` from each formatter,
+  `ParseResult<Root>` / `<Program>` / `<StyleSheetFile>` from the parsers, each narrowing on
+  `ok`) and every option type by name, with a forwarded
   `{sourceType: undefined}` bag on the goalless exports;
 - `TsvParseError`'s `kind`, `message`, `frame`, `start`, `end` and `loc` fields, the format
   error's `kind` union, the `IgnoreStack` verdict union, the locator's `position_at` / `loc_of` /
@@ -1576,7 +1576,7 @@ every subpath (the root, `./worker`, `./locations`). What they type:
 - type EQUALITY where an assignment would pass an `any` (`wasm_module` is exactly
   `WebAssembly.Module`, `loc_of` returns exactly `SourceLocation | null`);
 - `// @ts-expect-error` negatives for what must not compile — an unknown option key,
-  `locations` on a `_json` export, `sourceType` on a goalless export, a function or option type
+  `sourceType` on a goalless export, a function or option type
   from the other single-family package, `Position` from `./locations`, `wasm_module` from
   `./worker` or the browser entry, the WASM lifecycle from the napi loader. An unused directive
   is itself an error, so the negatives are pinned too.

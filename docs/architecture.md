@@ -186,7 +186,7 @@ directly; ASCII sources pass through byte-space). The output is valid UTF-8 by
 construction, and returning bytes lets byte-oriented boundaries skip the O(output)
 UTF-8 validation a `String` requires (the wire is several times the source);
 `convert_ast_json_string` is the span-only bytes plus that one validation, for `&str`
-boundaries (the WASM binding's `JSON.parse`, the N-API strings).
+boundaries (`parse_to_json`).
 
 No language crate reads the wire back: the one `Value` consumer is `tsv_debug` (the
 fixture gate, the audits), whose `json` module reads these bytes with serde_json's
@@ -907,7 +907,7 @@ The `fits()` lookahead runs on an inline `SmallVec` stack, and the render loop's
 
 **Lazy work over eager caching.** Line/column positions are computed only when `loc` is asked for — the error path, and the opt-in loc wire behind the `locations` cargo feature — via O(log n) binary search over line-start offsets (`LocationTracker`); the span-only wire every binding emits builds no line table. Error context (the point and the excerpted line) is computed only on the error path. Svelte `Text::data()` decodes entities only when entities are present, borrowing `raw` otherwise.
 
-**Boundaries — serialize once, copy once.** `convert_ast_json_string` emits compact wire JSON without any intermediate `serde_json::Value` — all three languages write it directly from the internal AST via the writer (see [Closed Scope, Open Convention](#closed-scope-open-convention)) — into a buffer pre-sized from source length (`tsv_lang::estimated_json_capacity`, a per-wire bytes-per-source-byte ratio — the JSON sibling of the render-path pre-sizing above). FFI returns a leaked `Box<[u8]>` the caller frees via `tsv_free` — one serialization, one buffer; the full ownership and panic-safety contract is in [crates/tsv_ffi/CLAUDE.md](../crates/tsv_ffi/CLAUDE.md). WASM ships the AST across the boundary as a single JSON string and hands it to the engine's native `JSON.parse` rather than building the JS object graph node-by-node. The CLI reads each file into one `String` and drops all per-file state before the next; worker threads share only an atomic index into the file list.
+**Boundaries — serialize once, copy once.** `convert_ast_json_bytes` emits compact wire JSON without any intermediate `serde_json::Value` — all three languages write it directly from the internal AST via the writer (see [Closed Scope, Open Convention](#closed-scope-open-convention)) — into a buffer pre-sized from source length (`tsv_lang::estimated_json_capacity`, a per-wire bytes-per-source-byte ratio — the JSON sibling of the render-path pre-sizing above); the writer's tape copy writes the same wire as the binary tape ([tape_format.md](tape_format.md)) from its own copy of the same walk. FFI returns a leaked `Box<[u8]>` the caller frees via `tsv_free` (`tsv_free_tape` for a tape) — one serialization, one buffer; the full ownership and panic-safety contract is in [crates/tsv_ffi/CLAUDE.md](../crates/tsv_ffi/CLAUDE.md). WASM and N-API ship the AST across the boundary as the tape, which a generated decoder builds the JS object graph from, rather than building it node by node. The CLI reads each file into one `String` and drops all per-file state before the next; worker threads share only an atomic index into the file list.
 
 Profiling methodology — including when to reach for heap profiling — is in [performance.md](./performance.md).
 

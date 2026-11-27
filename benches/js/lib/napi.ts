@@ -12,19 +12,19 @@
  * (`napi_library_path` in `lib/tsv_artifacts.ts`).
  *
  * Unlike FFI there are no raw pointers and no manual free: napi-rs marshals the JS string in and
- * the returned `String` out. `parse_<lang>_json` returns the span-only wire as a JSON string, and
- * `parse_tape_<lang>` the same wire laid down as the tape's words, copied into a `Uint32Array` the
- * JS engine owns. A failure the source causes (a parse failure, a format's refusal) is RETURNED in
- * the product's place as `{ok: false, error}`; only an argument refusal, the size cap and a caught
- * panic surface as thrown JS errors (napi-rs converts the `napi::Error`), so there is no status
- * out-param to read (the FFI shape). A Rust PANIC surfaces the same way: every export catches one
- * and the `napi` profile unwinds, so a panic throws an `Error` whose message is `panic: <payload>`,
- * the C FFI's text, instead of aborting the host (stack overflow excepted — that still aborts).
+ * the returned `String` out. `parse_tape_<lang>` returns the span-only wire as the tape's words,
+ * written by the language's wire writer and copied into a `Uint32Array` the JS engine owns; the
+ * addon emits no JSON wire. A failure the source causes (a parse failure, a format's refusal) is
+ * RETURNED in the product's place as `{ok: false, error}`; only an argument refusal, the size cap
+ * and a caught panic surface as thrown JS errors (napi-rs converts the `napi::Error`), so there is
+ * no status out-param to read (the FFI shape). A Rust PANIC surfaces the same way: every export
+ * catches one and the `napi` profile unwinds, so a panic throws an `Error` whose message is
+ * `panic: <payload>`, the C FFI's text, instead of aborting the host (stack overflow excepted —
+ * that still aborts).
  *
  * The `parse` and `format` rows call the published API over these exports — the
  * packages' facade, wired as the `@fuzdev/tsv` loader wires it (`crates/tsv_napi/npm/parse.js`:
- * `parse_<lang>` decodes `parse_tape_<lang>`'s tape, `parse_<lang>_json` keeps the wire
- * string; `index.js` the format). See `lib/tsv_api.ts`.
+ * `parse_<lang>` decodes `parse_tape_<lang>`'s tape; `index.js` the format). See `lib/tsv_api.ts`.
  *
  * Only instantiated under Node/Bun (see `implementations.ts`); importing this
  * module under Deno is harmless because `process.dlopen` is only touched in
@@ -45,15 +45,12 @@ import type { InitScope } from './types.ts';
  * ignoring it (`tsv_napi`'s `napi_source_type`), so `TsvBinding` withholds it for them.
  */
 export interface NapiAddon {
-	parse_svelte_json: EngineFn<string | EngineFailure>;
 	parse_tape_svelte: EngineFn<Uint32Array | EngineFailure>;
 	parse_internal_svelte: EngineFn<EngineFailure | undefined>;
 	format_svelte: EngineFn<string | EngineFailure>;
-	parse_typescript_json: EngineFn<string | EngineFailure>;
 	parse_tape_typescript: EngineFn<Uint32Array | EngineFailure>;
 	parse_internal_typescript: EngineFn<EngineFailure | undefined>;
 	format_typescript: EngineFn<string | EngineFailure>;
-	parse_css_json: EngineFn<string | EngineFailure>;
 	parse_tape_css: EngineFn<Uint32Array | EngineFailure>;
 	parse_internal_css: EngineFn<EngineFailure | undefined>;
 	format_css: EngineFn<string | EngineFailure>;
@@ -92,19 +89,14 @@ export class NapiImplementation extends TsvBinding {
 		const mod: { exports: NapiAddon } = { exports: {} as NapiAddon };
 		process.dlopen(mod, path);
 
-		// The addon's flat exports, the tape exports beneath `parse_<lang>` and the wire
-		// beneath `parse_<lang>_json` — the loader's own wiring.
+		// The addon's flat exports, the tape exports beneath `parse_<lang>` — the loader's own
+		// wiring.
 		const addon = mod.exports;
 		this.bind({
 			parse_tape: {
 				svelte: addon.parse_tape_svelte,
 				typescript: addon.parse_tape_typescript,
 				css: addon.parse_tape_css
-			},
-			parse_json: {
-				svelte: addon.parse_svelte_json,
-				typescript: addon.parse_typescript_json,
-				css: addon.parse_css_json
 			},
 			format: {
 				svelte: addon.format_svelte,

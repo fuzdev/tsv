@@ -25,9 +25,10 @@ The gates: for the oracle and the format, `npm run check:tape` (docs/audits.md �
 `tests/tape_roundtrip.rs`, the transcoder legs of `tests/depth_limit.rs`, and at conformance
 cadence `npm run tape:corpus`; for the direct producer — what ships — the same, over its tapes
 ([§Grading a direct tape](#grading-a-direct-tape)), and the bindings' in-crate tests (each
-export's words are its language's writer's); over the shipped packages, the package suites and
-`npm run engines:audit`'s parse leg (each engine's `parse_<lang>` against `JSON.parse` of its own
-`parse_<lang>_json`, over the fixtures and the corpus snapshot).
+export's words are its language's writer's); over the shipped packages, the package suites (the
+decoded tree, stringified, is the native CLI's span-only wire byte for byte) and
+`npm run engines:audit`'s parse leg (the two engines' `parse_<lang>` equal, over the fixtures and
+the corpus snapshot).
 `npm run check:ast-schema` holds the two generated files to the table and the shape list.
 
 ## The schema
@@ -334,13 +335,14 @@ across calls.
 
 ## Where it ships
 
-The npm packages' `parse_<lang>` takes the tape route: the parse-capable packages' `./parse`
-entries (and `@fuzdev/tsv-parse-wasm`'s root) build
+The npm packages' `parse_<lang>` takes the tape route, and it is their only parse: the
+parse-capable packages' `./parse` entries (and `@fuzdev/tsv-parse-wasm`'s root) build
 `create_parse_api`'s `engine.parse` with `create_tape_parse` (`tape_engine.js`), which calls the
 engine's raw `parse_tape_<lang>`, decodes a returned tape with `decode_tape` against the text the
 wire indexes (the source, less a leading BOM for Svelte and CSS), and passes a failure through.
-`parse_<lang>_json`, the CLI, the C FFI's `tsv_parse_<lang>` and the Rust crates keep the JSON
-wire. Decoding is synchronous and calls
+No npm engine emits the JSON wire — `JSON.stringify` of the decoded tree is that wire, byte for
+byte, which is how the packages' `tsv parse` (`cli.js`) prints it; the native CLI, the C FFI's
+`tsv_parse_<lang>` and the Rust crates keep the JSON wire. Decoding is synchronous and calls
 nothing in between, which is what each binding's hand-over relies on:
 
 - **The export body.** `tsv_arena::parse_tape!` parses into the thread's stores and writes the
@@ -362,7 +364,8 @@ nothing in between, which is what each binding's hand-over relies on:
   over the parked sink's own words
   (`js_sys::Uint32Array::new_with_byte_offset_and_length` over `wasm_bindgen::memory()`'s
   buffer, never `Uint32Array::view`), valid until the next call into the instance; the
-  instance keeps one tape-sized buffer, the sink's.
+  instance keeps one tape-sized buffer, the sink's. No export reaches the writers' JSON copies,
+  so they drop out of the bundles at link time.
 - **C FFI** (`tsv_ffi`): `tsv_parse_tape_<lang>`, the uniform signature, its payload — the tape,
   or the `{"error": …}` JSON — a `Box<[u32]>` freed by `tsv_free_tape(ptr, len)`, with
   `*out_len` the byte length.

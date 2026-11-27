@@ -5,7 +5,7 @@
  * `scripts/test_bun.ts` over the staged packages, so the two engines are held to one
  * table.
  *
- * Every `parse_*`, `parse_*_json`, `format_*` and `parse_imports_*` call on a source that
+ * Every `parse_*`, `format_*` and `parse_imports_*` call on a source that
  * does not parse returns `{ok: false, error}` (those two keys, in that order), whose `error`
  * is a plain object with exactly `kind` (`'parse'`), `message`, `frame`, `start`, `end` and
  * `loc` — a one-line `message`; a point, so `end === start`; and `loc` deep-equal to
@@ -307,7 +307,6 @@ const calls = (api: Record<string, any>, row: ParseFailureRow) =>
 	(
 		[
 			[`parse_${row.language}`, row.at],
-			[`parse_${row.language}_json`, row.at],
 			[`format_${row.language}`, row.format_at ?? row.at],
 			[`parse_imports_${row.language}`, row.format_at ?? row.at]
 		] as const
@@ -446,7 +445,7 @@ export function register_parse_failure_suite(
 }
 
 /** The product under `key` of an `{ok: true}` result, failing the test on anything else. */
-function ok_value(result: unknown, key: 'code' | 'ast' | 'json'): any {
+function ok_value(result: unknown, key: 'code' | 'ast'): any {
 	const ok = result as { ok?: unknown; error?: unknown } | null | undefined;
 	assert.ok(ok?.ok === true, `expected {ok: true}, got ${JSON.stringify(result)}`);
 	return (result as Record<string, unknown>)[key];
@@ -457,6 +456,3 @@ export const ok_code = (result: unknown): string => ok_value(result, 'code');
 
 /** A `parse_<lang>` result's `ast`, failing the test on a failure. */
 export const ok_ast = (result: unknown): any => ok_value(result, 'ast');
-
-/** A `parse_<lang>_json` result's `json`, failing the test on a failure. */
-export const ok_json = (result: unknown): string => ok_value(result, 'json');

@@ -4,7 +4,7 @@
  * (`benches/js/lib/ffi.ts` `NativeImplementation`, its facade included), so a library is
  * called exactly as the Deno bench row calls it: per listed file, in order, each named
  * operation, every export by name (`FFI_OPS`) — `parse` (`tsv_parse_<lang>`'s span-only wire,
- * the string `parse_<lang>_json` publishes), `tape` (the package's default parse, the bench
+ * the JSON string the C FFI alone emits), `tape` (the package's default parse, the bench
  * row's: `tsv_parse_tape_<lang>`'s tape decoded through the facade, hashed as
  * `JSON.stringify` writes the tree), `parse_internal` (the parse that hands JS nothing) and
  * `format` — recorded as a sha256 of its output, or its failure. `pgo.ts train` runs it over the
@@ -74,7 +74,7 @@ const call = (op: FfiOp, path: string, source: string): Omit<FfiRecord, 'path' |
 	try {
 		const text =
 			op === 'parse'
-				? (binding.engine.parse_json[language](source) as string)
+				? (binding.engine.parse_json![language](source) as string)
 				: op === 'tape'
 					? JSON.stringify(binding.parse(source, language))
 					: op === 'format'

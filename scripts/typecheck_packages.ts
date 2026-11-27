@@ -257,16 +257,11 @@ const parse_module = (specifier: string): string => `
 import {
 	create_locator,
 	parse_css,
-	parse_css_json,
 	parse_svelte,
-	parse_svelte_json,
 	parse_typescript,
-	parse_typescript_json,
 	reconstruct_locations
 } from '${specifier}';
 import type {
-	ParseJsonOptions,
-	ParseJsonResult,
 	ParseOptions,
 	ParseResult,
 	Position,
@@ -275,7 +270,6 @@ import type {
 	SourceLocation,
 	StyleSheetFile,
 	TsvParseError,
-	TypeScriptParseJsonOptions,
 	TypeScriptParseOptions
 } from '${specifier}';
 
@@ -285,13 +279,10 @@ const returns: [
 	Exact<ReturnType<typeof parse_svelte>, ParseResult<Root>>,
 	Exact<ReturnType<typeof parse_typescript>, ParseResult<Program>>,
 	Exact<ReturnType<typeof parse_css>, ParseResult<StyleSheetFile>>,
-	Exact<ReturnType<typeof parse_svelte_json>, ParseJsonResult>,
-	Exact<ReturnType<typeof parse_typescript_json>, ParseJsonResult>,
-	Exact<ReturnType<typeof parse_css_json>, ParseJsonResult>,
 	Exact<TsvParseError['kind'], 'parse'>,
 	Exact<TsvParseError['start'], number>,
 	Exact<TsvParseError['loc'], {start: {line: number; column: number}; end: {line: number; column: number}}>
-] = [true, true, true, true, true, true, true, true, true];
+] = [true, true, true, true, true, true];
 const typescript_options: TypeScriptParseOptions = {sourceType: 'script', locations: true};
 const parsed = parse_svelte('<p>x</p>', {locations: true});
 // @ts-expect-error the tree is there only once \`ok\` says so
@@ -308,15 +299,8 @@ const sheet: StyleSheetFile = sheet_result.ast;
 const forwarded: ParseOptions = {sourceType: undefined, locations: true};
 parse_svelte('<p>x</p>', forwarded);
 parse_typescript('let a', forwarded);
-const typescript_json_options: TypeScriptParseJsonOptions = {sourceType: 'module'};
-const wire_result = parse_typescript_json('let a', typescript_json_options);
-const wire: string = wire_result.ok ? wire_result.json : '';
-const json_options: ParseJsonOptions = {sourceType: undefined};
-const css_wire = parse_css_json('a {}', json_options);
-const svelte_wire = parse_svelte_json('<p>x</p>');
-parse_typescript_json('let a', {sourceType: undefined});
-// @ts-expect-error a _json export returns the wire and takes no locations
-parse_css_json('a {}', {locations: true});
+// the span-only wire is the tree, stringified
+const wire: string = JSON.stringify(program);
 // @ts-expect-error the source type is TypeScript-only
 parse_svelte('<p>x</p>', {sourceType: 'module'});
 // @ts-expect-error an unknown option key
@@ -336,7 +320,7 @@ const location: SourceLocation | null = locator.loc_of(program.body[0]);
 const loc_of_returns: Exact<ReturnType<typeof locator.loc_of>, SourceLocation | null> = true;
 const again: Program = locator.reconstruct(program);
 const same: StyleSheetFile = reconstruct_locations(sheet, 'a {}');
-void [returns, root, wire, css_wire, svelte_wire, position, location, loc_of_returns, again, same];
+void [returns, root, wire, position, location, loc_of_returns, again, same];
 `;
 
 /** The type strip, over the package root: the result narrows on `ok`, the error on

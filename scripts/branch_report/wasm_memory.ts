@@ -63,9 +63,9 @@ const language_of = (path: string): Language =>
 const EXPORTS: Readonly<Record<Surface, Readonly<Record<Language, string>>>> = {
 	format: { typescript: 'format_typescript', svelte: 'format_svelte', css: 'format_css' },
 	parse: {
-		typescript: 'parse_typescript_json',
-		svelte: 'parse_svelte_json',
-		css: 'parse_css_json'
+		typescript: 'parse_tape_typescript',
+		svelte: 'parse_tape_svelte',
+		css: 'parse_tape_css'
 	}
 };
 

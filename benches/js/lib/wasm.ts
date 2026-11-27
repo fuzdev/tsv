@@ -13,7 +13,7 @@
  * The `parse` and `format` rows call the published API over these exports — the
  * packages' facade, wired as the staged `parse.js` / `index.js` wire it over the web-target
  * glue (`parse_<lang>` decoding `parse_tape_<lang>`'s tape, a view of the instance's linear
- * memory, beside `parse_<lang>_json`). So what stands between these rows and the package is
+ * memory). So what stands between these rows and the package is
  * the wasm-bindgen TARGET's glue alone: same engine, same facade. See `lib/tsv_api.ts`.
  */
 
@@ -30,22 +30,17 @@ import type { InitScope } from './types.ts';
  * (`'script'` / `'module'`; omitted = none named). Svelte and CSS REJECT a set one
  * rather than ignoring it (`crates/tsv_wasm/src/lib.rs`'s `wasm_source_type`), so
  * `TsvBinding` withholds it for them. `parse_tape_<lang>` returns the tape as a `Uint32Array`
- * view of the instance's linear memory, valid until the next call into it;
- * `parse_<lang>_json` returns the wire string itself; each returns a parse failure as
- * `{ok: false, error}`. (The raw `parse_<lang>`, the wire `JSON.parse`d engine-side, no
- * published entry calls, so no row does.)
+ * view of the instance's linear memory, valid until the next call into it; each returns a parse
+ * failure as `{ok: false, error}`. The module emits no JSON wire.
  */
 interface WasmModule {
 	parse_tape_svelte: EngineFn<Uint32Array | EngineFailure>;
-	parse_svelte_json: EngineFn<string | EngineFailure>;
 	parse_internal_svelte: EngineFn<EngineFailure | undefined>;
 	format_svelte: EngineFn<string | EngineFailure>;
 	parse_tape_typescript: EngineFn<Uint32Array | EngineFailure>;
-	parse_typescript_json: EngineFn<string | EngineFailure>;
 	parse_internal_typescript: EngineFn<EngineFailure | undefined>;
 	format_typescript: EngineFn<string | EngineFailure>;
 	parse_tape_css: EngineFn<Uint32Array | EngineFailure>;
-	parse_css_json: EngineFn<string | EngineFailure>;
 	parse_internal_css: EngineFn<EngineFailure | undefined>;
 	format_css: EngineFn<string | EngineFailure>;
 }
@@ -84,18 +79,13 @@ export class WasmImplementation extends TsvBinding {
 			module = createRequire(import.meta.url)(wasm_path);
 		}
 
-		// The bundle's flat exports, the tape exports beneath `parse_<lang>` and the wire
-		// beneath `parse_<lang>_json` — the staged `parse.js`'s own wiring.
+		// The bundle's flat exports, the tape exports beneath `parse_<lang>` — the staged
+		// `parse.js`'s own wiring.
 		this.bind({
 			parse_tape: {
 				svelte: module.parse_tape_svelte,
 				typescript: module.parse_tape_typescript,
 				css: module.parse_tape_css
-			},
-			parse_json: {
-				svelte: module.parse_svelte_json,
-				typescript: module.parse_typescript_json,
-				css: module.parse_css_json
 			},
 			format: {
 				svelte: module.format_svelte,
@@ -115,10 +105,9 @@ export class WasmImplementation extends TsvBinding {
 		// a stale bundle whose parse still emits the loc-bearing wire can't be timed under the
 		// span rows' label — the freshness guard refuses such a bundle unless
 		// `BENCH_STALE_OK=1`, and this is what still stands then. The tape probe is the
-		// fairness guard the parse rows need: the row's parse runs through the tape export
-		// and decodes, in the published wiring, to the tree `JSON.parse` makes of the
-		// `_json` wire — so no glue or build regression can hand the rows a cheaper product
-		// than the packages' (`lib/tape_probe.ts`).
+		// fairness guard the parse rows need: the row's parse runs through the tape export in
+		// the published wiring, and its tape decodes — so no glue or build regression can hand
+		// the rows a cheaper product than the packages' (`lib/tape_probe.ts`).
 		this.probe(
 			'tsv (WASM)',
 			{ path: wasm_path, rebuild: `npm run build:wasm:all:${target}` },

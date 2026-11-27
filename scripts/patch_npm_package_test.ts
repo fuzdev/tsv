@@ -45,7 +45,6 @@ export function format_css(source, source_type) {}
 export function format_svelte(source, source_type) {}
 export function format_typescript(source, source_type) {}
 export function parse_internal_bench(source) {}
-export function parse_tape_bench(source) {}
 const IgnoreStackFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(ptr => wasm.__wbg_ignorestack_free(ptr, 1));
@@ -275,7 +274,6 @@ export function format_css(source, source_type) {}
 export function format_svelte(source, source_type) {}
 export function format_typescript(source, source_type) {}
 export function parse_internal_bench(source) {}
-export function parse_tape_bench(source) {}
 const IgnoreStackFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
     : new FinalizationRegistry(({ ptr, gen }) => {
@@ -699,19 +697,25 @@ const REFUSALS: Array<[name: string, variant: string, glue: string, error: strin
 		'no parse exports in the all variant',
 		'all',
 		GLUE,
-		'FAIL: all variant has no parse_* exports — was `--features parse` passed?'
+		'FAIL: all variant has no parse_tape_* exports — was `--features parse` passed?'
 	],
 	[
 		'no type strip in the all variant',
 		'all',
-		GLUE + 'export function parse_css(source) {}\n',
+		GLUE + 'export function parse_tape_css(source) {}\n',
 		'FAIL: generated tsv_wasm.js is missing expected export `strip_typescript` — was the default `strip` feature dropped?'
 	],
 	[
 		'parse exports in the format variant',
 		'format',
-		GLUE + 'export function parse_css(source) {}\n',
-		'FAIL: format variant contains parse_* exports — stale build dir?'
+		GLUE + 'export function parse_tape_css(source) {}\n',
+		'FAIL: format variant contains parse_tape_* exports — stale build dir?'
+	],
+	[
+		'a raw parse export beside the tape',
+		'all',
+		GLUE + 'export function parse_tape_css(source) {}\nexport function parse_css_json(source) {}\n',
+		'FAIL: generated tsv_wasm.js exports raw parse function(s) the facade does not publish (parse_css_json) — stale build dir?'
 	],
 	[
 		'strip exports in the format variant',
@@ -821,18 +825,14 @@ test('with no gzip the package is written and the summary fails', async () => {
 	);
 });
 
-/** The glue of a parse-only build: no class, and per language the three raw parse exports the
- * split reads (the object parse, the wire string, the tape) beside the engine-only bench one. */
+/** The glue of a parse-only build: no class, and per language the raw tape export the split
+ * decodes through. */
 const GLUE_PARSE =
 	GLUE.replace(/^export class IgnoreStack[\s\S]*?^}\n/m, '')
 		.replace(/^export function format_\w+\(.*\n/gm, '')
 		.replace(/^const IgnoreStackFinalization[\s\S]*?\);\n/m, '') +
 	['css', 'svelte', 'typescript']
-		.flatMap((l) => [
-			`export function parse_${l}(source, source_type) {}`,
-			`export function parse_${l}_json(source, source_type) {}`,
-			`export function parse_tape_${l}(source, source_type) {}`
-		])
+		.flatMap((l) => [`export function parse_tape_${l}(source, source_type) {}`])
 		.join('\n') +
 	'\n';
 
@@ -846,8 +846,7 @@ test('parse: the ./parse entry decodes the tape, and the root re-exports it whol
 	ok(parse_js.includes("import './node_init.js';"), parse_js);
 	ok(parse_js.includes('parse: create_tape_parse({'), parse_js);
 	ok(parse_js.includes('typescript: _parse_tape_typescript })'), parse_js);
-	ok(parse_js.includes('typescript: _parse_typescript_json }\n'), parse_js);
-	ok(!/\b_parse_typescript\b/.test(parse_js), 'the raw object parse is not the facade engine');
+	ok(!parse_js.includes('_json'), 'no JSON wire reaches the facade');
 	const parse_browser_js = await pkg.read_text('parse_browser.js');
 	ok(parse_browser_js.includes("import { _guarded } from './lazy.js';"), parse_browser_js);
 	ok(parse_browser_js.includes('_guarded(_parse_tape_typescript)'), parse_browser_js);

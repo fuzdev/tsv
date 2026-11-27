@@ -61,7 +61,7 @@ export const is_depth_refusal = (message: string): boolean =>
 
 /**
  * The calls a shape is graded through at its depth, each `[phase, call]`, in order: the
- * parse (the object form, with and without `{locations: true}`, and the `_json` string),
+ * parse (with and without `{locations: true}`),
  * the format, the format OUTPUT parsed again and formatted to itself (F1 — the output nests
  * deeper in frames than the input, since the printer adds the pairs the input's parse only
  * charged, as the native gate's reparse of it grades), the import records (TypeScript and
@@ -80,7 +80,6 @@ export const shape_calls = (
 	return [
 		['parse', () => tsv[`parse_${lang}`](source)],
 		['parse+locations', () => tsv[`parse_${lang}`](source, { locations: true })],
-		['parse_json', () => tsv[`parse_${lang}_json`](source)],
 		['format', () => (formatted = tsv[`format_${lang}`](source))],
 		[
 			'format output',
@@ -89,7 +88,7 @@ export const shape_calls = (
 					return { ok: false, error: { message: 'the format returned no output to reparse' } };
 				}
 				const output: string = formatted.code;
-				const reparsed = tsv[`parse_${lang}_json`](output);
+				const reparsed = tsv[`parse_${lang}`](output);
 				if (reparsed?.ok !== true) return reparsed;
 				const again = tsv[`format_${lang}`](output);
 				if (again?.ok !== true) return again;

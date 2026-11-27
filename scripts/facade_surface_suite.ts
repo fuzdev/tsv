@@ -44,7 +44,7 @@ export function register_facade_surface_suite(
 				([, value]) => typeof value === 'function'
 			);
 			assert.ok(
-				functions.length > 5,
+				functions.length >= 3,
 				`expected the published functions, found ${functions.length}`
 			);
 			for (const [name, value] of functions) {

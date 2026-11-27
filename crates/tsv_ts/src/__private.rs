@@ -1985,12 +1985,12 @@ pub fn convert_ast_json_bytes_with_locations<'a>(
     ast::convert::write_program_bytes(parsed.into(), source, tsv_lang::Wire::Loc)
 }
 
-/// The `String` form of `convert_ast_json_bytes` for `&str` boundaries (the WASM
-/// binding's `JSON.parse`, N-API strings): same wire bytes plus one UTF-8 validation of
-/// the output. Byte-oriented consumers should prefer the bytes variant.
+/// The `String` form of `convert_ast_json_bytes` for `&str` boundaries (`parse_to_json`):
+/// same wire bytes plus one UTF-8 validation of the output. Byte-oriented consumers should
+/// prefer the bytes variant.
 ///
-/// There is no `_with_locations` `String` twin: the bindings this form serves ship the
-/// span-only wire alone, and `parse_to_json_with` validates the loc-bearing bytes itself.
+/// There is no `_with_locations` `String` twin: `parse_to_json_with` validates the
+/// loc-bearing bytes itself.
 #[cfg(feature = "json")]
 #[expect(clippy::expect_used)]
 pub fn convert_ast_json_string<'a>(parsed: impl Into<ParsedRef<'a>>, source: &str) -> String {

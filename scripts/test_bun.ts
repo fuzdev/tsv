@@ -1,18 +1,18 @@
 /**
- * The parse-failure table (`scripts/parse_failure_suite.ts`) over the staged npm packages
- * under BUN, for both engines — the one supported runtime no other package suite runs. Each
- * engine BUILDS the failure it returns (`failure_result` in `crates/tsv_wasm/src/lib.rs` and
- * in `crates/tsv_napi/src/lib.rs`), and the facade hands it back as it is, so what a Bun
- * caller reads is the object the engine built through JavaScriptCore's own object and
- * N-API paths: its keys, their order, its span and `loc` are graded here and nowhere else
- * under Bun. The type strip's API table (`scripts/strip_suite.ts`) rides along over the two
- * packages that carry the strip, since its refusal is built the same way, and so does the
- * import-records table (`scripts/imports_suite.ts`), whose failures are the same object. Every
- * package that parses also runs the tape route (`register_tape_route_suite`): `parse_<lang>`
- * decodes a tape handed over as a typed array — over the native addon a copy napi-rs makes into
- * a buffer JavaScriptCore allocates, a path only a Bun run exercises — into the tree
- * `JSON.parse` makes of the JSON wire. Where a root formats, its parse family is imported from
- * the `./parse` entry beside it.
+ * The parse-failure table (`scripts/parse_failure_suite.ts`) over the staged npm packages under
+ * BUN, for both engines — the one supported runtime no other package suite runs. Each engine BUILDS
+ * the failure it returns (`failure_result` in `crates/tsv_wasm/src/lib.rs` and in
+ * `crates/tsv_napi/src/lib.rs`), and the facade hands it back as it is, so what a Bun caller reads
+ * is the object the engine built through JavaScriptCore's own object and N-API paths: its keys,
+ * their order, its span and `loc` are graded here and nowhere else under Bun. The type strip's API
+ * table (`scripts/strip_suite.ts`) rides along over the two packages that carry the strip, since
+ * its refusal is built the same way, and so does the import-records table
+ * (`scripts/imports_suite.ts`), whose failures are the same object. Every package that parses also
+ * runs the tape route (`register_tape_route_suite`): `parse_<lang>` decodes a tape handed over as a
+ * typed array — over the native addon a copy napi-rs makes into a buffer JavaScriptCore allocates,
+ * a path only a Bun run exercises — into the tree the same package decodes under Node, key order
+ * included (a `node` child of the suite; Node's decode is held to the native wire by the package
+ * suites). Where a root formats, its parse family is imported from the `./parse` entry beside it.
  *
  * Narrow by design. The package suites themselves run under `bun test` nearly whole, but
  * their CLI and resolution rows assert Node's own behavior; this registers the shared
@@ -74,26 +74,41 @@ const IMPORTS_PACKAGES: ReadonlySet<Package> = new Set(['all', 'napi']);
 /** The packages whose root formats, so their parse family is the `./parse` entry's. */
 const PARSE_SUBPATH_PACKAGES: ReadonlySet<Package> = new Set(['all', 'napi']);
 
+/** The tape route's probe sources: a BOM (counted for TypeScript, elided for Svelte and CSS),
+ * astral and non-ASCII text, a template, a comment and numbers, per language. */
+const TAPE_ROUTE_SOURCES = [
+	['typescript', '\ufeffconst é = `x${1}😀`; /* c */ let a = [1, 2.5, -0];'],
+	['svelte', '\ufeff<div title="é" {...a}>{b}😀</div><style>a { color: red }</style>'],
+	['css', '\ufeff@media (min-width: 1px) { a::before { content: "é" } }']
+] as const;
+
 /**
  * The tape route under Bun: `parse_<lang>` decodes the engine's tape — over the native addon a
  * typed array napi-rs copies into a buffer the engine owns, over WASM a view of the instance's
- * memory — into the tree `JSON.parse` makes of `parse_<lang>_json`'s wire, key order included.
+ * memory — into the tree the same package's `parse_<lang>` returns under Node, key order
+ * included: `entry` is imported by a `node` child, which prints each tree's `JSON.stringify`.
  */
-function register_tape_route_suite(label: string, api: Record<string, any>): void {
+function register_tape_route_suite(label: string, api: Record<string, any>, entry: string): void {
 	describe(`tape route: ${label}`, () => {
-		it('parse_<lang> is the JSON wire, read back', () => {
-			for (const [language, source] of [
-				['typescript', '\ufeffconst é = `x${1}😀`; /* c */ let a = [1, 2.5, -0];'],
-				['svelte', '\ufeff<div title="é" {...a}>{b}😀</div><style>a { color: red }</style>'],
-				['css', '\ufeff@media (min-width: 1px) { a::before { content: "é" } }']
-			] as const) {
-				for (let i = 0; i < 3; i++) {
+		it('parse_<lang> is the tree Node decodes', () => {
+			const script =
+				`const api = await import(${JSON.stringify(pathToFileURL(entry).href)});\n` +
+				`const sources = ${JSON.stringify(TAPE_ROUTE_SOURCES)};\n` +
+				'process.stdout.write(JSON.stringify(sources.map(([l, s]) => ' +
+				'JSON.stringify(api[`parse_${l}`](s).ast))));\n';
+			const node = spawnSync('node', ['--input-type=module', '-e', script], {
+				encoding: 'utf8',
+				env
+			});
+			assert.equal(node.status, 0, `node: ${node.error ?? node.stderr}`);
+			const under_node: Array<string> = JSON.parse(node.stdout);
+			TAPE_ROUTE_SOURCES.forEach(([language, source], i) => {
+				for (let n = 0; n < 3; n++) {
 					const tape = api[`parse_${language}`](source);
-					const json = api[`parse_${language}_json`](source);
 					assert.equal(tape.ok, true, language);
-					assert.equal(JSON.stringify(tape.ast), JSON.stringify(JSON.parse(json.json)), language);
+					assert.equal(JSON.stringify(tape.ast), under_node[i], language);
 				}
-			}
+			});
 		});
 	});
 }
@@ -182,7 +197,7 @@ async function register(packages: Array<string>): Promise<void> {
 
 	// every import ahead of the first `describe`: a top-level await after one yields to a
 	// runner that may already be draining what is registered
-	const apis: Array<[string, Record<string, unknown>, Package]> = [];
+	const apis: Array<[string, Record<string, unknown>, Package, string]> = [];
 	for (const p of named) {
 		let name: string;
 		if (p === 'napi') {
@@ -203,11 +218,11 @@ async function register(packages: Array<string>): Promise<void> {
 			`export * from ${JSON.stringify(name)};\n` +
 				(PARSE_SUBPATH_PACKAGES.has(p) ? `export * from ${JSON.stringify(`${name}/parse`)};\n` : '')
 		);
-		apis.push([name, await import(pathToFileURL(entry).href), p]);
+		apis.push([name, await import(pathToFileURL(entry).href), p, entry]);
 	}
-	for (const [name, api, p] of apis) {
+	for (const [name, api, p, entry] of apis) {
 		register_parse_failure_suite(`${name} under Bun`, api);
-		if (p !== 'format') register_tape_route_suite(`${name} under Bun`, api);
+		if (p !== 'format') register_tape_route_suite(`${name} under Bun`, api, entry);
 		// the strip's refusal is an engine-built object too, returned through the same path
 		if (STRIP_PACKAGES.has(p)) register_strip_api_suite(`${name} under Bun`, api);
 		if (IMPORTS_PACKAGES.has(p)) register_imports_api_suite(`${name} under Bun`, api);

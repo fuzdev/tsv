@@ -210,8 +210,8 @@ without `parse_to_json*`.
 | `parse_imports_typescript(src, {sourceType})`          | `tsv_ts::parse_imports` / `parse_imports_with_goal`                        |
 | `parse_imports_svelte(src)`                            | `tsv_svelte::parse_imports`                                                |
 | -                                                      | `tsv_ts::strip_with_imports`: the strip and the records from one parse     |
-| `parse_typescript_json(src, {sourceType})`             | `tsv_ts::parse_to_json` / `parse_to_json_with` with `JsonOptions::goal`    |
-| `parse_typescript(src)` (an object)                    | - (`parse_to_json` and a JSON reader)                                      |
+| `JSON.stringify(parse_typescript(src, {sourceType}).ast)` | `tsv_ts::parse_to_json` / `parse_to_json_with` with `JsonOptions::goal`    |
+| `parse_typescript(src, {sourceType})` (an object)      | - (`parse_to_json` and a JSON reader)                                      |
 | `parse_*(src, {locations: true})`, `reconstruct_locations` | `JsonOptions::new().locations(true)` (`locations` feature)                 |
 | `{ok: false, error}`                                   | `Err(Error)` (strip: `Err(StripError)`)                                    |
 | `error.kind` `'parse'` / `'refused'` / `'unsupported'` | `ErrorKind::Syntax` or `TooDeep` / `ErrorKind::Refusal` / `StripError::Unsupported` |

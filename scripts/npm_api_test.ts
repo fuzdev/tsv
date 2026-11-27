@@ -35,7 +35,7 @@ const span_wire = (type: string, source: string): string =>
 	JSON.stringify({ type, start: 0, end: source.length, body: [] });
 
 /** A fake engine over all three languages that records every call it gets. */
-function fake_engine(with_object_parse: boolean) {
+function fake_engine() {
 	const calls: Array<Call & { op: string; language: string }> = [];
 	const roots: Record<string, string> = {
 		svelte: 'Root',
@@ -55,15 +55,10 @@ function fake_engine(with_object_parse: boolean) {
 	return {
 		calls,
 		engine: {
-			parse_json: family('parse_json', (language, source) => span_wire(roots[language], source)),
-			...(with_object_parse
-				? {
-						parse: family('parse', (language, source) => ({
-							ok: true,
-							ast: JSON.parse(span_wire(roots[language], source))
-						}))
-					}
-				: {}),
+			parse: family('parse', (language, source) => ({
+				ok: true,
+				ast: JSON.parse(span_wire(roots[language], source))
+			})),
 			format: family('format', (_language, source) => `formatted:${source}`)
 		}
 	};
@@ -89,7 +84,7 @@ test('read_options: defaults — locations off, the source type unset', () => {
 	}
 	// a supported key set to `undefined` is its default, sourceType included on a
 	// language that refuses a set one — the forwarding idiom
-	for (const kind of ['parse', 'parse_json', 'format'] as const) {
+	for (const kind of ['parse', 'format'] as const) {
 		deepStrictEqual(read_options({ sourceType: undefined }, kind, 'svelte'), {
 			locations: false,
 			source_type: undefined
@@ -103,7 +98,7 @@ test('read_options: defaults — locations off, the source type unset', () => {
 		locations: true,
 		source_type: 'script'
 	});
-	deepStrictEqual(read_options({ sourceType: 'module' }, 'parse_json', 'typescript'), {
+	deepStrictEqual(read_options({ sourceType: 'module' }, 'parse', 'typescript'), {
 		locations: false,
 		source_type: 'module'
 	});
@@ -190,8 +185,8 @@ test('read_options: every refusal, word for word', () => {
 		"unknown parse option 'x' (expected 'locations')"
 	);
 	throws_type_error(
-		() => read_options({ x: 1 }, 'parse_json', 'typescript'),
-		"unknown parse option 'x' (expected 'sourceType')"
+		() => read_options({ x: 1 }, 'strip', 'typescript'),
+		"unknown strip option 'x' (expected 'sourceType')"
 	);
 	// an unknown key is quoted by the same rule as a refused value, in both copies
 	throws_type_error(
@@ -210,16 +205,9 @@ test('read_options: every refusal, word for word', () => {
 		() => read_options({ anything: true }, 'format', 'css'),
 		"unknown format option 'anything' (this export takes no options)"
 	);
-	// a `_json` export: `locations` gets its own explanation, naming the export's language,
-	// and any other unknown key the ordinary refusal
 	throws_type_error(
-		() => read_options({ locations: undefined }, 'parse_json', 'typescript'),
-		"parse option 'locations' is not supported by parse_typescript_json — the JSON string " +
-			'is the span-only wire; use parse_typescript(source, {locations: true})'
-	);
-	throws_type_error(
-		() => read_options({ x: 1 }, 'parse_json', 'css'),
-		"unknown parse option 'x' (this export takes no options)"
+		() => read_options({ locations: undefined }, 'strip', 'typescript'),
+		"unknown strip option 'locations' (expected 'sourceType')"
 	);
 });
 
@@ -261,26 +249,24 @@ test('read_options: a non-plain object reads as a keyless bag — all defaults',
 });
 
 test('parse: the span tree by default, `loc` reconstructed on request', () => {
-	for (const with_object_parse of [true, false]) {
-		const { engine, calls } = fake_engine(with_object_parse);
-		const api = create_parse_api(engine);
-		const source = 'let x = 1;\nx;';
-		const ast = api.parse_typescript(source);
-		deepStrictEqual(ast, { ok: true, ast: JSON.parse(span_wire('Program', source)) });
-		strictEqual(calls.at(-1)?.op, with_object_parse ? 'parse' : 'parse_json');
-		const located = api.parse_typescript(source, { locations: true }).ast;
-		deepStrictEqual(
-			located,
-			reconstruct_locations(JSON.parse(span_wire('Program', source)), source, {
-				language: 'typescript'
-			})
-		);
-		deepStrictEqual(located.loc, { start: { line: 1, column: 0 }, end: { line: 2, column: 2 } });
-	}
+	const { engine, calls } = fake_engine();
+	const api = create_parse_api(engine);
+	const source = 'let x = 1;\nx;';
+	const ast = api.parse_typescript(source);
+	deepStrictEqual(ast, { ok: true, ast: JSON.parse(span_wire('Program', source)) });
+	strictEqual(calls.at(-1)?.op, 'parse');
+	const located = api.parse_typescript(source, { locations: true }).ast;
+	deepStrictEqual(
+		located,
+		reconstruct_locations(JSON.parse(span_wire('Program', source)), source, {
+			language: 'typescript'
+		})
+	);
+	deepStrictEqual(located.loc, { start: { line: 1, column: 0 }, end: { line: 2, column: 2 } });
 });
 
 test('parse: the language reaches the reconstruction (Svelte counts LF alone)', () => {
-	const { engine } = fake_engine(false);
+	const { engine } = fake_engine();
 	const api = create_parse_api(engine);
 	// a lone CR: a line under ECMAScript's rule, none under Svelte's
 	const source = 'a\rb';
@@ -672,11 +658,11 @@ test('reconstruct_locations: an in-tag comment is told by where it sits in the t
 });
 
 test('parse: the source type is forwarded, unset when not named', () => {
-	const { engine, calls } = fake_engine(false);
+	const { engine, calls } = fake_engine();
 	const api = create_parse_api(engine);
 	api.parse_typescript('x', { sourceType: 'script' });
-	api.parse_typescript_json('x');
-	api.parse_typescript_json('x', { sourceType: 'module' });
+	api.parse_typescript('x');
+	api.parse_typescript('x', { sourceType: 'module' });
 	api.parse_svelte('x', { sourceType: undefined });
 	deepStrictEqual(
 		calls.map((c) => c.source_type),
@@ -684,34 +670,22 @@ test('parse: the source type is forwarded, unset when not named', () => {
 	);
 });
 
-test('parse_*_json: the wire string untouched, and `locations` refused with a pointer', () => {
-	const { engine, calls } = fake_engine(true);
+test('parse: a refused bag never reaches the engine', () => {
+	const { engine, calls } = fake_engine();
 	const api = create_parse_api(engine);
-	deepStrictEqual(api.parse_css_json('a{}'), {
-		ok: true,
-		json: span_wire('StyleSheetFile', 'a{}')
-	});
-	// whatever the value, `undefined` included — the key itself is the mistake
-	for (const [language, value] of [
-		['typescript', false],
-		['css', true],
-		['svelte', undefined]
-	] as const) {
-		throws_type_error(
-			() => api[`parse_${language}_json`]('x', { locations: value }),
-			`parse option 'locations' is not supported by parse_${language}_json — the JSON ` +
-				`string is the span-only wire; use parse_${language}(source, {locations: true})`
-		);
-	}
-	strictEqual(calls.length, 1, 'a refused bag never reaches the engine');
 	throws_type_error(
 		() => api.parse_svelte('x', { sourceType: 'module' }),
 		"parse option 'sourceType' is only supported for TypeScript"
 	);
+	throws_type_error(
+		() => api.parse_css('x', { locations: 'yes' }),
+		"parse option 'locations' must be a boolean (got 'yes')"
+	);
+	strictEqual(calls.length, 0);
 });
 
 test('format: the source type forwarded, `locations` unknown', () => {
-	const { engine, calls } = fake_engine(false);
+	const { engine, calls } = fake_engine();
 	const api = create_format_api(engine.format);
 	deepStrictEqual(api.format_typescript('x', { sourceType: 'script' }), {
 		ok: true,
@@ -740,11 +714,11 @@ test('format: the source type forwarded, `locations` unknown', () => {
 });
 
 test('a non-string source is refused before the engine sees it', () => {
-	const { engine, calls } = fake_engine(false);
+	const { engine, calls } = fake_engine();
 	const api = { ...create_parse_api(engine), ...create_format_api(engine.format) };
 	for (const [name, noun] of [
 		['parse_typescript', 'parse'],
-		['parse_svelte_json', 'parse'],
+		['parse_svelte', 'parse'],
 		['format_css', 'format']
 	] as const) {
 		for (const [source, got] of [
@@ -765,30 +739,27 @@ test('a non-string source is refused before the engine sees it', () => {
 });
 
 test('the facade builds exactly the engine families it is handed', () => {
-	const { engine } = fake_engine(false);
+	const { engine } = fake_engine();
 	deepStrictEqual(Object.keys(create_format_api(engine.format)).sort(), [
 		'format_css',
 		'format_svelte',
 		'format_typescript'
 	]);
-	deepStrictEqual(Object.keys(create_parse_api({ parse_json: engine.parse_json })).sort(), [
+	deepStrictEqual(Object.keys(create_parse_api({ parse: engine.parse })).sort(), [
 		'parse_css',
-		'parse_css_json',
 		'parse_svelte',
-		'parse_svelte_json',
-		'parse_typescript',
-		'parse_typescript_json'
+		'parse_typescript'
 	]);
 });
 
 test('every function the facade builds is named for its export', () => {
-	const { engine } = fake_engine(true);
+	const { engine } = fake_engine();
 	const api = { ...create_parse_api(engine), ...create_format_api(engine.format) };
 	for (const [name, f] of Object.entries(api)) strictEqual(f.name, name);
 });
 
 test('a source that is not well-formed UTF-16 is refused, naming its offset', () => {
-	const { engine, calls } = fake_engine(true);
+	const { engine, calls } = fake_engine();
 	const api: Record<string, (source: string) => unknown> = {
 		...create_parse_api(engine),
 		...create_format_api(engine.format)
@@ -830,10 +801,9 @@ test('a source that is not well-formed UTF-16 is refused, naming its offset', ()
 
 /**
  * The whole published surface over an engine whose every call ends on `make()` (a fresh
- * value per call): throwing it, or returning it in the product's place — with or without the
- * engine-side object parse.
+ * value per call): throwing it, or returning it in the product's place.
  */
-function failing_api(make: () => unknown, mode: 'throw' | 'return', with_object_parse: boolean) {
+function failing_api(make: () => unknown, mode: 'throw' | 'return') {
 	const calls: Array<string> = [];
 	const family = (op: string) =>
 		Object.fromEntries(
@@ -846,10 +816,7 @@ function failing_api(make: () => unknown, mode: 'throw' | 'return', with_object_
 				}
 			])
 		);
-	const engine = {
-		parse_json: family('parse_json'),
-		...(with_object_parse ? { parse: family('parse') } : {})
-	};
+	const engine = { parse: family('parse') };
 	const api: Record<string, (source: any, options?: unknown) => unknown> = {
 		...create_parse_api(engine),
 		...create_format_api(family('format'))
@@ -858,8 +825,7 @@ function failing_api(make: () => unknown, mode: 'throw' | 'return', with_object_
 }
 
 /** `failing_api` over an engine that throws. */
-const throwing_api = (make_thrown: () => unknown, with_object_parse: boolean) =>
-	failing_api(make_thrown, 'throw', with_object_parse);
+const throwing_api = (make_thrown: () => unknown) => failing_api(make_thrown, 'throw');
 
 /** What `f` throws. */
 const caught = (f: () => unknown): unknown => {
@@ -873,11 +839,8 @@ const caught = (f: () => unknown): unknown => {
 
 const PUBLISHED = [
 	'parse_svelte',
-	'parse_svelte_json',
 	'parse_typescript',
-	'parse_typescript_json',
 	'parse_css',
-	'parse_css_json',
 	'format_svelte',
 	'format_typescript',
 	'format_css'
@@ -897,42 +860,30 @@ const engine_failure = (kind: string) => ({
 });
 
 test("a returned engine failure of kind 'parse' is the result, as it is", () => {
-	for (const with_object_parse of [true, false]) {
-		let last: unknown;
-		const { api } = failing_api(
-			() => (last = engine_failure('parse')),
-			'return',
-			with_object_parse
-		);
-		for (const name of PUBLISHED) {
-			// the very object the engine built: nothing copied, nothing added
-			strictEqual(api[name]('x\nx y'), last, name);
-		}
+	let last: unknown;
+	const { api } = failing_api(() => (last = engine_failure('parse')), 'return');
+	for (const name of PUBLISHED) {
+		// the very object the engine built: nothing copied, nothing added
+		strictEqual(api[name]('x\nx y'), last, name);
 	}
 });
 
 test("a format's returned refusal is the result; a parse export throws it", () => {
-	for (const with_object_parse of [true, false]) {
-		let last: unknown;
-		const { api } = failing_api(
-			() => (last = engine_failure('refused')),
-			'return',
-			with_object_parse
-		);
-		for (const name of PUBLISHED) {
-			if (name.startsWith('format_')) {
-				strictEqual(api[name]('x'), last, name);
-				continue;
-			}
-			// only a format refuses a source that parses: from a parse export it is an engine bug
-			const error = caught(() => api[name]('x')) as Error;
-			strictEqual(
-				error.message,
-				'internal error: the engine returned neither its product nor a failure',
-				name
-			);
-			strictEqual(error.cause, last, name);
+	let last: unknown;
+	const { api } = failing_api(() => (last = engine_failure('refused')), 'return');
+	for (const name of PUBLISHED) {
+		if (name.startsWith('format_')) {
+			strictEqual(api[name]('x'), last, name);
+			continue;
 		}
+		// only a format refuses a source that parses: from a parse export it is an engine bug
+		const error = caught(() => api[name]('x')) as Error;
+		strictEqual(
+			error.message,
+			'internal error: the engine returned neither its product nor a failure',
+			name
+		);
+		strictEqual(error.cause, last, name);
 	}
 });
 
@@ -944,8 +895,8 @@ test('a malformed returned failure is thrown as an engine bug, the value its cau
 		return { ok: false, error };
 	};
 	const values: Array<() => unknown> = [
-		// a string is the product, so neither of these is reachable as a failure on a string
-		// export — but an object parse's product must be `{ok: true, ast}`
+		// a string is a format's product, so neither of these is reachable as a failure there —
+		// but a parse's product must be `{ok: true, ast}`
 		() => ({ ok: false }),
 		() => ({ ok: false, error: null }),
 		() => ({ ok: 'false', error: complete.error }),
@@ -982,28 +933,23 @@ test('a malformed returned failure is thrown as an engine bug, the value its cau
 		() => undefined
 	];
 	for (const make of values) {
-		for (const with_object_parse of [true, false]) {
-			let last: unknown;
-			const { api } = failing_api(() => (last = make()), 'return', with_object_parse);
-			for (const name of PUBLISHED) {
-				const error = caught(() => api[name]('x')) as Error;
-				strictEqual(
-					error.message,
-					'internal error: the engine returned neither its product nor a failure',
-					name
-				);
-				strictEqual(error.cause, last, name);
-			}
+		let last: unknown;
+		const { api } = failing_api(() => (last = make()), 'return');
+		for (const name of PUBLISHED) {
+			const error = caught(() => api[name]('x')) as Error;
+			strictEqual(
+				error.message,
+				'internal error: the engine returned neither its product nor a failure',
+				name
+			);
+			strictEqual(error.cause, last, name);
 		}
 	}
 });
 
-test("an object parse's `{ok: true}` without an `ast` is thrown as an engine bug", () => {
+test("a parse's `{ok: true}` without an `ast` is thrown as an engine bug", () => {
 	for (const returned of [{ ok: true }, { ok: true, json: '{}' }]) {
-		const api = create_parse_api({
-			parse_json: { typescript: () => '{}' },
-			parse: { typescript: () => returned }
-		});
+		const api = create_parse_api({ parse: { typescript: () => returned } });
 		const error = caught(() => api.parse_typescript('x')) as Error;
 		strictEqual(
 			error.message,
@@ -1029,37 +975,22 @@ test('anything an engine throws passes through as the same object', () => {
 		() => undefined
 	];
 	for (const make of values) {
-		for (const with_object_parse of [true, false]) {
-			let last: unknown;
-			const { api } = throwing_api(() => (last = make()), with_object_parse);
-			for (const name of PUBLISHED) {
-				const error = caught(() => api[name]('x'));
-				strictEqual(error, last, name);
-			}
+		let last: unknown;
+		const { api } = throwing_api(() => (last = make()));
+		for (const name of PUBLISHED) {
+			const error = caught(() => api[name]('x'));
+			strictEqual(error, last, name);
 		}
 	}
 });
 
 test('argument refusals stay TypeErrors and never reach the engine', () => {
-	const { api, calls } = failing_api(() => engine_failure('parse'), 'return', true);
+	const { api, calls } = failing_api(() => engine_failure('parse'), 'return');
 	for (const name of PUBLISHED) {
 		strictEqual(caught(() => api[name](42)) instanceof TypeError, true, name);
 		strictEqual(caught(() => api[name]('x', { nope: true })) instanceof TypeError, true, name);
 	}
 	strictEqual(calls.length, 0);
-});
-
-test("the facade's own JSON.parse failing is a thrown internal Error, not a result", () => {
-	const api = create_parse_api({
-		parse_json: { typescript: () => '{"type":"Program",' }
-	});
-	const error = caught(() => api.parse_typescript('x'));
-	strictEqual(error instanceof Error, true);
-	strictEqual(error instanceof SyntaxError, false);
-	strictEqual((error as Error).message, 'internal error: AST serialized to invalid JSON');
-	strictEqual((error as Error).cause instanceof SyntaxError, true);
-	// the string export hands the wire back untouched — it parses nothing
-	deepStrictEqual(api.parse_typescript_json('x'), { ok: true, json: '{"type":"Program",' });
 });
 
 test('an options read that throws reaches the caller as itself, before any engine call', () => {
@@ -1074,7 +1005,7 @@ test('an options read that throws reaches the caller as itself, before any engin
 			}
 		}
 	);
-	const { api, calls } = throwing_api(() => new Error('engine'), true);
+	const { api, calls } = throwing_api(() => new Error('engine'));
 	for (const name of PUBLISHED) {
 		strictEqual(
 			caught(() => api[name]('x', bag)),

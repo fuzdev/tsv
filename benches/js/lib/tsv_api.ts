@@ -65,18 +65,19 @@ export interface EngineFailure {
  * One binding's flat exports, keyed by language and resolved once, so a timed call
  * allocates no table.
  *
- * `parse_tape`, `parse_json` and `format` are what the facade's factories take.
- * `parse_tape` returns the tape as words (`docs/tape_format.md`) — over the WASM engine a
- * view of its linear memory and over the C FFI a view of the wrapper's result buffer, each
- * valid only until the binding's next call, which the facade's decode never outlives.
- * `parse_json` returns the span-only wire as a string (`parse_<lang>_json`). `parse_internal`
+ * `parse_tape` and `format` are what the facade's factories take. `parse_tape` returns the
+ * tape as words (`docs/tape_format.md`) — over the WASM engine a view of its linear memory and
+ * over the C FFI a view of the wrapper's result buffer, each valid only until the binding's
+ * next call, which the facade's decode never outlives. `parse_json`, the span-only wire as a
+ * string, is the C FFI's alone (`tsv_parse_<lang>`): the npm engines emit no JSON wire, so the
+ * tape probe compares a tree against it where a binding has it. `parse_internal`
  * is the bench-only parse that converts nothing: no package publishes it, so it is called
  * as is — its success value `undefined` (or the FFI's empty payload), its failure returned
  * as the others' is.
  */
 export interface TsvEngine {
 	parse_tape: Record<Language, EngineFn<Uint32Array | EngineFailure>>;
-	parse_json: Record<Language, EngineFn<string | EngineFailure>>;
+	parse_json?: Record<Language, EngineFn<string | EngineFailure>>;
 	format: Record<Language, EngineFn<string | EngineFailure>>;
 	parse_internal: Record<Language, EngineFn<unknown>>;
 }
@@ -90,15 +91,12 @@ type Outcome<K extends string, T> =
 
 /**
  * The parse family `engine` publishes, wired as every package's `./parse` entry wires it:
- * `parse_<lang>` over the tape route (`create_tape_parse` over the raw tape exports),
- * `parse_<lang>_json` over the JSON wire. One function for the timed table (`bind`) and the
- * tape probe's untimed twin (`lib/tape_probe.ts`), so the probe asks the wiring the rows run.
+ * `parse_<lang>` over the tape route (`create_tape_parse` over the raw tape exports). One
+ * function for the timed table (`bind`) and the tape probe's untimed twin (`lib/tape_probe.ts`),
+ * so the probe asks the wiring the rows run.
  */
 export const publish_parse = (engine: TapeProbeEngine): Record<string, Published<unknown>> =>
-	create_parse_api({
-		parse_json: engine.parse_json,
-		parse: create_tape_parse(engine.parse_tape)
-	});
+	create_parse_api({ parse: create_tape_parse(engine.parse_tape) });
 
 /** What `bind` leaves: the engine as given, and the facade's functions over it. */
 interface Bound {
@@ -182,7 +180,8 @@ export abstract class TsvBinding extends BaseImplementation {
 	 * The wrapper's init self-checks, run once `bind` has published the engine: every
 	 * row's call still THROWS on a source tsv rejects (`lib/reject_probe.ts`), the
 	 * parse wire is the span-only one (`lib/locations_probe.ts`), and the parse runs
-	 * through the tape and decodes to the `_json` wire's tree (`lib/tape_probe.ts`).
+	 * through the tape (`lib/tape_probe.ts`), decoding to the JSON wire's tree where the
+	 * binding emits one.
 	 * Through the wrapper's own methods, so each probes the call the rows make, facade
 	 * included.
 	 *

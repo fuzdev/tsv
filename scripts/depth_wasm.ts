@@ -7,7 +7,7 @@
  * memory, and its call frames on the engine's own, about 1 MiB on a V8 main thread. The
  * native gate (`npm run test:depth:napi`) grades neither, so this one runs the package
  * itself: for every shape, at its accepted `n`, the parse (the object form, with and
- * without `{locations: true}`, and the `_json` string), the format, the format's output
+ * without `{locations: true}`), the format, the format's output
  * parsed again and formatted to itself (F1), the import records — TypeScript and Svelte,
  * whose walk descends into what the strip refuses — and — TypeScript — the type strip must
  * each return `{ok: true, …}` (a strip's refusal is a verdict too), never
@@ -125,7 +125,7 @@ async function run_child(args: Map<string, string>): Promise<void> {
 			}
 		}
 		try {
-			const over = tsv[`parse_${shape.language}_json`](make_shape(shape, shape.n + 1));
+			const over = tsv[`parse_${shape.language}`](make_shape(shape, shape.n + 1));
 			if (over?.ok !== false || !is_depth_refusal(String(over.error?.message))) {
 				fail(
 					shape,

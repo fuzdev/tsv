@@ -25,7 +25,7 @@ The default (both features) is the full `libtsv_ffi` any FFI host links; the ben
 
 The `lang_bindings!` macro generates four `extern "C"` functions per language (svelte, typescript, css) — the full default build; the `format`/`parse` features gate which are emitted (see [Features](#features) above):
 
-- `tsv_parse_<lang>` — the span-only JSON AST (`start`/`end` offsets, no per-node `loc`; Svelte also no `name_loc`) — the one parse wire every binding emits. See [../tsv_ts/CLAUDE.md](../tsv_ts/CLAUDE.md) §Public API. The `loc`-bearing wire has no C-ABI export; the corpus tools ask `tsv_debug loc_wires --stdin` for it.
+- `tsv_parse_<lang>` — the span-only JSON AST (`start`/`end` offsets, no per-node `loc`; Svelte also no `name_loc`) — the one parse wire every binding emits, as JSON from this binding alone (the npm engines hand it over as the tape). See [../tsv_ts/CLAUDE.md](../tsv_ts/CLAUDE.md) §Public API. The `loc`-bearing wire has no C-ABI export; the corpus tools ask `tsv_debug loc_wires --stdin` for it.
 - `tsv_parse_internal_<lang>` — Empty payload (`*out_len == 0` with `TSV_STATUS_OK`; benchmark-only; AST is built but not converted/serialized — `std::hint::black_box` prevents elision)
 - `tsv_parse_tape_<lang>` — the tape, the binary parse wire ([../../docs/tape_format.md](../../docs/tape_format.md)): `tsv_parse_<lang>`'s wire written by the language's wire writer straight into words (its tape copy, through `tsv_arena`'s `parse_tape!`), `*out_len` its length in bytes. The one export whose payload is not a byte allocation — see the free rule below
 - `tsv_format_<lang>` — Formatted source

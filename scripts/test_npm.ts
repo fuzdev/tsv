@@ -62,7 +62,6 @@ import {
 	LONE_CR_TAG_COMMENT,
 	ok_ast,
 	ok_code,
-	ok_json,
 	register_parse_failure_suite
 } from './parse_failure_suite.ts';
 
@@ -460,7 +459,7 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 		const raw = await import(`../${pkg_dir}/tsv_wasm.js`);
 		const raw_typescript: (source: string, source_type?: unknown) => unknown = has_format
 			? raw.format_typescript
-			: raw.parse_typescript_json;
+			: raw.parse_tape_typescript;
 		for (const [value, kind] of [
 			[1, 'a number'],
 			[true, 'a boolean'],
@@ -520,7 +519,7 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 	// them would silently disable recovery); the poisoning is real (an ordinary input
 	// now traps too); the hook clears it; and recovery is repeatable.
 	it('reinstantiate recovers the instance after a poisoning trap', () => {
-		const call = has_format ? 'format_typescript' : 'parse_typescript_json';
+		const call = has_format ? 'format_typescript' : 'parse_typescript';
 		const source = `
 const tsv = await import(${JSON.stringify(pathToFileURL(join(repo_root, pkg_dir, 'index.js')).href)});
 const deep = 'x = ' + '['.repeat(250) + '1' + ']'.repeat(250) + ';';
@@ -667,7 +666,6 @@ console.log(JSON.stringify({ kinds, poisoned, recovered, again: healthy().ok }))
 	// the format-only build has no parser at all; the umbrella's is the `./parse` entry's alone
 	it('parse_* absent from a root that formats', { skip: !has_format }, () => {
 		assert.equal(node_entry.parse_typescript, undefined);
-		assert.equal(node_entry.parse_typescript_json, undefined);
 	});
 
 	it('reconstruct_locations absent from a root that formats', { skip: !has_format }, () => {
@@ -720,25 +718,18 @@ console.log(JSON.stringify({ kinds, poisoned, recovered, again: healthy().ok }))
 		plain.free();
 	});
 
-	// parse_X is defined as JSON.parse(parse_X_json(src)): each object parser returns its
-	// language's root, and its `_json` sibling the same tree as a string
-	it(
-		'parse_* return the root, parse_*_json the same tree as a string',
-		{ skip: !has_parse },
-		() => {
-			for (const [language, source, root] of [
-				['typescript', 'const x = 1;', 'Program'],
-				['svelte', '<div>x</div>', 'Root'],
-				['css', 'a { color: red }', 'StyleSheetFile']
-			]) {
-				const ast = ok_ast(parse_entry[`parse_${language}`](source));
-				assert.equal(ast.type, root);
-				const json = ok_json(parse_entry[`parse_${language}_json`](source));
-				assert.equal(typeof json, 'string');
-				assert.deepEqual(JSON.parse(json), ast);
-			}
+	// each parser returns its language's root, and no JSON-wire export rides beside it
+	it('parse_* return the root; no parse_*_json is published', { skip: !has_parse }, () => {
+		for (const [language, source, root] of [
+			['typescript', 'const x = 1;', 'Program'],
+			['svelte', '<div>x</div>', 'Root'],
+			['css', 'a { color: red }', 'StyleSheetFile']
+		]) {
+			const ast = ok_ast(parse_entry[`parse_${language}`](source));
+			assert.equal(ast.type, root);
+			assert.equal(parse_entry[`parse_${language}_json`], undefined);
 		}
-	);
+	});
 
 	it('parse: the span-only wire by default, `loc` on request', { skip: !has_parse }, () => {
 		const span_only = ok_ast(parse_entry.parse_typescript('const x = 1;'));
@@ -785,27 +776,12 @@ console.log(JSON.stringify({ kinds, poisoned, recovered, again: healthy().ok }))
 		);
 		assert.equal(composed.sourceType, 'script');
 		assert.ok(composed.loc);
-		// the `_json` export takes the source type too
-		assert.equal(
-			JSON.parse(
-				ok_json(parse_entry.parse_typescript_json('var await = 1;', { sourceType: 'script' }))
-			).sourceType,
-			'script'
-		);
 	});
 
 	it('parse options: the entries route through the shared facade', { skip: !has_parse }, () => {
 		assert.throws(() => parse_entry.parse_typescript('x;', { locatons: true }), {
 			name: 'TypeError',
 			message: "unknown parse option 'locatons' (expected 'locations' or 'sourceType')"
-		});
-		// the `_json` exports return the wire string itself, so they refuse `locations`,
-		// pointing at the object parser
-		assert.throws(() => parse_entry.parse_css_json('a{}', { locations: false }), {
-			name: 'TypeError',
-			message:
-				"parse option 'locations' is not supported by parse_css_json — the JSON string is " +
-				'the span-only wire; use parse_css(source, {locations: true})'
 		});
 		assert.throws(() => parse_entry.parse_svelte('<div>x</div>', { sourceType: 'module' }), {
 			name: 'TypeError',
@@ -863,8 +839,7 @@ describe(`raw engine parse failure (tsv_wasm.js): ${pkg_dir}`, () => {
 		const source = 'let a;\nconst = ;';
 		const calls: Array<() => any> = [];
 		if (has_parse) {
-			calls.push(() => raw.parse_typescript_json(source));
-			calls.push(() => raw.parse_typescript(source));
+			calls.push(() => raw.parse_tape_typescript(source));
 			calls.push(() => raw.parse_internal_typescript(source));
 		}
 		if (has_format) calls.push(() => raw.format_typescript(source));
@@ -883,14 +858,14 @@ describe(`raw engine parse failure (tsv_wasm.js): ${pkg_dir}`, () => {
 				loc: { start: { line: 2, column: 6 }, end: { line: 2, column: 6 } }
 			});
 		}
-		// a success is the product itself — the wire string, the formatted code — or, for the
-		// object parse, `{ok: true, ast}`
+		// a success is the product itself — the tape's words, the formatted code — and no raw
+		// export emits the JSON wire
 		if (has_parse) {
-			assert.equal(typeof raw.parse_typescript_json('x;'), 'string');
-			const parsed = raw.parse_typescript('x;');
-			assert.deepEqual(Object.keys(parsed), ['ok', 'ast']);
-			assert.equal(parsed.ast.type, 'Program');
+			assert.ok(raw.parse_tape_typescript('x;') instanceof Uint32Array);
 			assert.equal(raw.parse_internal_typescript('x;'), undefined);
+			for (const gone of ['parse_typescript', 'parse_typescript_json']) {
+				assert.equal(raw[gone], undefined, gone);
+			}
 		}
 		if (has_format) assert.equal(raw.format_typescript('x'), 'x;\n');
 	});
@@ -1184,7 +1159,7 @@ describe(`browser entry (browser.js): ${pkg_dir}`, () => {
 		// the `./parse` entry's guard reads the same flag
 		if (has_parse) {
 			assert.throws(() => browser_parse.parse_typescript('const x = 1'), /WASM not initialized/);
-			assert.throws(() => browser_parse.parse_css_json('a {}'), /WASM not initialized/);
+			assert.throws(() => browser_parse.parse_css('a {}'), /WASM not initialized/);
 		}
 	});
 
@@ -1253,7 +1228,7 @@ describe(`browser entry (browser.js): ${pkg_dir}`, () => {
 		assert.equal(ok_ast(browser_parse.parse_typescript('const x = 1;')).type, 'Program');
 		assert.deepEqual(
 			ok_ast(browser_parse.parse_svelte('<p>{a}</p>')),
-			JSON.parse(ok_json(browser_parse.parse_svelte_json('<p>{a}</p>')))
+			ok_ast(parse_entry.parse_svelte('<p>{a}</p>'))
 		);
 	});
 
@@ -1663,11 +1638,8 @@ console.log(JSON.stringify(report));
 						names: [
 							'create_locator',
 							'parse_css',
-							'parse_css_json',
 							'parse_svelte',
-							'parse_svelte_json',
 							'parse_typescript',
-							'parse_typescript_json',
 							'reconstruct_locations'
 						],
 						works: 'Program'
@@ -2247,8 +2219,12 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		const bare = run_cli(['parse', '--content', 'const x = 1;', '--parser', 'ts']);
 		assert.equal(bare.status, 0, bare.stderr);
 		assert.doesNotMatch(bare.stdout, /"loc"/);
-		// the default output is the engine's wire string, verbatim
-		assert.equal(bare.stdout, `${ok_json(parse_entry.parse_typescript_json('const x = 1;'))}\n`);
+		// the default output is the decoded tree, stringified (byte for byte the native CLI's
+		// wire: `scripts/test_napi_npm.ts` holds the two bins to it)
+		assert.equal(
+			bare.stdout,
+			`${JSON.stringify(ok_ast(parse_entry.parse_typescript('const x = 1;')))}\n`
+		);
 		// --locations is the facade's `{locations: true}`, stringified
 		const composed = run_cli([
 			'parse',

@@ -35,21 +35,20 @@
  * `README_parse.md`, and `README_all.md` are the canonical sources and ship
  * as each package's `README.md`.
  *
- * The raw exports are flat — `parse_<lang>(source, source_type?)`,
- * `parse_<lang>_json(…)`, `format_<lang>(…)` — and every entry publishes them
- * through the hand-written facade (`crates/tsv_wasm/npm/api.js` + `api_parse.js`,
- * shared with the native `@fuzdev/tsv`), which owns the `(source, options?)` bag,
- * its errors, and the `{locations: true}` sugar. The function list is extracted
- * from the generated `tsv_wasm.js` (every `export function format_*` / `parse_*`),
- * so adding a language to `lang_bindings!` flows through the entries with no
- * changes here. The engine-only exports (`ENGINE_ONLY_PREFIXES`: the bench's
- * `parse_internal_*`, the tape's `parse_tape_*`) are excluded. Its TYPES
- * do not flow through — the published declarations are the facade's hand-written
- * `facade_format.d.ts` / `facade_parse.d.ts`, so a new language also needs a declaration added
- * there. This script fails the build when one is missing (the declaration check
- * alongside the export validations), because the omission is otherwise silent all
- * the way to a consumer. The facade's option and error types are re-exported by the
- * names those files declare (`facade_type_names`).
+ * The raw exports are flat — `parse_tape_<lang>(source, source_type?)`, `format_<lang>(…)` — and
+ * every entry publishes them through the hand-written facade (`crates/tsv_wasm/npm/api.js` +
+ * `api_parse.js`, shared with the native `@fuzdev/tsv`), which owns the `(source, options?)` bag,
+ * its errors, and the `{locations: true}` sugar. The function list is extracted from the generated
+ * `tsv_wasm.js` (every `export function format_*` / `strip_*` / `parse_imports_*`, and a
+ * `parse_<lang>` per raw `parse_tape_<lang>`, which the facade decodes), so adding a language to
+ * `lang_bindings!` flows through the entries with no changes here. The engine-only exports
+ * (`ENGINE_ONLY_PREFIXES`: the bench's `parse_internal_*`, the tape's `parse_tape_*`) are not
+ * published. Its TYPES do not flow through — the published declarations are the facade's
+ * hand-written `facade_format.d.ts` / `facade_parse.d.ts`, so a new language also needs a
+ * declaration added there. This script fails the build when one is missing (the declaration check
+ * alongside the export validations), because the omission is otherwise silent all the way to a
+ * consumer. The facade's option and error types are re-exported by the names those files declare
+ * (`facade_type_names`).
  *
  * Every variant gets the facade's shared part (`api.js`: the options reader and the
  * format family; `facade_error.d.ts`, the `TsvError` shape and the `TsvParseError` every
@@ -238,7 +237,12 @@ export async function run_patch_npm_package(
 	// into the parse family's checks and wiring
 	const is_imports = (name: string): boolean => name.startsWith('parse_imports_');
 	const has_format = fns.some((name) => name.startsWith('format_'));
-	const has_parse = fns.some((name) => name.startsWith('parse_') && !is_imports(name));
+	// the raw tape exports the `./parse` entries decode through — engine-only, so read off the
+	// generated JS apart from the published names; each is a published `parse_<lang>`
+	const tape_fns = [...generated_js.matchAll(/^export function (parse_tape_\w+)/gm)].map(
+		(m) => m[1]!
+	);
+	const has_parse = tape_fns.length > 0;
 	if (has_format_exports) {
 		for (const name of expected_formats) {
 			if (!fns.includes(name)) {
@@ -252,12 +256,22 @@ export async function run_patch_npm_package(
 	}
 	if (has_parse_exports && !has_parse) {
 		print_error(
-			`FAIL: ${variant} variant has no parse_* exports — was \`--features parse\` passed?`
+			`FAIL: ${variant} variant has no parse_tape_* exports — was \`--features parse\` passed?`
 		);
 		return 1;
 	}
 	if (!has_parse_exports && has_parse) {
-		print_error(`FAIL: ${variant} variant contains parse_* exports — stale build dir?`);
+		print_error(`FAIL: ${variant} variant contains parse_tape_* exports — stale build dir?`);
+		return 1;
+	}
+	// no raw export of the parse family is published: the facade's `parse_<lang>` decodes the
+	// tape, and a raw `parse_*` beside it is an engine left behind
+	const stray_parse = fns.filter((name) => name.startsWith('parse_') && !is_imports(name));
+	if (stray_parse.length) {
+		print_error(
+			`FAIL: generated ${main_js} exports raw parse function(s) the facade does not publish ` +
+				`(${stray_parse.join(', ')}) — stale build dir?`
+		);
 		return 1;
 	}
 	const has_strip = fns.some((name) => name.startsWith('strip_'));
@@ -576,23 +590,11 @@ export function reinstantiate() {
 	const languages_of = (pattern: RegExp): Array<string> =>
 		fns.map((name) => pattern.exec(name)?.[1]).filter((l): l is string => l !== undefined);
 	const format_languages = languages_of(/^format_(\w+)$/);
-	const parse_languages = languages_of(/^parse_(\w+)_json$/);
-	// the raw tape exports the `./parse` entries decode through — engine-only, so read off the
-	// generated JS apart from the published names
-	const tape_fns = [...generated_js.matchAll(/^export function (parse_tape_\w+)/gm)].map(
-		(m) => m[1]!
-	);
-	for (const language of parse_languages) {
-		for (const raw of [`parse_${language}`, `parse_tape_${language}`]) {
-			if (!fns.includes(raw) && !tape_fns.includes(raw)) {
-				print_error(`FAIL: generated ${main_js} has \`parse_${language}_json\` but no \`${raw}\``);
-				return 1;
-			}
-		}
-	}
-	/** The names the facade publishes per family — the raw names, which it keeps. */
+	const parse_languages = tape_fns.map((name) => name.slice('parse_tape_'.length)).sort();
+	/** The names the facade publishes per family — the raw names, which it keeps, and the
+	 * parse family's `parse_<lang>` over each raw tape export. */
 	const format_fns = fns.filter((name) => name.startsWith('format_'));
-	const parse_fns = fns.filter((name) => name.startsWith('parse_') && !is_imports(name));
+	const parse_fns = parse_languages.map((language) => `parse_${language}`);
 	const strip_fns = fns.filter((name) => name.startsWith('strip_'));
 	const strip_languages = languages_of(/^strip_(\w+)$/);
 	const imports_fns = fns.filter(is_imports);
@@ -684,14 +686,10 @@ export function reinstantiate() {
 	const root_fns = fns.filter((name) => !parse_fns.includes(name));
 	const parse_reexport = variant === 'parse' ? `export * from './parse.js';\n` : '';
 	const parse_browser_reexport = variant === 'parse' ? `export * from './parse_browser.js';\n` : '';
-	const parse_raw = [
-		...parse_languages.map((l) => `parse_tape_${l}`),
-		...parse_languages.map((l) => `parse_${l}_json`)
-	];
+	const parse_raw = parse_languages.map((l) => `parse_tape_${l}`);
 	const parse_facade = (wrap: (raw: string) => string): string =>
 		`export const { ${parse_fns.join(', ')} } = create_parse_api({\n` +
-		`\tparse: create_tape_parse(${engine_table(parse_languages, (l) => wrap(`_parse_tape_${l}`))}),\n` +
-		`\tparse_json: ${engine_table(parse_languages, (l) => wrap(`_parse_${l}_json`))}\n});\n`;
+		`\tparse: create_tape_parse(${engine_table(parse_languages, (l) => wrap(`_parse_tape_${l}`))})\n});\n`;
 	const parse_imports =
 		`import {\n${parse_raw.map((f) => `\t${f} as _${f},`).join('\n')}\n} from './${main_js}';\n` +
 		`import { create_parse_api } from './${api_parse_file}';\n` +
@@ -1173,7 +1171,7 @@ export declare const wasm_module: WebAssembly.Module;
 				}
 			: {}),
 		// the reconstruction helper alone (a consumer holding a tree — from disk, another
-		// process, a `_json` export — reaches it without loading the engine); parse-capable
+		// process, the native CLI — reaches it without loading the engine); parse-capable
 		// variants only, like the helper itself
 		...(has_parse_exports ? { './locations': LOCATIONS_EXPORT } : {})
 	};

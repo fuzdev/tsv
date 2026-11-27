@@ -39,7 +39,7 @@ if (program.ok && stylesheet.ok) {
 
 Three parsers, each returning the AST its canonical parser returns: `parse_svelte` Svelte's modern `parse` AST, `parse_typescript` ESTree as acorn + acorn-typescript emit it, and `parse_css` Svelte's `parseCss` AST. Each takes a source `string` and an optional options object, and returns a result: `{ok: true, ast}`, or `{ok: false, error}` for a source that doesn't parse ([below](#errors-and-depth-limits)). The AST is **span-only** by default: `start`/`end` offsets on every node, no per-node `loc` (line/column) and no Svelte `name_loc` — pass `{locations: true}` for those.
 
-AST types are bundled in `tsv_ast.d.ts` and re-exported from the package — `import type` any node directly. The parsers read a compact binary form of the wire straight out of WASM memory and decode it to objects in JS — the same tree `JSON.parse` makes of the `_json` string, key order included.
+AST types are bundled in `tsv_ast.d.ts` and re-exported from the package — `import type` any node directly. The parsers read a compact binary form of the wire straight out of WASM memory and decode it to objects in JS — the same tree `JSON.parse` makes of the wire, key order included.
 
 The parse family is also the `@fuzdev/tsv-parse-wasm/parse` entry — the same functions and types, under the subpath `@fuzdev/tsv-wasm` and `@fuzdev/tsv` publish their parsers at, so switching packages changes only the package name:
 
@@ -55,7 +55,7 @@ if (parsed.ok) {
 
 To parse across threads, compile once and share: the main entry exports `wasm_module`, the compiled `WebAssembly.Module`, and the `@fuzdev/tsv-parse-wasm/worker` subpath is the same API without import-time initialization, so a worker calls `init_sync({module: wasm_module})` on the module handed to it (`workerData` or `postMessage`) instead of compiling again. `wasm_module` is exported by the Node/Bun entry alone; in a browser Worker call `await init()`, or `postMessage` a `WebAssembly.Module` you compiled yourself.
 
-Each parser also has a `parse_*_json` variant (`parse_svelte_json`, `parse_typescript_json`, `parse_css_json`) returning the span-only AST as a compact JSON string — `{ok: true, json}` — skipping the JS object tree, for writing it to disk or the wire. It takes `{sourceType}` alone; a `locations` key there throws.
+For the span-only AST as a JSON string — to write it to disk or the wire — `JSON.stringify(result.ast)` is that wire, byte for byte what the native `tsv parse` prints.
 
 ### Options
 

@@ -42,8 +42,8 @@ const deno_bundle = (variant: WasmVariant): string =>
  * band too (the centers the bounds were cut from differ by the measured deltas). */
 const CENTER: Record<WasmVariant, number> = {
 	format: 2_856_548,
-	parse: 1_380_933,
-	all: 3_438_190
+	parse: 1_108_762,
+	all: 3_171_082
 };
 
 /**
@@ -145,9 +145,9 @@ const touch = (root: FsDir, path: string, ms = T_LATER): Promise<void> =>
 const FULL_OUT = [
 	'=== WASM binary sizes ===',
 	'  PASS: format/npm: 2.86 MB (2856548 B)',
-	'  PASS: parse/npm: 1.38 MB (1380933 B)',
-	'  PASS: all/npm: 3.44 MB (3438190 B)',
-	'  PASS: all - format (npm) = 581.6 KB',
+	'  PASS: parse/npm: 1.11 MB (1108762 B)',
+	'  PASS: all/npm: 3.17 MB (3171082 B)',
+	'  PASS: all - format (npm) = 314.5 KB',
 	'  PASS: all - parse (npm) = 2.06 MB',
 	'\n=== Third-party notice ===',
 	'  PASS: format/npm — package.json files declares NOTICE',
@@ -173,7 +173,7 @@ test('a bundle outside its band fails, naming the size and the bound', async () 
 	strictEqual(small.code, 1);
 	strictEqual(
 		small.out.find((line) => line.includes('parse/npm:')),
-		'  FAIL: parse/npm: 1.27 MB (1269999 B) < min 1.27 MB — suspiciously small'
+		'  FAIL: parse/npm: 1.02 MB (1019999 B) < min 1.02 MB — suspiciously small'
 	);
 	const big = await run(sized(root.readonly(), { [npm_bundle('format')]: BOUNDS.format.max + 1 }));
 	strictEqual(big.code, 1);
@@ -192,8 +192,8 @@ test('a bundle outside its band fails, naming the size and the bound', async () 
 		edges.out.filter((line) => / B\)$/.test(line)),
 		[
 			'  PASS: format/npm: 3.08 MB (3085000 B)',
-			'  PASS: parse/npm: 1.27 MB (1270000 B)',
-			'  PASS: all/npm: 3.44 MB (3438190 B)'
+			'  PASS: parse/npm: 1.02 MB (1020000 B)',
+			'  PASS: all/npm: 3.17 MB (3171082 B)'
 		]
 	);
 });
@@ -209,8 +209,8 @@ test("a subset's distance below `all` outside its band fails", async () => {
 	deepStrictEqual(
 		narrow.out.filter((line) => line.includes('(npm) =')),
 		[
-			'  FAIL: all - format (npm) = 530.0 KB — expected ≥530.0 KB (feature gate broken?)',
-			'  PASS: all - parse (npm) = 2.01 MB'
+			'  FAIL: all - format (npm) = 284.0 KB — expected ≥284.0 KB (feature gate broken?)',
+			'  PASS: all - parse (npm) = 2.03 MB'
 		]
 	);
 	const wide = await run(

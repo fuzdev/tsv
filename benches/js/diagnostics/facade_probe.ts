@@ -27,9 +27,10 @@
  * diagnostics, not rows, each a raw export called bare:
  *
  *   - `internal` `parse_internal_<lang>`: the parse alone, nothing written or handed over
- *   - `json`     `parse_<lang>_json`'s export: the JSON wire written and crossed as a string
- *   - `tape`     `parse_tape_<lang>`'s export: that wire transcoded to the tape and handed
- *                over as words, undecoded
+ *   - `json`     (the C FFI alone) `tsv_parse_<lang>`: the JSON wire written and crossed as a
+ *                string — the npm engines emit none, so the arm is absent over them
+ *   - `tape`     `parse_tape_<lang>`'s export: the wire's tape, written by the language's
+ *                wire writer and handed over as words, undecoded
  *
  * The identity gate holds `json` (through `JSON.parse`) and `tape` (through the decoder) to
  * the row's tree; `internal` returns no tree, so it is timed ungated.
@@ -40,9 +41,8 @@
  *   - `facade`    row ÷ engine — what the facade adds (>1 = the facade costs)
  *   - `package`   package ÷ row — what separates the row from the installed package
  *   - `wire`      json ÷ internal — the JSON writer and the string crossing (`--transfer`)
- *   - `transcode` tape ÷ json — the transcoder and the words' hand-over over the string's
- *                 crossing; its `ns` is the transcoder plus the words' hand-over, less the
- *                 string's crossing (`--transfer`)
+ *   - `transcode` tape ÷ json — the tape copy's write and the words' hand-over over the JSON
+ *                 writer's and the string's crossing (`--transfer`, where a `json` arm exists)
  *   - `decode`    row ÷ tape — the generated decoder plus the facade (`--transfer`)
  *
  * Every arm is timed in one process whose bindings ran their unscoped init probes, so the
@@ -261,8 +261,8 @@ const transfer_arms = (impl: TsvBinding): BindingArms['arms'] => {
 			return (source) => (internal(source), true);
 		},
 		json: (operation, language) => {
-			if (operation !== 'parse') return undefined;
-			const parse_json = engine.parse_json[language];
+			const parse_json = engine.parse_json?.[language];
+			if (operation !== 'parse' || parse_json === undefined) return undefined;
 			return (source) => parse_json(source);
 		},
 		tape: (operation, language) => {
@@ -279,8 +279,8 @@ const transfer_gates = (impl: TsvBinding): BindingArms['gates'] => {
 	const { engine } = impl;
 	return {
 		json: (operation, language) => {
-			if (operation !== 'parse') return undefined;
-			const parse_json = engine.parse_json[language];
+			const parse_json = engine.parse_json?.[language];
+			if (operation !== 'parse' || parse_json === undefined) return undefined;
 			return (source) => JSON.parse(parse_json(source) as string);
 		},
 		tape: (operation, language) =>

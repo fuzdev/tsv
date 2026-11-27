@@ -1019,14 +1019,13 @@ const cmd_byteid = (): void => {
 		}
 	}
 
-	// the addon's parse, tape route and strip, in process, held to the plain CLI's answer for
-	// the file — the tape route's to its parse
-	const addon_records = addon_ops(loader.index, sample, 'parse,tape,strip', 'addon_pgo');
-	const expected = sample.length * 2 + strip_sample.length;
+	// the addon's tape route and strip, in process, held to the plain CLI's answer for the
+	// file — the tape route's to its parse
+	const addon_records = addon_ops(loader.index, sample, 'tape,strip', 'addon_pgo');
+	const expected = sample.length + strip_sample.length;
 	if (addon_records.length !== expected) {
 		fail(
-			`byteid: the addon answered ${addon_records.length} of ${expected} ` +
-				'parse, tape and strip calls'
+			`byteid: the addon answered ${addon_records.length} of ${expected} ` + 'tape and strip calls'
 		);
 	}
 	for (const rec of addon_records) {

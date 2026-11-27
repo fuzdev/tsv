@@ -3,8 +3,9 @@
 //! This is the **sole emission path** for the TS wire JSON: it walks the
 //! *internal* AST once and writes the final JSON bytes as it goes, never
 //! materializing a typed public tree. It writes both wires: the span-only one
-//! behind `convert_ast_json_bytes` / `convert_ast_json_string` (every FFI/WASM/N-API
-//! parse binding, the CLI's default output) and the loc-bearing one behind
+//! behind `convert_ast_json_bytes` / `convert_ast_json_string` (the C FFI's
+//! `tsv_parse_<lang>`, the CLI's default output; the npm bindings write the tape copy) and
+//! the loc-bearing one behind
 //! `convert_ast_json_bytes_with_locations` (`tsv parse --locations`) — `--pretty` is a
 //! re-indent of either's bytes.
 //!
@@ -87,7 +88,7 @@ json_only! {
     /// but proving that to a `String` costs an O(output) validation scan, and the
     /// output is several times the source (`tsv_lang::estimated_json_capacity`).
     /// Byte-oriented boundaries (FFI, the CLI's stdout) take the bytes as-is; `&str`
-    /// boundaries (`convert_ast_json_string` → WASM/N-API) pay the one validation at
+    /// boundaries (`convert_ast_json_string` → `parse_to_json`) pay the one validation at
     /// the edge.
     pub(crate) fn write_program_bytes(
         parsed: ast::ParsedRef<'_>,

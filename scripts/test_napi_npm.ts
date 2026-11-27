@@ -7,7 +7,7 @@
  * both an ESM and a CommonJS host can load it (the loader is ESM, like the
  * wasm packages; the platform `.node` rides a `createRequire` shim), the
  * wasm-parity `(source, options?)` bags with their
- * exact error strings, the `_json` string variants, the package.json
+ * exact error strings, the package.json
  * selection fields, the unsupported-platform error, and the `tsv` bin —
  * `bin.js`, the dispatcher that execs the platform package's native
  * `tsv_cli` binary: that it really dispatches (argh's help output), that it
@@ -100,7 +100,6 @@ import {
 	LONE_CR_TAG_COMMENT,
 	ok_ast,
 	ok_code,
-	ok_json,
 	parse_failures,
 	register_parse_failure_suite
 } from './parse_failure_suite.ts';
@@ -325,11 +324,8 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		assert.deepEqual(Object.keys(parse_api).sort(), [
 			'create_locator',
 			'parse_css',
-			'parse_css_json',
 			'parse_svelte',
-			'parse_svelte_json',
 			'parse_typescript',
-			'parse_typescript_json',
 			'reconstruct_locations'
 		]);
 		// what the root imports (its module doc names the parse entry, so its code is read)
@@ -447,8 +443,8 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 
 	// The tape route under `parse_<lang>`: the raw export hands the words over as a typed array
 	// copied into a buffer V8 owns (4-aligned by type), its exact bytes the header's length, and
-	// the facade's decode is the JSON route's tree.
-	it('the raw tape export returns aligned words the facade decodes to the JSON tree', () => {
+	// the facade's decode, stringified, is the native CLI's span-only wire byte for byte.
+	it('the raw tape export returns aligned words the facade decodes to the native wire', () => {
 		const addon = createRequire(loader_path)(`@fuzdev/tsv-${platform_triple()}`);
 		for (const [language, source] of [
 			['typescript', '\ufeffconst é = `x${1}😀`;'],
@@ -460,17 +456,16 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 			assert.equal(words.byteOffset % 4, 0, language);
 			assert.equal(words[0], 0x54565354, `${language}: the magic`);
 			assert.ok(32 + words[3]! * 4 + words[4]! <= words.byteLength, language);
-			assert.deepEqual(
-				ok_ast(api[`parse_${language}`](source)),
-				JSON.parse(ok_json(api[`parse_${language}_json`](source))),
+			const native = run_native(['parse', '--content', source, '--parser', language]);
+			assert.equal(native.status, 0, native.stderr);
+			assert.equal(
+				`${JSON.stringify(ok_ast(api[`parse_${language}`](source)))}\n`,
+				native.stdout,
 				language
 			);
 		}
-		// a failure is the JSON export's own object, not a tape
-		assert.deepEqual(
-			addon.parse_tape_typescript('const = ;'),
-			addon.parse_typescript_json('const = ;')
-		);
+		// a failure is the returned failure object, not a tape — the one the facade hands back
+		assert.deepEqual(addon.parse_tape_typescript('const = ;'), api.parse_typescript('const = ;'));
 	});
 
 	// The tape is a buffer V8 owns, which its GC reclaims like any other, not an external one
@@ -486,7 +481,7 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		assert.ok(process.memoryUsage().arrayBuffers - before >= words.byteLength);
 	});
 
-	it('parses to span-only objects, and _json siblings return the string', () => {
+	it('parses to span-only objects', () => {
 		const ast = ok_ast(api.parse_typescript('const x = 1;'));
 		assert.equal(ast.type, 'Program');
 		assert.equal(ast.body[0].loc, undefined, 'the default wire is span-only');
@@ -498,9 +493,6 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		const css = ok_ast(api.parse_css('a { color: red }'));
 		assert.equal(css.type, 'StyleSheetFile');
 		assert.equal(css.children[0].loc, undefined);
-		const json = ok_json(api.parse_typescript_json('const x = 1;'));
-		assert.equal(typeof json, 'string');
-		assert.deepEqual(JSON.parse(json), ast);
 	});
 
 	// The facade and the helper that `{locations: true}` runs ship together — the
@@ -531,8 +523,6 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		const css_located = ok_ast(api.parse_css(css, { locations: true }));
 		assert.deepEqual(api.reconstruct_locations(ok_ast(api.parse_css(css)), css), css_located);
 		assert.ok(css_located.children[0].loc);
-		// The `_json` siblings return the span-only wire the object parse reads.
-		assert.equal(ok_json(api.parse_css_json(css)), JSON.stringify(ok_ast(api.parse_css(css))));
 	});
 
 	it('the TypeScript sourceType axis reaches parse AND format', () => {
@@ -575,11 +565,6 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 			() => api.parse_typescript('const x = 1;', { locatons: false }),
 			"unknown parse option 'locatons' (expected 'locations' or 'sourceType')"
 		);
-		throws_with(
-			() => api.parse_css_json('a{}', { locations: false }),
-			"parse option 'locations' is not supported by parse_css_json — the JSON string is " +
-				'the span-only wire; use parse_css(source, {locations: true})'
-		);
 		// every argument refusal is a TypeError, the class `read_source` throws too
 		assert.throws(() => api.format_typescript('x', { sourceType: 'sloppy' }), TypeError);
 		throws_with(
@@ -592,7 +577,7 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 
 	// export names and the lone-surrogate refusal, shared with the wasm entries' suite
 	register_facade_surface_suite('@fuzdev/tsv loader (root)', root_api, { facade_exports: 6 });
-	register_facade_surface_suite('@fuzdev/tsv loader (./parse)', parse_api, { facade_exports: 6 });
+	register_facade_surface_suite('@fuzdev/tsv loader (./parse)', parse_api, { facade_exports: 3 });
 
 	it('the loader ships the shared facade verbatim', () => {
 		for (const { published, source } of facade_files(ALL_FAMILIES)) {
@@ -1679,56 +1664,91 @@ describe('message parity: the native CLI and cli.js refuse in the same order', (
 		assert.equal(mirror.stdout, native.stdout);
 	});
 
-	// The mirror serializes in JS — `--pretty` re-reads and re-stringifies the wire,
-	// `--locations` stringifies the reconstructed tree — and `JSON.stringify` recurses per
-	// nesting level on the JS stack, which a tree the native engine parsed fine outgrows.
-	// That is the serialization failing, neither the input nor the engine: its own line,
-	// exit 2 (trouble running, not a verdict on the input, which parsed), never an uncaught
-	// stack trace. (The native bin re-indents the wire's bytes without reading them back,
-	// so it has no such ceiling — not compared here: its `--pretty` of this tree is
-	// hundreds of megabytes of indent.)
+	/**
+	 * `assert.deepEqual` over a JSON tree of any depth: the assert recurses on the JS stack, which
+	 * the deepest tree outgrows, so this walks from an explicit stack. Key order is not compared.
+	 */
+	const assert_same_tree = (actual: unknown, expected: unknown): void => {
+		const stack: Array<[unknown, unknown, number]> = [[actual, expected, 0]];
+		while (stack.length > 0) {
+			const [a, e, depth] = stack.pop()!;
+			if (a === null || e === null || typeof a !== 'object' || typeof e !== 'object') {
+				assert.ok(Object.is(a, e), `the trees differ at depth ${depth}`);
+				continue;
+			}
+			assert.equal(Array.isArray(a), Array.isArray(e), `the trees differ at depth ${depth}`);
+			const a_record = a as Record<string, unknown>;
+			const e_record = e as Record<string, unknown>;
+			const keys = Object.keys(e_record);
+			assert.equal(Object.keys(a_record).length, keys.length, `keys differ at depth ${depth}`);
+			for (const key of keys) {
+				assert.ok(Object.hasOwn(a_record, key), `'${key}' is missing at depth ${depth}`);
+				stack.push([a_record[key], e_record[key], depth + 1]);
+			}
+		}
+	};
+
+	// The mirror serializes the decoded tree in JS, and `JSON.stringify` can recurse per nesting
+	// level on the JS stack, which a tree the native engine parsed fine outgrows; on that
+	// `RangeError` it serializes from an explicit stack instead (`stringify_iteratively`), so
+	// the deepest tree the engine accepts prints, exit 0, byte for byte the native wire, as the
+	// native bin prints it — whatever stack the mirror runs on.
 	// The input is the deepest flat `+` chain the spine limit admits, found by bisecting on
 	// the engine itself so the test follows the limit's constants rather than restating them
 	// (`docs/cli.md` §The depth limits; `tests/depth_limit.rs` grades the limit) — a `+` chain
 	// nests to the left, one wire level per operator, so it is as deep a tree as the engine
-	// accepts. The tree outgrows Node's default stack by too thin a margin to hold on every
-	// platform's frame size, so the mirror runs on about half that stack, which the tree
-	// outgrows everywhere; the classification under test does not depend on where the stack ends.
-	it('a tree too deep to serialize in JS is its own error on the mirror', () => {
+	// accepts. The mirror runs on about half Node's default stack. Where `JSON.stringify`
+	// recurses for the compact form (before V8's recursion-free fast path), that tree outgrows
+	// it and the compact and `--locations` legs take the fallback; on a Node with that fast path
+	// only `--pretty`, which always takes the recursive path, does. So `--pretty` is graded on a
+	// shallower chain under a still smaller stack, which reaches the fallback on every Node (at
+	// the deepest tree its output is hundreds of megabytes of indent). The `--locations` leg
+	// compares trees, not bytes: the key order differs by design.
+	it('a tree too deep for JSON.stringify prints on the mirror as the native bin prints it', () => {
 		const chain = (terms: number) => `x = ${Array.from({ length: terms }, () => '1').join('+')};\n`;
 		let [accepted, refused] = [2, 2 * 6_000];
-		assert.equal(api.parse_typescript_json(chain(refused)).ok, false, 'past the spine limit');
+		assert.equal(api.parse_typescript(chain(refused)).ok, false, 'past the spine limit');
 		while (refused - accepted > 1) {
 			const mid = (accepted + refused) >> 1;
-			if (api.parse_typescript_json(chain(mid)).ok) accepted = mid;
+			if (api.parse_typescript(chain(mid)).ok) accepted = mid;
 			else refused = mid;
 		}
 		const deep = chain(accepted);
 		const too_long = run_mirror(['parse', '--content', chain(refused), '--parser', 'typescript']);
 		assert.equal(too_long.status, 1, too_long.stderr);
 		assert.match(too_long.stderr, /^Parse error: Chain of .* exceeds tsv's length limit\n/);
-		for (const flag of ['--pretty', '--locations']) {
-			const args = ['parse', flag, '--content', deep, '--parser', 'typescript'];
-			const mirror = spawnSync(process.execPath, ['--stack-size=500', cli_path, ...args], {
-				encoding: 'utf-8'
+		const mirror_at = (stack_size: number, args: Array<string>) =>
+			spawnSync(process.execPath, [`--stack-size=${stack_size}`, cli_path, ...args], {
+				encoding: 'utf-8',
+				maxBuffer: 1024 * 1024 * 1024
 			});
-			assert.equal(mirror.status, 2, mirror.stderr);
-			assert.equal(mirror.stdout, '');
-			assert.match(
-				mirror.stderr,
-				/^Error: the parsed tree is too deeply nested to serialize in JS \([^)\n]+\)\n$/,
-				flag
-			);
-		}
-		// the engine parsed it: the compact default prints the engine's wire string verbatim,
-		// with nothing to serialize (its size follows the limit, so the buffer has headroom)
-		const compact = spawnSync(
-			process.execPath,
-			[cli_path, 'parse', '--content', deep, '--parser', 'typescript'],
-			{ encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024 }
-		);
-		assert.equal(compact.status, 0, compact.stderr);
-		assert.ok(compact.stdout.startsWith('{"type":"Program"'));
+		const compact = ['parse', '--content', deep, '--parser', 'typescript'];
+		const native = spawnSync(native_path, compact, {
+			encoding: 'utf-8',
+			maxBuffer: 1024 * 1024 * 1024
+		});
+		assert.equal(native.status, 0, native.stderr);
+		const mirror = mirror_at(500, compact);
+		assert.equal(mirror.status, 0, mirror.stderr);
+		assert.ok(mirror.stdout === native.stdout, "the compact wire is the native bin's");
+		const with_locations = ['parse', '--locations', ...compact.slice(1)];
+		const located = mirror_at(500, with_locations);
+		assert.equal(located.status, 0, located.stderr);
+		const native_located = spawnSync(native_path, with_locations, {
+			encoding: 'utf-8',
+			maxBuffer: 1024 * 1024 * 1024
+		});
+		assert.equal(native_located.status, 0, native_located.stderr);
+		assert_same_tree(JSON.parse(located.stdout), JSON.parse(native_located.stdout));
+		const shallow = ['parse', '--pretty', '--content', chain(1_500), '--parser', 'typescript'];
+		const pretty_native = spawnSync(native_path, shallow, {
+			encoding: 'utf-8',
+			maxBuffer: 1024 * 1024 * 1024
+		});
+		assert.equal(pretty_native.status, 0, pretty_native.stderr);
+		const pretty = mirror_at(60, shallow);
+		assert.equal(pretty.status, 0, pretty.stderr);
+		assert.ok(pretty.stdout === pretty_native.stdout, "the --pretty wire is the native bin's");
 	});
 
 	// `parse --locations`: the native bin writes `loc` with its Rust emitter, the mirror
@@ -1741,6 +1761,13 @@ describe('message parity: the native CLI and cli.js refuse in the same order', (
 	it('parse --locations is deep-equal on both bins, the default wire byte-identical', () => {
 		const cases: Array<[string, string]> = [
 			['typescript', 'let a = 1;\rlet b = { c: [2, "\u2028"] };\r\nfunction f(x) { return x; }\n'],
+			// every number spelling and string escape class the stringified tree must reproduce:
+			// exponent forms, the fixed decade, Infinity, a BigInt, controls, lone surrogates
+			[
+				'typescript',
+				'x = [1e21, 1e-7, 0.000001, 0.0000015, 123456789012345680000, 5e-324, 1e400, 0x1F, 10n];\n' +
+					'y = ["\\u0001\\b\\t\\u2028\\ud800\\"\\\\", `a${1}\\u{1F600}`, \'\\uDC00\'];\n'
+			],
 			[
 				'svelte',
 				'\ufeff<script lang="ts">\nlet x: number = 1;\u2028let y = 2;\n</script>\n<div /* c */ class="a" {x} on:click|once={f}>\n\t{#each xs as { a }, i (a)}{a}{/each}\n\t{@const k = x}\n</div>\n{#snippet s(p)}{p}{/snippet}\n<style>\np { color: red; }\n</style>\n'

@@ -16,8 +16,7 @@ Package shape, version-of-truth rule, and the `npm run release` / `build:npm:*` 
 
 ## The npm Facade: Options & Typed Returns
 
-The raw exports are **flat** — `parse_<lang>(source, source_type?)`,
-`parse_<lang>_json(source, source_type?)`, `parse_tape_<lang>(source, source_type?)`,
+The raw exports are **flat** — `parse_tape_<lang>(source, source_type?)`,
 `format_<lang>(source, source_type?)` (`src/lib.rs`'s `lang_bindings!`), the same shape
 `tsv_napi`'s addon takes. The published
 surface is a **hand-written JS facade** over them: `npm/api.js` (the options reader and
@@ -30,12 +29,10 @@ one set of error texts by construction rather than by a parity test. Each packag
 functions and re-exports the result by name.
 
 Every export takes `(source, options?)` with an acorn-style bag:
-`parse_<lang>(source, {locations?, sourceType?})`, `parse_<lang>_json(source,
-{sourceType?})`, `format_<lang>(source, {sourceType?})`.
+`parse_<lang>(source, {locations?, sourceType?})`, `format_<lang>(source, {sourceType?})`.
 
 - **`locations`** (default `false`) adds per-node `loc` to the span-only tree — see
-  [The Span-Only Wire](#the-span-only-wire-and-locations-true). The `_json` exports return the
-  wire string itself and take no `locations`, since `loc` is a view over objects.
+  [The Span-Only Wire](#the-span-only-wire-and-locations-true).
 - **`sourceType`** (`'script'` / `'module'`) is TypeScript-only — Svelte hard-wires `Module`,
   CSS has no goal — so the other languages reject a set value. Unset, it means `'module'`
   **for a parse** (the wire's `Program.sourceType` is a claim one settled grammar has to
@@ -65,8 +62,8 @@ facade call reaches, since the facade grades the source type first.
 **Every argument refusal is a thrown `TypeError`** — the bag's, `read_source`'s (a non-string or
 ill-formed source), and `locations.js`'s (a non-string source, a non-object bag or unknown key,
 a missing or unknown `language`, an uninferable root, a non-number offset to `position_at`);
-**everything a call concludes about the source is a RETURNED result** — `parse_*`, `parse_*_json`,
-`format_*` and `strip_*` alike return `{ok: true, ast | json | code}` or `{ok: false, error}` — so
+**everything a call concludes about the source is a RETURNED result** — `parse_*`, `format_*`
+and `strip_*` alike return `{ok: true, ast | code}` or `{ok: false, error}` — so
 a caller tells "you called it wrong" (a throw) from "the source doesn't parse" (a result).
 `locations.js`'s single lookups add the one `RangeError` (a numeric offset the text doesn't
 hold — [the helper](#linecolumn-reconstruction-helper-npmlocationsjs)).
@@ -92,13 +89,11 @@ engine returns `{ok: false, error}` in its product's place — no `Error` constr
 thrown — built by `failure_result` in either crate (here a hand-declared `#[wasm_bindgen]
 extern` `Object` with a constructor and setters, `PlainObject` in `src/lib.rs`, since the
 format-only build carries no `js-sys`; in `tsv_napi`, `Object::new` on the injected `Env`),
-the two setting the keys in one order. The facade tells product from failure by `typeof`: the
-product of `format_*`, `parse_*_json` and `strip_*` is a string and a failure never is; the raw
-`parse_<lang>` (WASM only), whose product is an object, returns the whole result itself,
-`{ok: true, ast}` or the failure, built engine-side in place of the facade's own result object.
-The success path carries nothing extra: a string export's product is returned as a `JsValue`
-string (one decode, as a `String` return costs), the object parse builds the `{ok: true, ast}`
-result engine-side as the one result object of the call, and the facade copies nothing:
+the two setting the keys in one order. The facade tells product from failure by type: the
+product of `format_*` and `strip_*` is a string and of `parse_tape_*` a `Uint32Array`, and a
+failure is neither. The success path carries nothing extra: a string export's product is
+returned as a `JsValue` string (one decode, as a `String` return costs), a tape as the words
+(§The Tape Export), and the facade copies nothing:
 `read_failure` (in `api.js`) checks the failure's shape and hands the engine's object back as
 it is. A malformed failure, or a `kind` the export never returns (a refusal from a parse export,
 `'unsupported'` from a format), is thrown as `Error('internal error: the engine returned neither
@@ -111,11 +106,7 @@ Anything else an engine throws passes through as itself, THROWN: the raw engines
 source-type refusals, a source over the 4 GiB cap (a plain `Error`), a caught panic, a WASM
 trap (`RuntimeError`) or stack exhaustion (`RangeError`). A format parses the CR-folded text
 through the language's `parse_folded` (`FoldedSource::parse_with`), which maps the error back
-onto the caller's source, so it reports the span a parse of that source would. Where the facade
-`JSON.parse`s an engine's wire itself (an engine table with no `parse` — every published entry
-and the bench's tables take the tape route, so only a test's fake builds one), a failure there
-is thrown as `Error('internal error: AST serialized to invalid JSON', {cause})` — the WASM
-engine's own text for that case — never returned as a parse failure.
+onto the caller's source, so it reports the span a parse of that source would.
 
 **The strip family** (`npm/api_strip.js` + `npm/facade_strip.d.ts`, in `@fuzdev/tsv-wasm` and the
 native `@fuzdev/tsv` alone — [docs/strip.md](../../docs/strip.md)). `strip_typescript(source,
@@ -170,12 +161,12 @@ wasm-bindgen's release glue coerces a wrong-typed string argument rather than re
 the `JsValue`, a value that is not a string throws by its kind (`invalid sourceType:
 expected a string ('script' or 'module'), got a number`) — where N-API refuses it at its own
 conversion. `JsValue` is wasm-bindgen's own, so the format-only build still links no
-`js-sys`. The raw `parse_<lang>` returns `{ok: true, ast}`, the object `js_sys::JSON::parse` made
-of the wire; no published entry and no bench row calls it (both take the tape route).
+`js-sys`. No raw export emits the JSON wire: the parse crosses as the tape alone, so no export
+reaches the writers' JSON copies and they drop out of every bundle at link time.
 
 **The parse family is its own entry, `./parse`, and `parse_<lang>` takes the tape route.**
 In `@fuzdev/tsv-wasm` and the native `@fuzdev/tsv` the root carries format, the strip, the
-import records and `IgnoreStack`; `parse_<lang>`, `parse_<lang>_json`, the `locations.js`
+import records and `IgnoreStack`; `parse_<lang>`, the `locations.js`
 helpers and the AST, option and result types are the `./parse` entry's alone (no root
 re-export), since its static graph holds the tape decoder (`npm/tape_decode.js`, generated,
 [../../docs/tape_format.md](../../docs/tape_format.md)) — so a process that never parses never
@@ -183,13 +174,13 @@ loads it, and no `require()` defers it. `parse_<lang>` is `create_parse_api`'s `
 built by `npm/tape_engine.js` (`create_tape_parse`) over the raw `parse_tape_<lang>`: on a
 `Uint32Array` it decodes the tape — its exact bytes the header's length, against the text the
 wire indexes (a Svelte or CSS source less its leading BOM) — into `{ok: true, ast}`, the tree
-`JSON.parse` makes of the `_json` wire, and passes any other value through for `read_failure`;
+`JSON.parse` makes of the span-only wire (whose `JSON.stringify` is that wire, byte for byte —
+what `npm/cli.js`'s `parse` prints), and passes any other value through for `read_failure`;
 a tape that does not decode throws `Error('internal error: the engine returned a tape that
-does not decode', {cause})`. `{locations: true}` is unchanged (`reconstruct_locations` over the
-decoded object); `parse_<lang>_json` keeps the JSON route. `create_parse_api` itself is
-unchanged: an engine table with no `parse` still `JSON.parse`s the string
-(`scripts/npm_api_test.ts`'s fakes build one; the bench's tables pass the tape route,
-`benches/js/lib/tsv_api.ts`).
+does not decode', {cause})`. `{locations: true}` is `reconstruct_locations` over the decoded
+object. The tape is the parse family's only route: no package publishes a JSON-wire export
+(the native CLI, the C FFI and the Rust API keep the JSON wire), and the bench's tables pass the
+same route (`benches/js/lib/tsv_api.ts`).
 
 The generated wasm entries (`scripts/patch_npm_package.ts`) for the parse-capable variants:
 `./parse` is `parse.js` under the `node` condition (it imports `node_init.js`, the
@@ -226,7 +217,7 @@ whichever family's declarations it carries, each of which imports it); `FormatRe
 `end` covers. `TsvError` and `TsvParseError` are re-exported by name from every entry and
 from the napi `index.d.ts` and `parse.d.ts`. The published declarations are the facade's hand-written
 `npm/facade_format.d.ts` (format and its `FormatResult` / `FormatRefusedError`; in the
-format-capable packages), `npm/facade_parse.d.ts` (parse, `ParseResult<T>` / `ParseJsonResult`),
+format-capable packages), `npm/facade_parse.d.ts` (parse, `ParseResult<T>`),
 `npm/facade_strip.d.ts` and `npm/facade_imports.d.ts`, re-exported **by name** from
 each entry's `index.d.ts` / `browser.d.ts` — the parse half from `parse.d.ts`, the `./parse`
 entry's (the napi `index.d.ts` / `parse.d.ts` the same way):
@@ -265,8 +256,8 @@ walks off address 0 into `memory access out of bounds` rather than quietly over 
 data segments), and `__stack_pointer` is a plain mutable global that a trap does not
 restore. So the pointer stays where the deep call left it and **every later call on
 that instance throws the same error, in every language and on every entry point** —
-verified across `format_typescript` / `format_css` / `format_svelte` /
-`parse_typescript_json` after one deep `format_typescript`. Only a fresh instance
+verified across `format_typescript` / `format_css` / `format_svelte` and the parse
+export after one deep `format_typescript`. Only a fresh instance
 recovers. The parsers' depth limits are sized for this surface too: the spine units of the
 links whose walks spend the most shadow stack (an `as` / `satisfies` assertion, a tagged
 template, a link that re-enters the expression printer) are set so every accepted input fits
@@ -317,29 +308,19 @@ instance's, reused by later calls but never handed back to the host. The release
 formatted an outsized input on a long-lived instance can swap in a fresh one after it, as it
 would after a trap.
 
-## JSON-String Transport
-
-The AST crosses the JS↔WASM boundary as **one compact JSON string** — the span-only wire:
-`parse_*` builds it with the lang crate's `__private::convert_ast_json_string` (each
-language's wire-JSON writer emits it directly from the internal AST — no intermediate
-`serde_json::Value` or typed public tree) and calls the engine's native `JSON.parse` from
-Rust via `js_sys::JSON::parse`, so the export returns the object (as `{ok: true, ast}`). Building
-the JS object graph node-by-node with `serde_wasm_bindgen` is measurably slower. `js-sys` rides the
-`parse` feature alone; the format-only build does not link it.
-
-`parse_*_json` exports return the JSON string itself (`{ok: true, json}` through the facade) — for
-consumers that forward the wire format (disk, network, another tool) without paying
-`JSON.parse` for an object they don't need.
-
 ## The Tape Export (`parse_tape_<lang>`)
 
-The binary parse wire ([../../docs/tape_format.md](../../docs/tape_format.md)): the raw
-`parse_tape_<lang>(source, source_type?)` lays the span-only wire down as words (`tsv_arena`'s
-`parse_tape!`, the body all three bindings share) and returns a `Uint32Array` **view** of this
-instance's linear memory — no copy — or the `{ok: false, error}` every parse export returns.
-The words are the thread's parked transcoder's own buffer (`tsv_arena::tape::with_transcoder`,
+The binary parse wire ([../../docs/tape_format.md](../../docs/tape_format.md)) — the AST crosses
+the JS↔WASM boundary as nothing else: the raw `parse_tape_<lang>(source, source_type?)` writes
+the span-only wire's tape with the language's wire writer, its tape copy (`tsv_arena`'s
+`parse_tape!`, the body all three bindings share), and returns a `Uint32Array` **view** of this
+instance's linear memory — no copy — or the `{ok: false, error}` every parse export returns. An
+object graph built node by node across the boundary (`serde_wasm_bindgen`) is measurably slower,
+and no export writes the JSON wire, so the writers' JSON copies drop out of the bundles at link
+time. `js-sys` rides the `parse` feature alone; the format-only build does not link it.
+The words are the thread's parked tape sink's own buffer (`tsv_arena::tape::with_tape_sink`,
 `tape_view` in `src/lib.rs`), the one the tape was written into, so the instance keeps one
-tape-sized buffer: the transcoder is taken for the call and parked back before the view is built
+tape-sized buffer: the sink is taken for the call and parked back before the view is built
 (take and park, so a trap leaves the slot empty, never locked), and the view is made last, by
 the safe `js_sys::Uint32Array::new_with_byte_offset_and_length` over `wasm_bindgen::memory()`'s
 buffer as it stands after every growth the call made — never the unsafe `Uint32Array::view`. A
@@ -388,21 +369,14 @@ it does not. The forwarding argument that makes
 `unknown format option 'locations' (this export takes no options)`. `sourceType` is the
 exception on those two: it matches its own arm first and reports `format option
 'sourceType' is only supported for TypeScript`, which is the more useful message and the
-reason the key stays leniently `undefined`-tolerant there. The `parse_*_json` exports refuse
-`locations` too, for the same reason — they return the wire itself — but in their own words,
-whatever the value (`undefined` included): `parse option 'locations' is not supported by
-parse_<lang>_json — the JSON string is the span-only wire; use parse_<lang>(source,
-{locations: true})`. There the key is not a typo but a near miss with a one-line remedy, so
-the error names it (`read_options`' `parse_json` kind); a format export has no
-such neighbour, so `locations` stays an unknown key there.
+reason the key stays leniently `undefined`-tolerant there.
 
 ## The Option Interfaces
 
 The bags, declared in the facade's `.d.ts`: `FormatOptions` / `TypeScriptFormatOptions`
-(`facade_format.d.ts`), and `ParseOptions` / `TypeScriptParseOptions` (the object parsers) and
-`ParseJsonOptions` / `TypeScriptParseJsonOptions` (the `_json` exports, no `locations`)
-in `facade_parse.d.ts`. The non-TypeScript bags — `FormatOptions`, `ParseOptions`,
-`ParseJsonOptions` — all declare **`sourceType?: undefined`**. None may be `{}`, and
+(`facade_format.d.ts`), and `ParseOptions` / `TypeScriptParseOptions` (the parsers) in
+`facade_parse.d.ts`. The non-TypeScript bags — `FormatOptions` and `ParseOptions` — both
+declare **`sourceType?: undefined`**. None may be `{}`, and
 none may omit the key. Two independent reasons:
 
 - **An empty interface guards nothing.** `{}` opts out of *both*
@@ -412,7 +386,7 @@ none may omit the key. Two independent reasons:
   compile and all throw. That is the one shape where the types are *looser*
   than the runtime rather than stricter. One declared key restores both checks.
   (`ParseOptions` would not be empty without it — it has `locations` — so this reason
-  binds the other two.)
+  binds `FormatOptions`.)
 - **Omitting the key breaks forwarding.** `npm/cli.js` builds
   `{sourceType: <maybe undefined>}` and hands it to whichever export rather than
   branching the call, and the runtime reads a `sourceType` set to `undefined` as
@@ -426,8 +400,7 @@ The TypeScript bags are standalone interfaces, **not** `extends` of their base: 
 would buy (handing a `TypeScriptParseOptions`-typed variable to `parse_svelte`) is unsound
 anyway, since it throws the moment `sourceType` is actually set; the only bag that forwards
 at runtime is one whose `sourceType` is `undefined`, which is exactly what these shapes
-accept. The `_json` pair exists because `locations` is unknown there: typed as
-`ParseOptions`, `parse_svelte_json(src, {locations: true})` would compile and throw.
+accept.
 
 **Every key spells `| undefined` on top of `?`** — `locations?: boolean |
 undefined`, `sourceType?: 'script' | 'module' | undefined`. Same reason as above,
@@ -487,8 +460,8 @@ keys alone, as `read_options` reads one — the language) are `TypeError`s; the 
 importing it, since this module imports nothing.
 
 **It is also its own entry point**, the `./locations` subpath of every package that ships
-it (`types: './locations.d.ts'`): a consumer holding a tree — from disk, another process, a
-`_json` export — reaches line/column without loading the engine. Both package suites import
+it (`types: './locations.d.ts'`): a consumer holding a tree — from disk, another process, the
+native CLI — reaches line/column without loading the engine. Both package suites import
 it by bare specifier from a staging that holds no engine (the wasm suite from a copy holding
 only the helper, the napi suite from the staging without a platform package).
 
@@ -857,7 +830,7 @@ exceed.
 
 ## Files
 
-- `src/lib.rs` — WASM bindings (`lang_bindings!` macro, its bodies the `parse_convert!` / `parse_internal!` / `parse_format!` macros shared with the two native bindings via [`tsv_arena`](../tsv_arena/), and the two imports exports' `parse_imports_json!` shared with `tsv_napi`, every export flat `(source, source_type?)`, + `wasm_source_type`, the raw module's source-type decoder; what every export family shares is gated on the private `_internal_exports` feature each family enables) + the wasm32-gated talc `#[global_allocator]` and panic hook
+- `src/lib.rs` — WASM bindings (`lang_bindings!` macro, its bodies the `parse_tape!` / `parse_internal!` / `parse_format!` macros shared with the two native bindings via [`tsv_arena`](../tsv_arena/), and the two imports exports' `parse_imports_json!` shared with `tsv_napi`, every export flat `(source, source_type?)`, + `wasm_source_type`, the raw module's source-type decoder; what every export family shares is gated on the private `_internal_exports` feature each family enables) + the wasm32-gated talc `#[global_allocator]` and panic hook
 - `types/tsv_ast_schema.json` — the AST schema table: every wire node type and named variant, its fields in wire order (§TS Type Maintenance)
 - `types/tsv_ast.d.ts` — TS types GENERATED from the table (`npm run ast-schema:update`), bundled into the parse-capable packages
 - `types/tsv_tape_shapes.json` — the tape's fast-shape list, GENERATED from the fixture wire (`npm run tape-shapes:update`)

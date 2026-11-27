@@ -15,20 +15,9 @@ export * from './locations.js';
 export type {
 	ParseOptions,
 	TypeScriptParseOptions,
-	ParseJsonOptions,
-	TypeScriptParseJsonOptions,
 	ParseSuccess,
-	ParseJsonSuccess,
 	ParseFailure,
-	ParseResult,
-	ParseJsonResult
+	ParseResult
 } from './facade_parse.js';
 export type { TsvError, TsvParseError } from './facade_error.js';
-export {
-	parse_svelte,
-	parse_svelte_json,
-	parse_typescript,
-	parse_typescript_json,
-	parse_css,
-	parse_css_json
-} from './facade_parse.js';
+export { parse_svelte, parse_typescript, parse_css } from './facade_parse.js';

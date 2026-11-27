@@ -8,16 +8,14 @@
 //! - `--no-default-features --features format` (`@fuzdev/tsv-format-wasm`):
 //!   `format_*` exports only.
 //! - `--no-default-features --features parse` (`@fuzdev/tsv-parse-wasm`):
-//!   `parse_*`, `parse_*_json`, `parse_internal_*` and `parse_tape_*` plus the convert layer
-//!   that serializes ASTs to JS and the transcoder that lays the wire down as a tape; the
-//!   printers drop out at link time.
+//!   `parse_tape_*` and `parse_internal_*`, over the language crates' wire writers' tape copies;
+//!   the printers drop out at link time.
 //!
-//! The AST crosses the JS boundary as a single JSON string — the span-only wire,
-//! the one every binding emits: `parse_*` calls the engine's native `JSON.parse` on
-//! it (via `js_sys`) and returns the object as `{ok: true, ast}`; `parse_*_json` returns
-//! the string itself for consumers that forward the wire format without materializing.
-//! Building the JS object graph node-by-node with `serde_wasm_bindgen` is
-//! measurably slower.
+//! The AST crosses the JS boundary as the tape (`parse_tape_*`, `docs/tape_format.md`): the
+//! span-only wire every binding emits, written by the language crate's wire writer straight into
+//! words in this instance's memory and handed to the host as a view, which the npm facade
+//! decodes into objects. No export emits the JSON wire, so the writers' JSON copies drop out at
+//! link time; the CLI, the C FFI and the Rust API keep it.
 //!
 //! Every export is flat, `(source, source_type?)`, and RETURNS a failure the source causes
 //! (a parse failure, a refusal) as `{ok: false, error}` in its product's place
@@ -37,7 +35,7 @@ use wasm_bindgen::prelude::*;
 // next call's `reset()`, and the helper parks its arena outside the
 // thread-local while it is in use, so a trap here leaves a callable instance
 // (see `tsv_arena`'s §Abort safety — this is the target that made it necessary).
-// The goal-axis macros and every export body (`parse_convert!`, `parse_internal!`,
+// The goal-axis macros and every export body (`parse_tape!`, `parse_internal!`,
 // `parse_format!`, `parse_imports_json!`) come from the same crate, so the bindings
 // share ONE definition of which languages have a goal and of what each export does,
 // rather than hand-synced copies.
@@ -50,7 +48,7 @@ use tsv_arena::parse_format;
 #[cfg(feature = "imports")]
 use tsv_arena::parse_imports_json;
 #[cfg(feature = "parse")]
-use tsv_arena::{parse_convert, parse_internal, parse_tape};
+use tsv_arena::{parse_internal, parse_tape};
 
 // The one parse-error type, shared by every language crate: each re-exports
 // `tsv_lang::Error` (and the `ErrorReport` its `to_report` returns, whose span is two
@@ -112,12 +110,11 @@ fn err(message: impl ToString) -> JsValue {
 }
 
 // The plain JS objects a failure is RETURNED as — `{ok: false, error}`, the error
-// `{kind, construct?, message, frame, start, end, loc: {start: {line, column}, end: {…}}}` —
-// and the `{ok: true, ast}` result `parse_<lang>` returns. Declared by hand rather than
-// taken from `js_sys::Object` / `Reflect`: the format-only build carries no `js-sys`, and a
-// constructor and a few setters are all this needs (the `console_error` binding above is
-// the same trade). Each setter writes a plain data property, so the key order is the order
-// the setters run in.
+// `{kind, construct?, message, frame, start, end, loc: {start: {line, column}, end: {…}}}`.
+// Declared by hand rather than taken from `js_sys::Object` / `Reflect`: the format-only build
+// carries no `js-sys`, and a constructor and a few setters are all this needs (the
+// `console_error` binding above is the same trade). Each setter writes a plain data property,
+// so the key order is the order the setters run in.
 #[cfg(feature = "_internal_exports")]
 #[wasm_bindgen]
 extern "C" {
@@ -129,10 +126,6 @@ extern "C" {
 
     #[wasm_bindgen(method, setter)]
     fn set_ok(this: &PlainObject, value: bool);
-
-    #[cfg(feature = "parse")]
-    #[wasm_bindgen(method, setter)]
-    fn set_ast(this: &PlainObject, value: &JsValue);
 
     #[wasm_bindgen(method, setter)]
     fn set_error(this: &PlainObject, value: &PlainObject);
@@ -641,30 +634,6 @@ fn wasm_source_type(
     })
 }
 
-/// The wire string behind both parse exports (`parse_<lang>` and `parse_<lang>_json`), or
-/// how the parse ended without one: `Result<String, Failure>`.
-#[cfg(feature = "parse")]
-macro_rules! wire_json {
-    ($goalness:ident, $lang:ident, $source:expr, $source_type:expr) => {
-        wasm_source_type(
-            SourceTypeArg::read(&$source_type),
-            goal_allowed!($goalness),
-            Family::Parse,
-        )
-        .map_err(|message| Failure::Thrown(err(message)))
-        .and_then(|goal| {
-            parse_convert!(
-                $goalness,
-                $lang,
-                convert_ast_json_string,
-                $source,
-                goal,
-                |e: Error| parse_failure(&e)
-            )
-        })
-    };
-}
-
 /// A view of a tape's words in this instance's linear memory, no copy: a `Uint32Array` over
 /// `words` (`(offset, len)`, the address and word count [`tape_words_at`] reads off the words
 /// `parse_tape!` lends it), its exact bytes the header's length.
@@ -704,9 +673,9 @@ fn tape_failure(e: tsv_arena::tape::SinkError) -> Failure {
     Failure::Thrown(err(format!("the parse does not fit a tape: {e}")))
 }
 
-/// Generate `parse_<lang>` / `parse_<lang>_json` / `parse_internal_<lang>` / `parse_tape_<lang>` /
-/// `format_<lang>` WASM functions for one language module. The parse exports
-/// are gated on `parse` (so the format-only build excludes the convert layer)
+/// Generate `parse_internal_<lang>` / `parse_tape_<lang>` / `format_<lang>` WASM functions for
+/// one language module. The parse exports are gated on `parse` (so the format-only build
+/// excludes the writers)
 /// and `format_*` on `format` (so the parse-only build drops the printers at
 /// link time). Every export shares one flat signature, `(source, source_type?)` —
 /// the same one `tsv_napi`'s addon takes — with `$goalness` (`goal` / `nogoal`)
@@ -716,51 +685,18 @@ fn tape_failure(e: tsv_arena::tape::SinkError) -> Failure {
 /// native `@fuzdev/tsv`; the declarations wasm-bindgen generates here type only the
 /// raw module.
 // The bodies parse the source into per-thread stores and run the
-// conversion/format/no-op over it. Every language crate is interner-free
+// tape write/format/no-op over it. Every language crate is interner-free
 // (identifier and element/attribute names are span-identity), so these are
 // uniform across svelte/typescript/css — no per-language arity split. WASM is
 // single-threaded, so the thread-local stores are a module static.
 macro_rules! lang_bindings {
     (
         $goalness:ident,
-        $parse_fn:ident,
-        $parse_json_fn:ident,
         $parse_internal_fn:ident,
         $parse_tape_fn:ident,
         $format_fn:ident,
         $lang:ident $(,)?
     ) => {
-        /// Parse source into `{ok: true, ast}`, the span-only AST object — `JSON.parse` of
-        /// `parse_<lang>_json`'s wire, run engine-side from Rust — or the
-        /// `{ok: false, error}` a parse failure is returned as.
-        #[cfg(feature = "parse")]
-        #[wasm_bindgen]
-        pub fn $parse_fn(source: &str, source_type: JsValue) -> Result<JsValue, JsValue> {
-            let json = match wire_json!($goalness, $lang, source, source_type) {
-                Ok(json) => json,
-                Err(failure) => return failure.into_return(),
-            };
-            let ast = js_sys::JSON::parse(&json)
-                .map_err(|_| err("internal error: AST serialized to invalid JSON"))?;
-            let result = PlainObject::new();
-            result.set_ok(true);
-            result.set_ast(&ast);
-            Ok(result.into())
-        }
-
-        /// Parse source into the span-only JSON wire as a compact string —
-        /// `start`/`end` offsets, no per-node `loc` (Svelte also no `name_loc`) —
-        /// skipping JS object materialization (for consumers forwarding the wire); or the
-        /// `{ok: false, error}` a parse failure is returned as.
-        #[cfg(feature = "parse")]
-        #[wasm_bindgen]
-        pub fn $parse_json_fn(source: &str, source_type: JsValue) -> Result<JsValue, JsValue> {
-            match wire_json!($goalness, $lang, source, source_type) {
-                Ok(json) => Ok(JsValue::from(json)),
-                Err(failure) => failure.into_return(),
-            }
-        }
-
         /// Parse only, no serialization — the benchmark coverage/throughput probe:
         /// `undefined`, or the `{ok: false, error}` a parse failure is returned as.
         #[cfg(feature = "parse")]
@@ -835,8 +771,6 @@ macro_rules! lang_bindings {
 
 lang_bindings!(
     nogoal,
-    parse_svelte,
-    parse_svelte_json,
     parse_internal_svelte,
     parse_tape_svelte,
     format_svelte,
@@ -844,8 +778,6 @@ lang_bindings!(
 );
 lang_bindings!(
     goal,
-    parse_typescript,
-    parse_typescript_json,
     parse_internal_typescript,
     parse_tape_typescript,
     format_typescript,
@@ -853,8 +785,6 @@ lang_bindings!(
 );
 lang_bindings!(
     nogoal,
-    parse_css,
-    parse_css_json,
     parse_internal_css,
     parse_tape_css,
     format_css,

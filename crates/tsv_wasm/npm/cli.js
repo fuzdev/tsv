@@ -130,24 +130,17 @@ const FORMATTERS = {
 /**
  * The parse family, loaded by the `parse` command alone: it lives on the package's
  * `./parse` entry (`parse.js`, a file both packages ship), whose static graph holds the
- * tape decoder, so a `format` or `strip` run never loads parse code. `PARSERS` are the
- * wire-string parsers; `OBJECT_PARSERS`, for `parse --locations`, the object parsers,
- * whose `{locations: true}` reconstructs `loc` over the span-only tree (the facade's
- * sugar), which is then stringified.
+ * tape decoder, so a `format` or `strip` run never loads parse code. Each parser returns
+ * the span-only tree decoded from the engine's tape, which `parse` stringifies;
+ * `{locations: true}` (`parse --locations`) reconstructs `loc` over it first (the facade's
+ * sugar).
  */
 async function load_parsers() {
 	const parse = await import('./parse.js');
 	return {
-		PARSERS: {
-			svelte: parse.parse_svelte_json,
-			typescript: parse.parse_typescript_json,
-			css: parse.parse_css_json
-		},
-		OBJECT_PARSERS: {
-			svelte: parse.parse_svelte,
-			typescript: parse.parse_typescript,
-			css: parse.parse_css
-		}
+		svelte: parse.parse_svelte,
+		typescript: parse.parse_typescript,
+		css: parse.parse_css
 	};
 }
 
@@ -1497,7 +1490,7 @@ function run_format_worker() {
 	}
 }
 
-function run_parse({ values, positionals }, { PARSERS, OBJECT_PARSERS }) {
+function run_parse({ values, positionals }, PARSERS) {
 	const flag_parser = values.parser;
 	// --source-type is validated upfront (exit 2) like the native CLI; it only
 	// affects the TypeScript parser (svelte is always a module, css has no goal).
@@ -1567,48 +1560,125 @@ function run_parse({ values, positionals }, { PARSERS, OBJECT_PARSERS }) {
 		}
 	}
 
-	// The default output is the span-only wire, verbatim from the engine. --locations
-	// adds per-node `loc` (svelte also `name_loc`) through the facade's
-	// `{locations: true}` — the JS reconstruction over the span tree — and stringifies
-	// the result; orthogonal to --source-type (the source type drives the TS parser),
-	// so they compose. The native CLI writes `loc` with its Rust emitter instead: the
-	// two trees are deep-equal, but its `loc` sits after `end` where the
-	// reconstruction appends it last, so the bytes differ by key order.
+	// The output is the span-only tree the engine's tape decodes to, stringified: byte for
+	// byte the native CLI's wire, since the decoder builds each object in the wire's key
+	// order and the wire writer spells every number in ECMAScript's own `Number::toString`
+	// form, emits no integer-like keys (so V8's key reordering never fires), and escapes
+	// exactly what `JSON.stringify` escapes. The package test pins the equality on both
+	// bins, `--pretty`'s tab indent included. --locations adds per-node `loc` (svelte also
+	// `name_loc`) through the facade's `{locations: true}` — the JS reconstruction over the
+	// span tree; orthogonal to --source-type (the source type drives the TS parser), so they
+	// compose. The native CLI writes `loc` with its Rust emitter instead: the two trees are
+	// deep-equal, but its `loc` sits after `end` where the reconstruction appends it last, so
+	// the bytes differ by key order.
 	// The engine call and the serialization are caught apart: a throw out of the first is the
 	// engine's (or the input's), one out of the second is this process's own JS failing on a
 	// tree the engine produced fine — reported as the engine's, it would blame the input.
 	let result;
 	try {
-		result = values.locations
-			? OBJECT_PARSERS[parser](input, { locations: true, sourceType: source_type })
-			: PARSERS[parser](input, { sourceType: source_type });
+		result = PARSERS[parser](
+			input,
+			values.locations ? { locations: true, sourceType: source_type } : { sourceType: source_type }
+		);
 	} catch (error) {
 		// a trap or stack overflow is the input's nesting, a failed parse as the native depth
 		// refusal is (1); an output past the JS string ceiling is no verdict on the input (2)
 		exit_with_error(is_output_ceiling(error) ? 2 : 1, single_input_failure(error));
 	}
 	if (!result.ok) exit_with_error(1, result_failure(result.error));
-	const parsed = values.locations ? result.ast : result.json;
 	let json;
 	try {
-		if (values.locations) {
-			json = JSON.stringify(parsed, null, values.pretty ? '\t' : undefined);
-		} else if (values.pretty) {
-			// A re-serialization, where the native CLI re-indents the compact bytes
-			// without ever reading them back — and byte-identical to it all the same: the
-			// wire writer spells every number in ECMAScript's own `Number::toString` form
-			// (so a `JSON.parse`/`stringify` round trip changes no token), emits no
-			// integer-like keys (so V8's key reordering never fires), and escapes exactly
-			// what `JSON.stringify` escapes. The package test pins the equality on both
-			// bins; the compact default is the verbatim wire string from Rust either way.
-			json = JSON.stringify(JSON.parse(parsed), null, '\t');
-		} else {
-			json = parsed;
-		}
+		json = stringify_tree(result.ast, values.pretty);
 	} catch (error) {
 		exit_with_error(2, serialization_failure(error));
 	}
 	print(`${json}\n`);
+}
+
+/**
+ * `JSON.stringify(tree, null, pretty ? '\t' : undefined)`, byte for byte, on a tree of any depth.
+ * `JSON.stringify` can recurse once per nesting level on the JS stack, which a tree the
+ * engine's own stack handled can outgrow (the N-API engine parses on the native stack, past
+ * where the JS one ends), so a call-stack `RangeError` falls back to `stringify_iteratively`,
+ * which keeps its frames on the heap. Only that error does: any other is the serialization's own failure.
+ *
+ * @param {unknown} tree - a decoded parse tree
+ * @param {boolean} pretty - indent with tabs, as `--pretty` does
+ * @returns {string}
+ */
+function stringify_tree(tree, pretty) {
+	try {
+		return JSON.stringify(tree, null, pretty ? '\t' : undefined);
+	} catch (error) {
+		if (!(error instanceof RangeError && /call stack/i.test(error_message(error)))) throw error;
+	}
+	return stringify_iteratively(tree, pretty);
+}
+
+/**
+ * `JSON.stringify`'s output for a parse tree, written from an explicit stack: each primitive and
+ * each key through `JSON.stringify` itself (its escapes, its number spellings, `null` for a
+ * non-finite number), the brackets, separators and — for `pretty` — the newlines and tab indents
+ * here, as `JSON.stringify(tree, null, '\t')` lays them out. An object's keys are its
+ * `Object.keys` order, the order `JSON.stringify` walks; a key whose value `JSON.stringify` drops
+ * (`undefined`, a function, a symbol) is dropped, and such an array item reads `null`. A parse
+ * tree holds no `toJSON` and no cycle, the two things this does not model.
+ *
+ * @param {unknown} tree
+ * @param {boolean} pretty
+ * @returns {string}
+ */
+function stringify_iteratively(tree, pretty) {
+	/** @type {Array<string>} */
+	const out = [];
+	/** @type {Array<{value: any, keys: Array<string> | null, i: number, depth: number}>} */
+	const stack = [];
+	const dropped = (v) => v === undefined || typeof v === 'function' || typeof v === 'symbol';
+	const indent = (depth) => (pretty ? `\n${'\t'.repeat(depth)}` : '');
+	/** Write `value`: a primitive at once, an object or array by opening its frame. */
+	const write = (value, depth) => {
+		if (value === null || typeof value !== 'object') {
+			out.push(JSON.stringify(value));
+			return;
+		}
+		if (Array.isArray(value)) {
+			if (value.length === 0) out.push('[]');
+			else {
+				out.push('[');
+				stack.push({ value, keys: null, i: 0, depth });
+			}
+			return;
+		}
+		const keys = Object.keys(value).filter((key) => !dropped(value[key]));
+		if (keys.length === 0) out.push('{}');
+		else {
+			out.push('{');
+			stack.push({ value, keys, i: 0, depth });
+		}
+	};
+	write(tree, 0);
+	while (stack.length > 0) {
+		const frame = /** @type {(typeof stack)[number]} */ (stack.at(-1));
+		const length = frame.keys === null ? frame.value.length : frame.keys.length;
+		if (frame.i === length) {
+			stack.pop();
+			out.push(indent(frame.depth), frame.keys === null ? ']' : '}');
+			continue;
+		}
+		out.push(frame.i === 0 ? indent(frame.depth + 1) : `,${indent(frame.depth + 1)}`);
+		let item;
+		if (frame.keys === null) {
+			item = frame.value[frame.i];
+			if (dropped(item)) item = null;
+		} else {
+			const key = frame.keys[frame.i];
+			out.push(JSON.stringify(key), pretty ? ': ' : ':');
+			item = frame.value[key];
+		}
+		frame.i++;
+		write(item, frame.depth + 1);
+	}
+	return out.join('');
 }
 
 /**
@@ -1690,18 +1760,12 @@ function run_strip({ values, positionals }) {
 
 /**
  * The line `parse` dies with when serializing a tree the engine returned throws — never the
- * input's fault, and never the engine's: `JSON.stringify` (and `JSON.parse`, for `--pretty`'s
- * re-read) recurse once per nesting level on the JS stack, which a tree the engine's own
- * stack handled can outgrow (the N-API engine parses on the native stack, past where the
- * JS one ends). Exit 2, trouble running the command: the input parsed, so the verdict
- * code 1 would misreport it. The native CLI never meets this, since it re-indents the
- * wire's bytes without reading them back.
+ * input's fault, and never the engine's (an output past the JS engine's string length, say;
+ * depth is no such failure, `stringify_tree` serializing any tree the engine returns). Exit 2,
+ * trouble running the command: the input parsed, so the verdict code 1 would misreport it.
  */
 function serialization_failure(error) {
-	const message = error_message(error);
-	return error instanceof RangeError && /call stack/i.test(message)
-		? `Error: the parsed tree is too deeply nested to serialize in JS (${message})`
-		: `Error: failed to serialize the parsed tree (${message})`;
+	return `Error: failed to serialize the parsed tree (${error_message(error)})`;
 }
 
 /**

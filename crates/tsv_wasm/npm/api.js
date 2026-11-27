@@ -6,8 +6,8 @@
  *
  * The engines are flat: the WASM bindings (`@fuzdev/tsv-wasm`, `-parse-wasm`,
  * `-format-wasm`) and the native N-API addon (`@fuzdev/tsv`) each export
- * `format_<lang>(source, source_type?)` and `parse_<lang>_json(source, source_type?)`
- * (the WASM ones `parse_<lang>(source, source_type?)` too). The facade turns that into
+ * `format_<lang>(source, source_type?)` and `parse_tape_<lang>(source, source_type?)`, the
+ * tape `api_parse.js` decodes (`tape_engine.js`). The facade turns that into
  * the published surface — `(source, options?)` with an acorn-style bag — and is the ONE
  * options reader: staged verbatim into every package (`scripts/patch_npm_package.ts`,
  * `scripts/build_napi_packages.ts`), so the error a caller matches on is the same text
@@ -16,22 +16,20 @@
  * decoders), and the facade never lets one reach them.
  *
  * The bag: `parse_<lang>(source, {locations?, sourceType?})`,
- * `parse_<lang>_json(source, {sourceType?})`, `format_<lang>(source, {sourceType?})`,
- * `strip_<lang>(source, {sourceType?})`, and `parse_imports_<lang>(source, {sourceType?})`.
+ * `format_<lang>(source, {sourceType?})`, `strip_<lang>(source, {sourceType?})`, and
+ * `parse_imports_<lang>(source, {sourceType?})`.
  * `sourceType` (`'script'` / `'module'`) is TypeScript's alone — Svelte hard-wires
  * `module` and CSS has no goal — so the other languages refuse a set one. Unknown keys
  * error whatever their value (a typo like `{locatons: true}` must not silently hand back
  * the default); a supported key explicitly set to `undefined` means its default,
  * including `sourceType` on a language that refuses a set one — which is what lets one
- * bag forward to whichever export (`npm/cli.js` does). `parse_*_json` and `format_*`
- * take no `locations`: the JSON string is the wire, and `loc` is a view over objects; a
- * format emits no wire at all. A `_json` export refuses the key with that explanation, a
- * format export as an unknown key.
+ * bag forward to whichever export (`npm/cli.js` does). `format_*` takes no `locations` — a
+ * format emits no tree — and refuses the key as an unknown one.
  *
  * Every argument refusal — the bag's and the source's — is a `TypeError`, thrown.
  *
- * Every parse, parse-JSON and format export RETURNS what it concludes about the source, as
- * the strip does (`api_strip.js`): `{ok: true, …}` with the product (`ast`, `json` or `code`),
+ * Every parse and format export RETURNS what it concludes about the source, as the strip
+ * does (`api_strip.js`): `{ok: true, …}` with the product (`ast` or `code`),
  * or `{ok: false, error}` for a source it cannot handle. `error` is a plain object — no stack
  * captured per failure, and structured-clone-able, so a worker can post it — whose span is
  * shaped like a wire node's: `start` and `end` the UTF-16 offsets a wire node there would
@@ -48,8 +46,8 @@
  *   end early; the span is the CR.
  *
  * The engines build that result themselves and RETURN it in the product's place — a string
- * for every export but the WASM engine's object `parse_<lang>`, which returns `{ok: true, ast}`
- * itself — so the facade tells the two apart by `typeof` (or by `ok`) and copies nothing;
+ * for a format, a `Uint32Array` for a tape — so the facade tells the two apart by type and
+ * copies nothing;
  * `read_failure` only checks the shape, and throws a malformed one as the engine bug it is
  * (as it does a `kind` the export never returns: a refusal from a parse export). What still
  * THROWS is an engine failure with no point, passed through as itself: a source over the
@@ -76,10 +74,9 @@
 
 /**
  * The export kinds a bag is read for: `parse` (`parse_<lang>`, which takes
- * `locations`), `parse_json` (`parse_<lang>_json`, which refuses it), `format`, `strip`
- * (`strip_<lang>`), and `imports` (`parse_imports_<lang>`).
+ * `locations`), `format`, `strip` (`strip_<lang>`), and `imports` (`parse_imports_<lang>`).
  *
- * @typedef {'parse' | 'parse_json' | 'format' | 'strip' | 'imports'} ExportKind
+ * @typedef {'parse' | 'format' | 'strip' | 'imports'} ExportKind
  */
 
 /**
@@ -87,9 +84,8 @@
  * `{locations, source_type}` (`locations` default `false`, `source_type` default
  * `undefined` — unset, not `'module'`; see the module doc).
  *
- * The key set follows from the export: `locations` is a key of a `parse` export alone (a
- * `parse_json` export refuses it with its own explanation — the export returns the wire,
- * which `loc` is not part of — and a `format` export as an unknown key), and `sourceType`
+ * The key set follows from the export: `locations` is a key of a `parse` export alone (every
+ * other export refuses it as an unknown key), and `sourceType`
  * is settable for TypeScript alone, the one language with a parse goal. Every error names
  * the export family, `parse`, `format`, `strip` or `imports`.
  *
@@ -98,7 +94,7 @@
  * refused. Any other object is read by its own enumerable keys and nothing else, so a
  * non-plain one — a `Date`, a `Map` — is not refused: it reads as a keyless bag, i.e.
  * all defaults. A key's getter runs once, and one that throws surfaces as
- * `failed to read <noun> option '<name>'` with the getter's error as its `cause`.
+ * `failed to read <kind> option '<name>'` with the getter's error as its `cause`.
  *
  * @param {unknown} options - the caller's bag
  * @param {ExportKind} kind - the export the bag is for
@@ -108,40 +104,34 @@
  *   holds a value of the wrong type, or has a getter that throws
  */
 export function read_options(options, kind, language) {
-	const noun = kind === 'parse_json' ? 'parse' : kind;
 	const takes_locations = kind === 'parse';
 	const takes_source_type = language === 'typescript';
 	const parsed = { locations: false, source_type: undefined };
 	if (options === undefined || options === null) return parsed;
 	if (typeof options !== 'object' || Array.isArray(options)) {
-		throw new TypeError(`${noun} options must be an object`);
+		throw new TypeError(`${kind} options must be an object`);
 	}
 	for (const name of Object.keys(options)) {
 		if (name === 'locations' && takes_locations) {
-			const value = read_option(options, name, noun);
+			const value = read_option(options, name, kind);
 			if (value === undefined) continue;
 			if (typeof value !== 'boolean') {
 				throw new TypeError(
-					`${noun} option 'locations' must be a boolean (got ${describe_value(value)})`
+					`${kind} option 'locations' must be a boolean (got ${describe_value(value)})`
 				);
 			}
 			parsed.locations = value;
-		} else if (name === 'locations' && kind === 'parse_json') {
-			throw new TypeError(
-				`${noun} option 'locations' is not supported by parse_${language}_json — the ` +
-					`JSON string is the span-only wire; use parse_${language}(source, {locations: true})`
-			);
 		} else if (name === 'sourceType') {
-			const value = read_option(options, name, noun);
+			const value = read_option(options, name, kind);
 			// checked before the language's refusal: a forwarded bag spells the
 			// inapplicable source type `undefined`, and that must pass everywhere
 			if (value === undefined) continue;
 			if (!takes_source_type) {
-				throw new TypeError(`${noun} option 'sourceType' is only supported for TypeScript`);
+				throw new TypeError(`${kind} option 'sourceType' is only supported for TypeScript`);
 			}
 			if (value !== 'script' && value !== 'module') {
 				throw new TypeError(
-					`${noun} option 'sourceType' must be 'script' or 'module' (got ${describe_value(value)})`
+					`${kind} option 'sourceType' must be 'script' or 'module' (got ${describe_value(value)})`
 				);
 			}
 			parsed.source_type = value;
@@ -154,7 +144,7 @@ export function read_options(options, kind, language) {
 						: takes_source_type
 							? "expected 'sourceType'"
 							: 'this export takes no options';
-			throw new TypeError(`unknown ${noun} option ${quote_string(name)} (${detail})`);
+			throw new TypeError(`unknown ${kind} option ${quote_string(name)} (${detail})`);
 		}
 	}
 	return parsed;

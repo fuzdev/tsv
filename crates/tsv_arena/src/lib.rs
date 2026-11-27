@@ -79,7 +79,7 @@ pub fn format_panic(payload: &(dyn std::any::Any + Send)) -> String {
 /// bindings pass it through [`decode_source_type`] for the refusal's wording.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Family {
-    /// `parse_*` / `parse_*_json` / `parse_tape_*` / `parse_internal_*` — a wire whose
+    /// `parse_*` / `parse_tape_*` / `parse_internal_*` — a wire whose
     /// `Program.sourceType` one settled grammar must produce.
     Parse,
     /// `format_*` — whose source type shapes only the parse the formatter runs.
@@ -196,10 +196,10 @@ macro_rules! read_ast {
     };
 }
 
-/// A binding's whole **parse** export body: parse `$source` through [`parse_ast!`] into the
-/// per-thread stores and convert it with the language's `__private::$convert` writer
-/// (`convert_ast_json_bytes` for the C FFI, `convert_ast_json_string` for the two JS
-/// bindings), a parse error mapped through `$map_err`, the binding's own error type.
+/// A binding's whole **JSON parse** export body — the C FFI's `tsv_parse_<lang>`; the two JS
+/// bindings emit no JSON wire: parse `$source` through [`parse_ast!`] into the per-thread stores
+/// and convert it with the language's `__private::$convert` writer (`convert_ast_json_bytes`), a
+/// parse error mapped through `$map_err`, the binding's own error type.
 ///
 /// `$goal` is the binding's decoded `Option` goal, and an unset one is read here as the
 /// grammar's default, `Module` (`Goal::default()`): a parse has no fallback to run, since

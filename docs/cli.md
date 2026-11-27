@@ -191,11 +191,16 @@ product surface that writer has; it mirrors acorn's `locations: true`): the line
 and column (0-based, UTF-16 code units) of each object's own `start`/`end`, on every object
 that carries them — CSS's included, which `parseCss` itself leaves bare — under the
 document's line rule (ECMAScript's terminators for TypeScript, LF alone for Svelte and
-everything in it, and for CSS). The JS mirror's `parse --locations` (`npm/cli.js`) gets the
-same `loc` from the packages' `{locations: true}` — the JS reconstruction over the span-only
-tree — so its tree deep-equals the native one while the key order differs (`loc` after
-`end` natively, appended last in JS). Orthogonal to `--source-type` (the source type drives
-the parser, `--locations` the writer), so the two compose.
+everything in it, and for CSS). The JS mirror's `parse` (`npm/cli.js`) prints
+`JSON.stringify` of the tree the packages' `parse_<lang>` decodes from the engine's tape —
+byte for byte the native wire, `--pretty`'s tab indent included (the package suite holds the
+two bins to it, the deepest tree the parser accepts included); a tree too deep for
+`JSON.stringify`'s recursion on the JS stack is serialized from an explicit stack instead, to
+the same bytes. Its `parse --locations` gets the same `loc` from the packages'
+`{locations: true}` — the JS reconstruction over the span-only tree — so its tree deep-equals
+the native one while the key order differs (`loc` after `end` natively, appended last in JS).
+Orthogonal to `--source-type` (the source type drives the parser, `--locations` the writer), so
+the two compose.
 
 Implemented in `tsv_cli/src/cli/input.rs`
 
@@ -636,8 +641,8 @@ contract holds there:
 | WASM on a Node, Deno or Bun worker | as above, on the worker's stack | holds |
 
 Every row was measured with every shape `tests/depth_limit.rs` generates, at its deepest
-accepted depth, through the packages' API (parse with and without `locations`, the `_json`
-string, format, strip); the WASM main-thread row on Node is the standing gate,
+accepted depth, through the packages' API (parse with and without `locations`, format,
+strip); the WASM main-thread row on Node is the standing gate,
 `npm run test:depth:wasm`. That gate adds the import records to the calls above and cuts
 V8's stack to nine tenths of its default, the native gate's margin. A WASM build keeps its spilled frames on a 1 MiB shadow stack in
 linear memory (wasm-ld's default) and its call frames on the engine's native stack, about

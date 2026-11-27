@@ -281,9 +281,9 @@ Things the published numbers measure that aren't quite what they look like.
   every third-party row pays its package's. The `-internal` rows stay on the raw
   export: bench-only, published by no package, behind no facade. The bench builds those
   tables by hand, so each binding's init asks, untimed, that the row's parse runs through
-  the tape export and returns the tree `JSON.parse` makes of the `_json` export's wire, key
-  order included (`lib/tape_probe.ts`); a wiring that fell back to the JSON wire would
-  otherwise be timed under the tape route's name.
+  the tape export — and, over the C FFI, which also emits the JSON wire, that it returns the
+  tree `JSON.parse` makes of that wire, key order included (`lib/tape_probe.ts`); a wiring
+  that took another route would otherwise be timed under the tape route's name.
 
   Three distances from an installed package remain, each deliberate. The facade is
   imported from the source tree — the files the packages stage verbatim, not a
@@ -504,7 +504,7 @@ Things the published numbers measure that aren't quite what they look like.
   is serialized to a JSON string in Rust and deserialized in JS — the native package's
   `index.js` `wrap()` runs `JSON.parse` on `.program` access (verified: `typeof program
   === 'object'`). tsv's rows take the packages' tape route instead: Rust writes the
-  span-only JSON wire, transcodes it to the binary tape, and hands the tape over as
+  span-only wire's binary tape straight from the AST, and hands the tape over as
   words (copied into a JS-owned buffer by N-API and the FFI wrapper, a view of linear
   memory for `tsv-wasm`), which the generated decoder builds the tree from
   ([tape_format.md](tape_format.md)) — the tree `JSON.parse` would make of the wire, key
@@ -564,9 +564,8 @@ Things the published numbers measure that aren't quite what they look like.
     enough to reverse a native `parse/typescript` ratio against a `tsv` that crossed as
     JSON, which is why the row is published rather than footnoted. tsv's rows cross by
     the same kind of transfer — a binary buffer and a generated decoder — so
-    `tsv` vs `oxc-parser-raw` is the pair closest in mechanism, one difference left:
-    oxc writes its buffer straight from the AST, where tsv writes its JSON wire first
-    and transcodes it.
+    `tsv` vs `oxc-parser-raw` is the pair closest in mechanism: each writes its buffer
+    straight from the AST.
     Absent under Bun, where `rawTransferSupported()` is false (its own impl slot, so
     the absence is recorded in `unavailable` rather than read as a missing row).
 - **The `+locations` rows price `{locations: true}`, and they are not opponents of

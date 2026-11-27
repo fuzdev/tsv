@@ -3,18 +3,17 @@
  *
  * Both default parse rows take the tape route (`docs/tape_format.md`):
  *
- * Native:  parse -> the span-only JSON wire -> transcoder -> the tape's words copied into
- *          a JS-owned `Uint32Array` (N-API) -> generated decoder (JS)
- * WASM:    parse -> the span-only JSON wire -> transcoder -> a `Uint32Array` view of linear
- *          memory -> generated decoder (JS)
+ * Native:  parse -> the wire writer's tape -> the tape's words copied into a JS-owned
+ *          `Uint32Array` (N-API) -> generated decoder (JS)
+ * WASM:    parse -> the wire writer's tape -> a `Uint32Array` view of linear memory ->
+ *          generated decoder (JS)
  *
- * Both share the parse; they differ in materialization. This splits total
- * into parse vs materialization for each, and prices `JSON.parse` of the same wire
- * beside it — the JS step the JSON route (`parse_<lang>_json`) would take instead of the
- * decode. Both paths are the bench rows' own calls, so they run
- * through the packages' facade (`lib/tsv_api.ts`), whose argument checks land in
- * the materialization share; `diagnostics/facade_probe.ts` prices those alone, and its
- * `--transfer` arms split the tape route itself.
+ * Both share the parse; they differ in materialization. This splits total into parse vs
+ * materialization for each, and prices `JSON.parse` of the same wire beside it — the JS step a JSON
+ * route would take instead of the decode. Both paths are the bench rows' own calls, so they run
+ * through the packages' facade (`lib/tsv_api.ts`), whose argument checks land in the
+ * materialization share; `diagnostics/facade_probe.ts` prices those alone, and its `--transfer`
+ * arms split the tape route itself.
  *
  * The native side is the bench's own: the profile-guided N-API addon
  * (`npm run build:bench:pgo`), beside the `nodejs` WASM bundle (`npm run build:wasm:all:nodejs`),
@@ -116,16 +115,12 @@ export async function run_wasm_json_probe(deps: WasmJsonProbeDeps): Promise<void
 	console.error(`native parse total          ${ms(native_total)} ms`);
 	console.error(`native parse_internal       ${ms(native_internal)} ms  (pure parse)`);
 	console.error(
-		`  -> native materialization ${ms(
-			native_total - native_internal
-		)} ms  (JSON wire+transcode+copy+decode)`
+		`  -> native materialization ${ms(native_total - native_internal)} ms  (tape write+copy+decode)`
 	);
 	console.error(`wasm   parse total          ${ms(wasm_total)} ms`);
 	console.error(`wasm   parse_internal       ${ms(wasm_internal)} ms  (pure parse)`);
 	console.error(
-		`  -> wasm materialization   ${ms(
-			wasm_total - wasm_internal
-		)} ms  (JSON wire+transcode+view+decode)`
+		`  -> wasm materialization   ${ms(wasm_total - wasm_internal)} ms  (tape write+view+decode)`
 	);
 	console.error(`\nJS-side only (the JSON route's JS step, for reference):`);
 	console.error(`  JSON.parse(wire)          ${ms(js_jsonparse)} ms`);

@@ -3,7 +3,7 @@
  * binary that ships, loaded through the `@fuzdev/tsv` loader — on a thread the contract's
  * size less the tenth the native gate keeps in hand (`GATE_STACK_MB`): every shape
  * `tests/depth_limit.rs` generates (`write_shape_limits`), at its accepted depth, through
- * the parse (object, `{locations: true}`, `_json`), the format, the format's output parsed
+ * the parse (with and without `{locations: true}`), the format, the format's output parsed
  * again and formatted to itself (F1), the import records and the type strip, each of which
  * must return `{ok: true, …}` (a strip's refusal is a verdict too), and at one level deeper
  * the parse must return the depth refusal.
@@ -180,7 +180,7 @@ async function run_worker(input: WorkerInput): Promise<void> {
 			}
 		}
 		try {
-			const over = tsv[`parse_${shape.language}_json`](make_shape(shape, shape.n + 1));
+			const over = tsv[`parse_${shape.language}`](make_shape(shape, shape.n + 1));
 			if (over?.ok !== false || !is_depth_refusal(String(over.error?.message))) {
 				fail(
 					shape,

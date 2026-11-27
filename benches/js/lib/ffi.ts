@@ -5,8 +5,9 @@
  *
  * The `parse` and `format` rows call the published API over these entry points — the
  * packages' facade, taken as it is over the N-API addon: `parse_<lang>` decodes the tape
- * `tsv_parse_tape_<lang>` returns (`call_ffi_tape`), `parse_<lang>_json` keeps the wire
- * string `tsv_parse_<lang>` returns (`call_ffi`). No npm package ships the C FFI, so this is
+ * `tsv_parse_tape_<lang>` returns (`call_ffi_tape`). The JSON wire `tsv_parse_<lang>` returns
+ * (`call_ffi`), which no npm package publishes, rides the engine table for the tape probe's
+ * tree comparison and the PGO training. No npm package ships the C FFI, so this is
  * the facade tsv WOULD publish over it; see `lib/tsv_api.ts`.
  */
 
@@ -234,8 +235,8 @@ export class NativeImplementation extends TsvBinding {
 
 		// Every entry point as a flat `(source, source_type?) => …` — the shape the other two
 		// bindings export: the tape entry points as the words beneath the facade's
-		// `parse_<lang>`, the JSON ones (the span-only wire, as a string) beneath
-		// `parse_<lang>_json`. A `parse_internal` payload is empty.
+		// `parse_<lang>`, the JSON ones (the span-only wire, as a string) as the engine's
+		// `parse_json`, which no package publishes. A `parse_internal` payload is empty.
 		const tape =
 			(fn: FfiFn): EngineFn<Uint32Array> =>
 			(source, source_type) =>
