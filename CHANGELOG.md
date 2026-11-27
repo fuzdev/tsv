@@ -23,7 +23,19 @@ Each `## Unreleased` section must be non-empty and carry a
   and narrowed to what the wire emits: `AttributeText` is gone (`AttributeValue` is
   `Text | ExpressionTag`), `RootComment` drops `'CSSComment'`, `TSDeclareMethod.id` is
   `null`, and `TSMethodSignature.kind` and `Attribute.value` are required
+- **breaking** feat: in `@fuzdev/tsv` and `@fuzdev/tsv-wasm` the parse family
+  (`parse_<lang>`, `reconstruct_locations`, `create_locator`, the AST and parse types) moves
+  from the root to the `./parse` subpath (`@fuzdev/tsv-parse-wasm` keeps it at its root too);
+  `parse_<lang>` decodes a binary tape, a faster route to the same tree
+- **breaking** feat: the npm packages drop `parse_<lang>_json` and its types —
+  `JSON.stringify(parse_<lang>(source).ast)` is the same wire; the CLI, the C FFI and the Rust
+  crates keep the JSON wire
+- **breaking** feat: with `{locations: true}`, `loc` comes right after `end` and a Svelte
+  `name_loc` right after `name`, as `tsv parse --locations` writes them (values unchanged);
+  `reconstruct_locations` still appends them last
 
+- feat: `tsv_ast.d.ts` types the CSS tree (`CSSRule`, `CSSAtrule`, the selector nodes, plus
+  `CSSSimpleSelector` and `CSSNode` aliases) where it was `unknown[]`
 - perf: parsing and formatting are faster
 - feat: an internal panic in `@fuzdev/tsv`'s addon throws an `Error` whose message is
   `panic: ` and the panic's message
