@@ -504,51 +504,6 @@ impl Transcoder {
         self.finish()
     }
 
-    /// [`Transcoder::transcode`], the tape as words — the form a binding hands a host, since a
-    /// `u32` buffer is 4-aligned by its type and a JS host views the tape in place (a
-    /// `Uint32Array`, then the exact bytes over the same memory). Each word's bytes in memory
-    /// are the tape's bytes in order, on any host: the header and body words are stored
-    /// little-endian and the pool packed into the words after them, its last word
-    /// zero-padded. Returns the words and the tape's length in bytes, the pool's last byte
-    /// included and the padding not.
-    ///
-    /// The words are the transcoder's own buffer, the one the transcode wrote the body into —
-    /// the tape is laid out where it was written, never copied — and stay valid until the next
-    /// transcode. A caller that must own them copies the slice (an exact allocation); a caller
-    /// that hands the host a view over them, as the WASM binding does, holds the one buffer a
-    /// parked transcoder already keeps.
-    ///
-    /// # Errors
-    ///
-    /// As [`Transcoder::transcode`].
-    pub fn transcode_words(
-        &mut self,
-        json: &[u8],
-        source: &str,
-    ) -> Result<(&[u32], usize), TapeError> {
-        self.run(json, source)?;
-        let header = self.header()?;
-        let len = self.tape.len() * 4 + self.pool.len();
-        self.tape[..HEADER_WORDS].copy_from_slice(&header);
-        // a no-op on a little-endian host, the loop with it
-        for word in &mut self.tape {
-            *word = word.to_le();
-        }
-        let mut chunks = self.pool.chunks_exact(4);
-        self.tape.extend(
-            chunks
-                .by_ref()
-                .map(|c| u32::from_ne_bytes([c[0], c[1], c[2], c[3]])),
-        );
-        let rest = chunks.remainder();
-        if !rest.is_empty() {
-            let mut last = [0u8; 4];
-            last[..rest.len()].copy_from_slice(rest);
-            self.tape.push(u32::from_ne_bytes(last));
-        }
-        Ok((&self.tape, len))
-    }
-
     /// Reads the JSON text into `tape` (after the header's words, which it leaves unwritten) and
     /// `pool`: everything a transcode does but lay out its output.
     fn run(&mut self, json: &[u8], source: &str) -> Result<(), TapeError> {
@@ -1370,34 +1325,6 @@ mod tests {
             .map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]]))
             .collect();
         assert_eq!(&body[..2], &[HEADER_ESCAPE, 5]);
-    }
-
-    /// The word form is the byte form, word by word in memory, padded to a whole word.
-    #[test]
-    fn the_word_tape_is_the_byte_tape() {
-        let mut t = Transcoder::new();
-        for (json, source) in [
-            (r#"{"a":1}"#, ""),
-            (r#"{"a":"xyz"}"#, ""),
-            (r#"{"a":"wxyz"}"#, ""),
-            (r#"{"a":"é"}"#, "a😀b"),
-            (r#"{"type":"Identifier","start":0,"end":1,"name":"a"}"#, "a"),
-        ] {
-            let bytes = t.transcode(json.as_bytes(), source).unwrap().to_vec();
-            let (words, len) = t.transcode_words(json.as_bytes(), source).unwrap();
-            assert_eq!(len, bytes.len(), "{json}");
-            assert_eq!(words.len(), bytes.len().div_ceil(4), "{json}");
-            let laid: Vec<u8> = words.iter().flat_map(|w| w.to_ne_bytes()).collect();
-            assert_eq!(&laid[..len], &bytes[..], "{json}");
-            assert!(
-                laid[len..].iter().all(|&b| b == 0),
-                "{json}: the padding is zero"
-            );
-        }
-        // the byte form after the word form, over the same buffers, is still the tape
-        let (_, len) = t.transcode_words(br#"{"a":"xyz"}"#, "").unwrap();
-        let bytes = t.transcode(br#"{"a":"xyz"}"#, "").unwrap();
-        assert_eq!(bytes.len(), len);
     }
 
     /// The inline integer reader agrees with the plain digit loop it shortcuts.

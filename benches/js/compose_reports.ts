@@ -613,8 +613,13 @@ export async function run_compose_reports(deps: ComposeReportsDeps): Promise<num
 	 * the JSON wire and `JSON.parse`. A combined report over siblings of both vintages is
 	 * `mixed_vintage` already; this is for a consumer comparing a row against an older
 	 * committed report under the same name.
+	 *
+	 * 21: no field moved, but from per-runtime report `version` 25 the same parse rows'
+	 * tape is written straight from the AST by each language's wire writer, where earlier
+	 * siblings timed the JSON wire transcoded to the tape. As for 20, a row compared
+	 * against an older committed report under the same name compares two mechanisms.
 	 */
-	const COMBINED_SCHEMA_VERSION = 20;
+	const COMBINED_SCHEMA_VERSION = 21;
 
 	// JSON: metadata + provenance per source + the comparison rows.
 	/**

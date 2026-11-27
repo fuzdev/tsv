@@ -567,7 +567,7 @@ fn run_walks_on(name: String, stack: usize, lang: Lang, source: String) {
                         &source,
                         tsv_ts::Goal::Module,
                         &span,
-                        &mut tsv_arena::tape::Transcoder::new(),
+                        &mut tsv_debug::transcoder::Transcoder::new(),
                         &mut tsv_lang::tape::TapeSink::new(),
                     ),
                 );
@@ -618,7 +618,7 @@ fn run_walks_on(name: String, stack: usize, lang: Lang, source: String) {
                     tsv_debug::tape::grade_css_direct_tape(
                         &source,
                         &span,
-                        &mut tsv_arena::tape::Transcoder::new(),
+                        &mut tsv_debug::transcoder::Transcoder::new(),
                         &mut tsv_lang::tape::TapeSink::new(),
                     ),
                 );
@@ -638,7 +638,7 @@ fn run_walks_on(name: String, stack: usize, lang: Lang, source: String) {
                     tsv_debug::tape::grade_svelte_direct_tape(
                         &source,
                         &span,
-                        &mut tsv_arena::tape::Transcoder::new(),
+                        &mut tsv_debug::transcoder::Transcoder::new(),
                         &mut tsv_lang::tape::TapeSink::new(),
                     ),
                 );
@@ -658,14 +658,13 @@ fn run_walks_on(name: String, stack: usize, lang: Lang, source: String) {
     });
 }
 
-/// The span-only wire transcodes to a tape (`docs/tape_format.md`) and prints back to itself,
-/// and the bindings' word form (`transcode_words`, on the thread's parked transcoder) lays
-/// down the same bytes, on the walks' thread: the transcoder and the printer keep their frames
-/// on the heap, so the deepest wire costs them no stack.
+/// The span-only wire transcodes to a tape (`docs/tape_format.md`) and prints back to itself, on
+/// the walks' thread: the transcoder and the printer keep their frames on the heap, so the
+/// deepest wire costs them no stack.
 fn assert_tape(name: &str, language: &str, span: &[u8], source: &str) {
     assert!(!span.is_empty());
     let source = tsv_debug::tape::wire_source(language, source);
-    let mut transcoder = tsv_arena::tape::Transcoder::new();
+    let mut transcoder = tsv_debug::transcoder::Transcoder::new();
     let tape = transcoder
         .transcode(span, source)
         .unwrap_or_else(|e| panic!("{name}: the transcoder refused the wire: {e}"));
@@ -675,18 +674,6 @@ fn assert_tape(name: &str, language: &str, span: &[u8], source: &str) {
         tsv_debug::tape::bytes_difference(&back, span),
         None,
         "{name}: the tape prints back to another wire"
-    );
-    // the bindings' form: the same tape as words, on the thread's parked transcoder
-    let (laid, len) = tsv_arena::tape::with_transcoder(|t| {
-        t.transcode_words(span, source).map(|(words, len)| {
-            let laid: Vec<u8> = words.iter().flat_map(|w| w.to_ne_bytes()).collect();
-            (laid, len)
-        })
-    })
-    .unwrap_or_else(|e| panic!("{name}: the parked transcoder refused the wire: {e}"));
-    assert!(
-        laid.get(..len) == Some(tape),
-        "{name}: the word tape is not the byte tape"
     );
 }
 

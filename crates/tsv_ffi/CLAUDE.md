@@ -17,7 +17,7 @@ Build/usage commands live in [../../CLAUDE.md §JS Bindings](../../CLAUDE.md#js-
 Mirrors `tsv_wasm`'s split so the bench can size scope-matched native artifacts:
 
 - `format` (default) — `tsv_format_<lang>` exports
-- `parse` (default) — `tsv_parse_<lang>` + `tsv_parse_internal_<lang>` + `tsv_parse_tape_<lang>` exports (and `tsv_free_tape`), the `json` layer on each language crate, and `tsv_arena/tape` (the transcoder)
+- `parse` (default) — `tsv_parse_<lang>` + `tsv_parse_internal_<lang>` + `tsv_parse_tape_<lang>` exports (and `tsv_free_tape`), the `json` layer on each language crate (`tsv_parse_<lang>`'s), the writers' tape copies (each language crate's `_tape`, `tsv_parse_tape_<lang>`'s), and `tsv_arena/tape` (the parked sink they write into)
 
 The default (both features) is the full `libtsv_ffi` any FFI host links; the bench's perf rows load its profile-guided build (`npm run build:bench:pgo`, trained as itself through the bench's FFI wrapper, every export by name — the row's parse is the tape export decoded through the facade, `benches/js/lib/ffi.ts`). The size table also reports two subset builds, plain, each in its own target dir so they don't clobber the full lib: `--no-default-features --features format` (the native mirror of `@fuzdev/tsv-format-wasm`, no wire-JSON layer, scope-matched to oxfmt) and `--no-default-features --features parse` (the mirror of `@fuzdev/tsv-parse-wasm`, printers dropped, scope-matched to oxc-parser). See `npm run build:ffi:format` / `build:ffi:parse` — built only by `build:bench`, which the gate never runs, so `npm run typecheck:features` (in `check`) `cargo check`s each half on its own.
 
@@ -27,7 +27,7 @@ The `lang_bindings!` macro generates four `extern "C"` functions per language (s
 
 - `tsv_parse_<lang>` — the span-only JSON AST (`start`/`end` offsets, no per-node `loc`; Svelte also no `name_loc`) — the one parse wire every binding emits. See [../tsv_ts/CLAUDE.md](../tsv_ts/CLAUDE.md) §Public API. The `loc`-bearing wire has no C-ABI export; the corpus tools ask `tsv_debug loc_wires --stdin` for it.
 - `tsv_parse_internal_<lang>` — Empty payload (`*out_len == 0` with `TSV_STATUS_OK`; benchmark-only; AST is built but not converted/serialized — `std::hint::black_box` prevents elision)
-- `tsv_parse_tape_<lang>` — the tape, the binary parse wire ([../../docs/tape_format.md](../../docs/tape_format.md)): `tsv_parse_<lang>`'s wire laid down as words (`tsv_arena`'s `parse_tape!`), `*out_len` its length in bytes. The one export whose payload is not a byte allocation — see the free rule below
+- `tsv_parse_tape_<lang>` — the tape, the binary parse wire ([../../docs/tape_format.md](../../docs/tape_format.md)): `tsv_parse_<lang>`'s wire written by the language's wire writer straight into words (its tape copy, through `tsv_arena`'s `parse_tape!`), `*out_len` its length in bytes. The one export whose payload is not a byte allocation — see the free rule below
 - `tsv_format_<lang>` — Formatted source
 
 Plus `tsv_free(ptr, len)` for deallocation, and `tsv_free_tape(ptr, len)` for a `tsv_parse_tape_*` payload.
@@ -89,8 +89,9 @@ alloc → write `out_len`/`out_status` → `tsv_free` round-trip): the happy
 path per language, the error status on invalid syntax, the goal axis and its three
 refusals (an unknown code; a script goal on a goalless language; the unspecified
 code on a parse export) beside the fallback that code answers, the invalid-UTF-8 path,
-empty input, `tsv_free` null/zero no-ops, and the tape family against the JSON
-wire (its errors in the same word payload, freed by `tsv_free_tape`). Its
+empty input, `tsv_free` null/zero no-ops, and the tape family against its
+language's own writer's tape (its errors the JSON export's, in a word payload freed by
+`tsv_free_tape`). Its
 `call_raw` helper pins the one
 direction of status↔payload agreement that is a contract — an error status must
 carry an `{"error": …}` payload — and deliberately leaves the converse unasserted,

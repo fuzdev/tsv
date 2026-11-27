@@ -3,7 +3,7 @@
 //!
 //! The Rust half of `npm run check:tape` (`scripts/check_tape.ts`): one process that parses every
 //! fixture document `loc_wires` grades, writes its span-only wire, transcodes the wire to a tape
-//! (`tsv_arena::tape::Transcoder`), and streams one NDJSON record per document to stdout —
+//! (`crate::transcoder::Transcoder`), and streams one NDJSON record per document to stdout —
 //! `{"path", "language", "source", "span", "tape", "direct"?}`, the wire embedded verbatim, the
 //! tapes in base64 — so the JS half can encode the same wire with the offline encoder, compare
 //! the two tapes byte for byte, and decode them. `direct` is the document's tape as its wire
@@ -37,10 +37,10 @@ use crate::tape::{
     base64, fixture_wires, grade_css_direct_tape, grade_svelte_direct_tape, grade_ts_direct_tape,
     wire_source,
 };
+use crate::transcoder::Transcoder;
 use argh::FromArgs;
 use std::io::Write;
 use std::path::PathBuf;
-use tsv_arena::tape::Transcoder;
 use tsv_lang::tape::TapeSink;
 
 /// Stream every fixture document's span-only wire and tape as NDJSON (`check:tape`'s input), or

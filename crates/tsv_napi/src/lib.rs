@@ -16,8 +16,8 @@
 //! an engine failure with no point (an argument refusal, the size cap) still throws
 //! (`napi::Error`). `parse_internal_<lang>` parses without converting (benchmark-only, AST
 //! kept live via `black_box`). `parse_tape_<lang>` returns the binary parse wire
-//! (`docs/tape_format.md`), the JSON wire laid down as words in a `Vec<u32>` and copied into a
-//! `Uint32Array` the engine owns (4-aligned by type), which the npm loader's `parse_<lang>`
+//! (`docs/tape_format.md`), written by the language's wire writer (its tape copy) as words,
+//! copied into a `Uint32Array` the engine owns (4-aligned by type), which the npm loader's `parse_<lang>`
 //! decodes. A copy, not an external buffer: an external buffer's finalizer runs only once the
 //! event loop turns, so a synchronous loop of parses would hold every tape it made until it
 //! yielded, out of reach of the garbage collector.
@@ -262,10 +262,11 @@ fn engine_export<T>(
     })
 }
 
-/// A transcode the tape export could not finish, thrown as a plain `Error`: a wire the writers
-/// emit never fails one but on size (a source too long for the tape's signed string offsets).
+/// A tape the sink refused, thrown as a plain `Error`: a tape the writers write is refused only
+/// on size (a source too long for the tape's signed string offsets), or for a writer bug the
+/// sink caught.
 #[cfg(feature = "parse")]
-fn tape_failure(e: tsv_arena::tape::TapeError) -> Failure {
+fn tape_failure(e: tsv_arena::tape::SinkError) -> Failure {
     Failure::Plain(format!("the parse does not fit a tape: {e}"))
 }
 
@@ -1211,16 +1212,17 @@ mod tests {
         }
     }
 
-    // --- parse_tape: the JSON route's wire as a tape, and its failures exactly ---
+    // --- parse_tape: the writer's tape, and its failures exactly ---
 
     /// Signature shared by every `parse_tape` engine half.
     type TapeFn = fn(&str, Option<String>) -> Result<Vec<u32>, Failure>;
 
-    /// The tape export is the JSON export's wire transcoded against the text its offsets
-    /// index (a Svelte or CSS document less its leading BOM), and every failure is the
-    /// JSON export's own: a parse failure, a refused source type.
+    /// The tape export is its language's own wire writer's tape (a transposed `lang_bindings!`
+    /// invocation would write another language's), and every failure is the JSON export's
+    /// own: a parse failure, a refused source type. The tape itself is graded against the
+    /// transcoder by the tape gates.
     #[test]
-    fn parse_tape_is_the_json_wire_and_its_failures() {
+    fn parse_tape_is_the_writers_tape_and_its_failures() {
         let cases: [(&str, StringFn, TapeFn, &str, &str); 3] = [
             (
                 "typescript",
@@ -1245,18 +1247,27 @@ mod tests {
             ),
         ];
         for (label, json_fn, tape_fn, good, bad) in cases {
-            let json = at_default(json_fn, good).unwrap();
-            let wire_text = if label == "typescript" {
-                good
-            } else {
-                good.strip_prefix('\u{FEFF}').unwrap()
+            let mut sink = tsv_arena::tape::TapeSink::new();
+            let expected = match label {
+                "typescript" => {
+                    let ast = tsv_ts::__private::parse(good).unwrap();
+                    tsv_ts::__private::write_tape(&ast, good, &mut sink);
+                    sink.finish_words().unwrap()
+                }
+                "css" => {
+                    let ast = tsv_css::__private::parse(good).unwrap();
+                    tsv_css::__private::write_tape(&ast, good, &mut sink);
+                    sink.finish_words().unwrap()
+                }
+                _ => {
+                    let ast = tsv_svelte::__private::parse(good).unwrap();
+                    tsv_svelte::__private::write_tape(&ast, good, &mut sink);
+                    sink.finish_words().unwrap()
+                }
             };
-            let mut transcoder = tsv_arena::tape::Transcoder::new();
-            let (expected, len) = transcoder
-                .transcode_words(json.as_bytes(), wire_text)
-                .unwrap();
+            let (expected, len) = (expected.0.to_vec(), expected.1);
             let words = tape_fn(good, None).unwrap_or_else(|e| panic!("{label}: {}", e.message()));
-            assert_eq!(words, expected, "{label}: the tape of the JSON wire");
+            assert_eq!(words, expected, "{label}: the writer's tape");
             assert_eq!(
                 words.len(),
                 len.div_ceil(4),

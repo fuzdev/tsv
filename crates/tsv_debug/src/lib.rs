@@ -16,4 +16,5 @@ pub mod sidecar;
 pub mod strip_fixtures;
 pub mod tape;
 pub mod test262;
+pub mod transcoder;
 pub mod tsc_conformance;

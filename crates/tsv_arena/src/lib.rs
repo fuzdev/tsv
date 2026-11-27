@@ -24,10 +24,10 @@
 //!
 //! # The tape
 //!
-//! Behind the `tape` feature, the `tape` module holds the binary parse wire's producer, the
-//! JSON → tape `tape::Transcoder` (`docs/tape_format.md`), over the format's types and schema
-//! tables in `tsv_lang::tape`, with the thread's parked transcoder (`tape::with_transcoder`) the
-//! bindings' `parse_tape!` export body runs on.
+//! Behind the `tape` feature, `parse_tape!` writes the binary parse wire (`docs/tape_format.md`)
+//! with the language crate's own wire writer — its tape copy, `__private::write_tape` — into the
+//! thread's parked `tsv_lang::tape::TapeSink` (`tape::with_tape_sink`), and lends the binding the
+//! finished words.
 
 #[cfg(feature = "tape")]
 pub mod tape;
@@ -79,7 +79,7 @@ pub fn format_panic(payload: &(dyn std::any::Any + Send)) -> String {
 /// bindings pass it through [`decode_source_type`] for the refusal's wording.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Family {
-    /// `parse_*` / `parse_*_json` / `parse_internal_*` — a wire whose
+    /// `parse_*` / `parse_*_json` / `parse_tape_*` / `parse_internal_*` — a wire whose
     /// `Program.sourceType` one settled grammar must produce.
     Parse,
     /// `format_*` — whose source type shapes only the parse the formatter runs.
@@ -254,21 +254,24 @@ macro_rules! parse_internal {
     }};
 }
 
-/// A binding's whole **tape** export body: [`parse_convert!`]'s span-only wire
-/// (`convert_ast_json_bytes`), transcoded on this thread's parked transcoder
-/// ([`tape::with_transcoder`]) to the tape's words
-/// ([`tape::Transcoder::transcode_words`]) — the binary parse wire (`docs/tape_format.md`) a
-/// JS host decodes to the tree `JSON.parse` makes of the same wire. The transcoder reads the
-/// text the wire's offsets index, `$lang::WIRE_COORDINATES.wire_text(source)`: a Svelte or CSS
-/// document less the leading byte-order mark its wire elides.
+/// A binding's whole **tape** export body: parse through [`parse_ast!`] into the per-thread
+/// stores and write the span-only wire's tape (`docs/tape_format.md`) with the language's own
+/// wire writer — its tape copy, `$lang::__private::write_tape`, the same walk that writes the
+/// JSON wire — into this thread's parked sink ([`tape::with_tape_sink`]), finished as words
+/// (`TapeSink::finish_words`): the binary parse wire a JS host decodes to the tree `JSON.parse`
+/// makes of the JSON wire. Its strings are true-offset refs into the text the wire's offsets
+/// index (a Svelte or CSS document less its leading byte-order mark — the writer's sink skips
+/// it).
 ///
-/// The words are the transcoder's own buffer, lent to `$take` — `|words: &[u32], len: usize|`,
-/// `len` the tape's length in bytes — which takes what the binding hands its host: a copy it
-/// gives away whole, or the address a view over the parked buffer reads (valid until the
-/// thread's next transcode). A parse error goes through `$map_err` as in [`parse_convert!`]
-/// (the goal read as it reads it); a transcode error, through `$map_tape_err` — a wire the
-/// writers emit never fails one but on size (a source too long for a string ref's signed
-/// offset). Expands to `Result<R, _>`, `R` what `$take` returns. Behind the `tape` feature.
+/// The words are the sink's own buffer, laid out where they were written, lent to `$take` —
+/// `|words: &[u32], len: usize|`, `len` the tape's length in bytes — which takes what the
+/// binding hands its host: a copy it gives away whole, or the address a view over the parked
+/// buffer reads (valid until the thread's next tape). A parse error goes through `$map_err`,
+/// the goal read as [`parse_convert!`] reads it (unset is `Module`; no fallback, no fold); a
+/// sink error (`tsv_lang::tape::SinkError`), through `$map_tape_err` — a tape the writers
+/// write is refused only on size (a source too long for a string ref's signed offset), or for
+/// a writer bug the sink caught. Expands to `Result<R, _>`, `R` what `$take` returns. Behind
+/// the `tape` feature.
 ///
 /// ```ignore
 /// parse_tape!(
@@ -286,19 +289,14 @@ macro_rules! parse_internal {
 macro_rules! parse_tape {
     ($goalness:ident, $lang:ident, $source:expr, $goal:expr, $take:expr, $map_err:expr, $map_tape_err:expr) => {{
         let source: &str = $source;
-        $crate::parse_convert!(
-            $goalness,
-            $lang,
-            convert_ast_json_bytes,
-            source,
-            $goal,
-            $map_err
-        )
-        .and_then(|json| {
-            $crate::tape::with_transcoder(|transcoder| {
-                transcoder
-                    .transcode_words(&json, $lang::WIRE_COORDINATES.wire_text(source))
-                    .map(|(words, len)| ($take)(words, len))
+        let goal = $goal.unwrap_or_default();
+        $crate::with_lang_stores!($lang, |stores| {
+            let ast =
+                $crate::parse_ast!($goalness, $lang, source, goal, stores).map_err($map_err)?;
+            let parsed = $crate::read_ast!($lang, ast, stores);
+            $crate::tape::with_tape_sink(|sink| {
+                $lang::__private::write_tape(parsed, source, sink);
+                sink.finish_words().map(|(words, len)| ($take)(words, len))
             })
             .map_err($map_tape_err)
         })

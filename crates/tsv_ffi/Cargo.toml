@@ -29,9 +29,18 @@ default = ["format", "parse"]
 # tsv_format_<lang> exports. Pulls the format path over the per-thread `DocArena` (tsv_arena/format).
 format = ["tsv_arena/format"]
 # tsv_parse_<lang> + tsv_parse_internal_<lang> + tsv_parse_tape_<lang> exports plus the
-# wire-JSON layer they emit through (each language crate's `json` feature) and the tape's
-# transcoder (`tsv_arena/tape`).
-parse = ["tsv_ts/json", "tsv_css/json", "tsv_svelte/json", "tsv_arena/tape"]
+# wire-JSON layer `tsv_parse_<lang>` emits through (each language crate's `json` feature), the
+# writers' tape copies `tsv_parse_tape_<lang>` writes through (each language crate's `_tape`),
+# and the tape's sink (`tsv_arena/tape`).
+parse = [
+    "tsv_ts/json",
+    "tsv_css/json",
+    "tsv_svelte/json",
+    "tsv_ts/_tape",
+    "tsv_css/_tape",
+    "tsv_svelte/_tape",
+    "tsv_arena/tape",
+]
 
 # The C ABI boundary needs `unsafe`. Cargo replaces the whole [lints] table on
 # override (no partial inherit), so the workspace lints are re-declared verbatim

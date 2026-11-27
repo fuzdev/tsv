@@ -12,8 +12,8 @@ publish = false
 # line-terminator fold and the thread's doc-arena slot (`tsv_lang::doc::arena::with_doc_arena`),
 # both reached through the hidden `__tsv_lang` re-export, so the bindings' code needs no
 # tsv_lang edge for them (tsv_wasm keeps one for its wasm32 layout pins). `tape`: the tape's
-# format and tables (`tsv_lang::tape`, its `_tape` feature), which the transcoder writes
-# against. So the dep is optional: a binding with neither feature gets none of it.
+# sink (`tsv_lang::tape::TapeSink`, under its `_tape` and `_json` features), which the thread
+# parks for `parse_tape!`. So the dep is optional: a binding with neither feature gets none of it.
 tsv_lang = { workspace = true, optional = true }
 
 [features]
@@ -22,10 +22,10 @@ tsv_lang = { workspace = true, optional = true }
 # from their own `format` feature.
 default = ["format"]
 format = ["dep:tsv_lang"]
-# `tape` adds the tape module: the JSON → tape transcoder (docs/tape_format.md), over the
-# tape's format and schema tables in `tsv_lang::tape`. A binding enables it from its `parse`
-# feature, so the format-only build never compiles the tables.
-tape = ["dep:tsv_lang", "tsv_lang/_tape"]
+# `tape` adds `parse_tape!` and the thread's parked tape sink it writes into (docs/tape_format.md).
+# The writer is the language crate's own tape copy, so a binding enables it from its `parse`
+# feature beside each language crate's `_tape`; the format-only build never compiles either.
+tape = ["dep:tsv_lang", "tsv_lang/_tape", "tsv_lang/_json"]
 
 [lints]
 workspace = true

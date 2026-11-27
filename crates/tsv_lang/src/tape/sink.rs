@@ -49,6 +49,23 @@ pub enum SinkError {
     Unbalanced,
 }
 
+impl std::fmt::Display for SinkError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::TooLarge => "the source or the tape is too large for a tape",
+            Self::Keyword => {
+                "a writer bug: a keyword field written as its word, or a foreign index"
+            }
+            Self::Name => "a writer bug: a key or field the open record's entry does not hold",
+            Self::Unbalanced => {
+                "a writer bug: a record, list or object opened, closed or written out of order"
+            }
+        })
+    }
+}
+
+impl std::error::Error for SinkError {}
+
 /// [`Frame::entry`] of a list frame.
 const LIST: u16 = u16::MAX;
 
@@ -178,8 +195,8 @@ impl TapeSink {
         ])
     }
 
-    /// The finished tape as words, the form `tsv_arena::tape::Transcoder::transcode_words`
-    /// hands a binding: the header and body stored little-endian, the pool packed after them,
+    /// The finished tape as words, the form a binding hands its host (`tsv_arena`'s
+    /// `parse_tape!`): the header and body stored little-endian, the pool packed after them,
     /// the last word zero-padded. Returns the words and the tape's length in bytes; the sink
     /// keeps the words until its next document, and asking again — either finish — reads them
     /// as laid out.
@@ -214,7 +231,7 @@ impl TapeSink {
         Ok((&self.tape, len))
     }
 
-    /// The finished tape as bytes, the form `tsv_arena::tape::Transcoder::transcode` returns.
+    /// The finished tape as bytes, the form `tsv_debug`'s transcoder returns.
     ///
     /// # Errors
     ///

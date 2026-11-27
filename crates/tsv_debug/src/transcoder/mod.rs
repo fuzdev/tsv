@@ -1,48 +1,22 @@
-//! The tape transcoder: the JSON wire → tape producer the bindings' tape exports run.
+//! The tape transcoder: the JSON wire → tape oracle every gate grades a direct tape against.
 //!
 //! The tape is tsv's binary parse wire, specified in `docs/tape_format.md`; its types, constants
-//! and generated schema tables are `tsv_lang::tape` (behind `tsv_lang`'s `_tape` feature, which
-//! this crate's `tape` feature turns on).
+//! and generated schema tables are `tsv_lang::tape` (behind `tsv_lang`'s `_tape` feature). The
+//! language crates' wire writers write it directly (their `_tape` tape copies), and the bindings
+//! ship those; this module is the second implementation they are graded against.
 //!
-//! [`Transcoder`] is the tape's producer: it reads the compact JSON one of the language crates'
-//! writers emitted, with the source it was parsed from, and writes the tape the offline JS encoder
-//! (`scripts/tape_encode.ts`) writes from the same wire, byte for byte (`npm run check:tape`). It
-//! recurses nowhere — an explicit frame stack holds every open object — so any depth the parsers
-//! accept transcodes on any stack. Behind this crate's `tape` feature.
+//! [`Transcoder`] reads the compact JSON one of the writers emitted, with the source it was
+//! parsed from, and writes the tape the offline JS encoder (`scripts/tape_encode.ts`) writes from
+//! the same wire, byte for byte (`npm run check:tape`) — the canonical refs a direct writer's
+//! true-offset refs are compared through (`transcode(tape_to_json(direct)) == transcode(json)`,
+//! [`crate::tape::grade_direct_tape`]). It recurses nowhere — an explicit frame stack holds every
+//! open object — so any depth the parsers accept transcodes on any stack.
 
 mod transcode;
 
 pub use transcode::{TapeError, Transcoder};
 
-use std::cell::Cell;
 use tsv_lang::tape::shapes;
-
-thread_local! {
-    /// This thread's parked transcoder, between [`with_transcoder`] calls.
-    static TRANSCODER: Cell<Option<Box<Transcoder>>> = const { Cell::new(None) };
-}
-
-/// Runs `f` with this thread's transcoder, whose buffers keep their capacity from call to call
-/// — the bindings' tape exports run once per file in a loop, as their parse exports do over
-/// the stores.
-///
-/// Take and park, never a held borrow: the transcoder leaves the slot for the call and goes
-/// back after, so a WASM trap inside `f` (which runs no `Drop`) leaves the slot empty — the
-/// next call starts a fresh transcoder — rather than locked, and a call nested inside `f` or
-/// one after a caught panic gets a fresh one too. Parked uncapped, as the bindings park their
-/// stores and doc arena: a thread keeps what its largest input grew. A call from a
-/// thread-local destructor, once the slot is gone, runs on a fresh transcoder and parks
-/// nothing.
-pub fn with_transcoder<R>(f: impl FnOnce(&mut Transcoder) -> R) -> R {
-    let mut transcoder = TRANSCODER
-        .try_with(Cell::take)
-        .ok()
-        .flatten()
-        .unwrap_or_default();
-    let result = f(&mut transcoder);
-    let _ = TRANSCODER.try_with(|slot| slot.set(Some(transcoder)));
-    result
-}
 
 /// [`TYPE_SLOTS`]' size, a power of two well over the number of distinct `type` values, so a
 /// probe sequence stays short.

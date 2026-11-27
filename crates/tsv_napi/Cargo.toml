@@ -48,8 +48,18 @@ serde_json.workspace = true
 default = ["format", "parse", "strip", "imports"]
 # Pulls the format path over the per-thread doc arena (`tsv_arena/format`), plus the `IgnoreStack` discovery matcher and its verdict methods.
 format = ["_internal_exports", "tsv_arena/format", "dep:tsv_ignore", "dep:tsv_discover"]
-# `tsv_arena/tape` adds the `parse_tape_<lang>` exports' transcoder (the binary parse wire).
-parse = ["_internal_exports", "tsv_ts/json", "tsv_css/json", "tsv_svelte/json", "tsv_arena/tape"]
+# The `parse_tape_<lang>` exports write the binary parse wire with each language crate's wire
+# writer — its tape copy (`_tape`) — into `tsv_arena/tape`'s parked sink.
+parse = [
+    "_internal_exports",
+    "tsv_ts/json",
+    "tsv_css/json",
+    "tsv_svelte/json",
+    "tsv_ts/_tape",
+    "tsv_css/_tape",
+    "tsv_svelte/_tape",
+    "tsv_arena/tape",
+]
 # The `strip_typescript` export — the type strip, `tsv_ts::strip` (the same export
 # `tsv_wasm`'s `strip` feature adds to `@fuzdev/tsv-wasm`).
 strip = ["_internal_exports"]

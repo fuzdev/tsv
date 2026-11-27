@@ -599,7 +599,7 @@ fn attempt(src: &str, parser: ParserType, render: bool, last: &mut LastInput) ->
 /// unset-goal fallback takes, as the strip; CSS; Svelte) and grade it against the same parse's
 /// span-only wire. Returns whether it was written (the input parsed), and why it failed.
 fn tape_check(src: &str, parser: ParserType) -> (bool, Option<String>) {
-    let mut transcoder = tsv_arena::tape::Transcoder::new();
+    let mut transcoder = crate::transcoder::Transcoder::new();
     let mut sink = tsv_lang::tape::TapeSink::new();
     let graded = match parser {
         ParserType::TypeScript => {

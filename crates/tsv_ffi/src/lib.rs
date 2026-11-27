@@ -233,7 +233,7 @@ where
         match written {
             // SAFETY: `words_to_ptr` needs `out_len` / `out_status` aligned and valid for
             // writes, which is this function's own contract, and `len` is the tape's byte
-            // length within `words` (`transcode_words`' return). The captured raw
+            // length within `words` (`TapeSink::finish_words`' return). The captured raw
             // out-params are still valid: `with_extracted_source` invokes this closure at
             // most once, synchronously, before returning.
             Ok(Ok((words, len))) => unsafe {
@@ -309,7 +309,7 @@ unsafe fn error_result(message: &str, out_len: *mut usize, out_status: *mut u32)
 }
 
 /// A word payload as the tape exports return it: `words` leaked as a `Box<[u32]>` (its
-/// length is its capacity — a copy of `transcode_words`' words and [`pack_words`] are exact,
+/// length is its capacity — a copy of `TapeSink::finish_words`' words and [`pack_words`] are exact,
 /// so no reallocation happens here) and its address returned as the uniform `*mut u8`,
 /// 4-aligned by the allocation's type; `len`, the payload's length in BYTES (the last word's
 /// padding not counted), written to `out_len` and `status` to `out_status`.
@@ -547,10 +547,11 @@ macro_rules! lang_bindings {
         }
 
         /// Parse source code and return its tape — the binary parse wire
-        /// (`docs/tape_format.md`): the span-only wire `tsv_parse_<lang>` returns, laid down
-        /// as words. `*out_len` is the tape's length in bytes, and the payload — the tape,
-        /// or on an error status the `{"error": …}` JSON — is a word allocation, 4-aligned,
-        /// freed by `tsv_free_tape(ptr, *out_len)`, never `tsv_free`.
+        /// (`docs/tape_format.md`): the span-only wire `tsv_parse_<lang>` returns, written by
+        /// the language's wire writer straight into words (its tape copy). `*out_len` is the
+        /// tape's length in bytes, and the payload — the tape, or on an error status the
+        /// `{"error": …}` JSON — is a word allocation, 4-aligned, freed by
+        /// `tsv_free_tape(ptr, *out_len)`, never `tsv_free`.
         ///
         /// # Safety
         /// See the module-level safety contract; free with `tsv_free_tape`.
@@ -859,7 +860,7 @@ mod tests {
         }
     }
 
-    // --- parse_tape: the JSON wire as a tape, in a word allocation ---
+    // --- parse_tape: the writer's tape, in a word allocation ---
 
     /// [`call_raw`] for a tape export: the payload's bytes, freed by `tsv_free_tape`, with
     /// the pointer's alignment checked — the word allocation is what lets a host view it.
@@ -890,11 +891,32 @@ mod tests {
         (out_status, out)
     }
 
-    /// The tape export's payload is the JSON export's wire transcoded against the text its
-    /// offsets index (a Svelte or CSS document less its leading BOM), and its every error
-    /// is the JSON export's own.
+    /// The tape a language's own wire writer writes for `source` into a sink of its own — what
+    /// the tape export must hand back byte for byte.
+    fn writer_tape(label: &str, source: &str) -> Vec<u8> {
+        let mut sink = tsv_arena::tape::TapeSink::new();
+        match label {
+            "typescript" => {
+                let ast = tsv_ts::__private::parse(source).unwrap();
+                tsv_ts::__private::write_tape(&ast, source, &mut sink);
+            }
+            "css" => {
+                let ast = tsv_css::__private::parse(source).unwrap();
+                tsv_css::__private::write_tape(&ast, source, &mut sink);
+            }
+            _ => {
+                let ast = tsv_svelte::__private::parse(source).unwrap();
+                tsv_svelte::__private::write_tape(&ast, source, &mut sink);
+            }
+        }
+        sink.finish_bytes().unwrap()
+    }
+
+    /// The tape export's payload is its language's own wire writer's tape (a transposed
+    /// `lang_bindings!` invocation would write another language's), and its every error is the
+    /// JSON export's own. The tape itself is graded against the transcoder by the tape gates.
     #[test]
-    fn parse_tape_is_the_json_wire_and_its_errors() {
+    fn parse_tape_is_the_writers_tape_and_its_errors() {
         let cases: [(&str, FfiFn, FfiFn, &str, &str); 3] = [
             (
                 "typescript",
@@ -919,19 +941,10 @@ mod tests {
             ),
         ];
         for (label, json_fn, tape_fn, good, bad) in cases {
-            let json = call(json_fn, good);
-            let wire_text = if label == "typescript" {
-                good
-            } else {
-                good.strip_prefix('\u{FEFF}').unwrap()
-            };
-            let expected = tsv_arena::tape::Transcoder::new()
-                .transcode(json.as_bytes(), wire_text)
-                .unwrap()
-                .to_vec();
+            let expected = writer_tape(label, good);
             let (status, tape) = call_tape_raw(tape_fn, good.as_bytes(), MODULE);
             assert_eq!(status, TSV_STATUS_OK, "{label}");
-            assert_eq!(tape, expected, "{label}: the tape of the JSON wire");
+            assert_eq!(tape, expected, "{label}: the writer's tape");
             for (bytes, goal) in [
                 (bad.as_bytes(), MODULE),
                 (good.as_bytes(), UNSPECIFIED),

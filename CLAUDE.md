@@ -360,7 +360,7 @@ TypeScript formatting is identical for standalone `.ts` and Svelte-embedded TS: 
 tsv/
 ├── crates/
 │   ├── tsv_lang/    # Foundation (span, location, error, doc builder, printing utils)
-│   ├── tsv_arena/   # Shared binding substrate (tsv_ffi, tsv_napi, tsv_wasm): the goal axis + the format path over tsv_lang's per-thread doc arena
+│   ├── tsv_arena/   # Shared binding substrate (tsv_ffi, tsv_napi, tsv_wasm): the goal axis + the format path over tsv_lang's per-thread doc arena + the tape export over the writers' tape copies
 │   ├── tsv_html/    # HTML spec data: named character references
 │   ├── tsv_ignore/  # gitignore-aware matcher: hierarchical .gitignore + .formatignore/.prettierignore
 │   ├── tsv_discover/# file-discovery policy (build-output heuristic + safety nets) over tsv_ignore
@@ -643,7 +643,7 @@ The shipped language/foundation crates' external deps (`tsv_cli` adds only `argh
 - ./docs/cli.md - CLI architecture, command patterns, multi-file formatting rules
 - ./docs/strip.md - the type strip: surfaces, the position invariant, verdicts and refusals, oracles
 - ./docs/imports.md - import records: surfaces, the record model, what is and isn't a record, coordinates, oracles
-- ./docs/tape_format.md - the tape, the binary parse wire: layout, encodings, the producer's rules, the generated decoder, the transcoder
+- ./docs/tape_format.md - the tape, the binary parse wire: layout, encodings, the producer's rules, the generated decoder, the transcoder (the oracle)
 - ./docs/audits.md - the standing audit gates: what each proves, blind spots, flags, gating
 - ./docs/benchmarks.md - benchmark fairness caveats, the implementation catalog, binary sizes, the canonical-oracle-pin ritual
 - ./docs/gate_counts.md - the pinned counts every graded gate and harvest enforces

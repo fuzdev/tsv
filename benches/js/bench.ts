@@ -1086,8 +1086,13 @@ interface BaselineVersions extends ReportVersions {
  * decoder (`docs/tape_format.md`) — where 23 and below timed the JSON wire and `JSON.parse`.
  * Same names, same tree, another transfer, so a row compared across the two versions
  * compares two mechanisms. The `.md`'s `**JSON overhead**` line is `**Transfer overhead**`.
+ *
+ * 25: no field moved, but the same rows' tape is written another way: straight from the
+ * AST by each language's wire writer, where 24 timed the JSON wire transcoded to the tape.
+ * Same names, same tree, another producer, so a row compared across the two versions
+ * compares two mechanisms.
  */
-const REPORT_SCHEMA_VERSION = 24;
+const REPORT_SCHEMA_VERSION = 25;
 
 interface Baseline {
 	/** See `REPORT_SCHEMA_VERSION`. */

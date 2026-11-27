@@ -63,8 +63,8 @@ function create_bar(value: number, max: number, width = 40): string {
  * with nothing in the output looking off.
  *
  * The materializing half is each binding's default row — the span-only wire, the one
- * parse wire the bindings ship, written as JSON, transcoded to the binary tape, handed over
- * and decoded into objects (`docs/tape_format.md`) — so the ratio is what turning the parse
+ * parse wire the bindings ship, its tape written straight from the AST, handed over and
+ * decoded into objects (`docs/tape_format.md`) — so the ratio is what turning the parse
  * into JS objects costs.
  *
  * tsv-only by ARGUMENT, not for lack of looking: no alternative parser has a
@@ -811,11 +811,11 @@ const OXC_RAW_NOTE: FairnessNote = {
 		'  (oxc-parser-raw is the same native parse and the same tree as oxc-parser, crossing as a',
 		'   shared buffer a generated JS deserializer builds the objects from — no JSON string. Every',
 		'   node is materialized before the call returns, so it is the full-tree tier tsv’s default',
-		'   rows are, by the same kind of transfer: a binary buffer and a generated decoder, where',
-		'   tsv still writes its JSON wire first and transcodes it; native only, absent under Bun)'
+		'   rows are, by the same kind of transfer: a binary buffer and a generated decoder, tsv’s',
+		'   rows too, each writing its buffer straight from the AST; native only, absent under Bun)'
 	],
 	markdown:
-		'oxc-parser-raw is the same native parse as oxc-parser and hands JS the identical tree (byte parity graded per file), but crosses the boundary as a shared buffer that a generated JS deserializer builds the objects from instead of a JSON string — oxc’s undocumented `experimentalRawTransfer`. Deserialization is eager and complete before `parseSync` returns, so the row materializes the full tree like tsv’s default rows, by the same kind of transfer: tsv’s rows also cross as a binary buffer (the tape) that a generated decoder builds the objects from, though tsv writes its JSON wire first and transcodes it to the tape, where oxc writes its buffer directly. Native only, and absent under Bun, where oxc does not support raw transfer'
+		'oxc-parser-raw is the same native parse as oxc-parser and hands JS the identical tree (byte parity graded per file), but crosses the boundary as a shared buffer that a generated JS deserializer builds the objects from instead of a JSON string — oxc’s undocumented `experimentalRawTransfer`. Deserialization is eager and complete before `parseSync` returns, so the row materializes the full tree like tsv’s default rows, by the same kind of transfer: tsv’s rows also cross as a binary buffer (the tape) written straight from the AST and built into objects by a generated decoder, as oxc’s does. Native only, and absent under Bun, where oxc does not support raw transfer'
 };
 
 const OXC_NOTE: FairnessNote = {
@@ -1721,7 +1721,7 @@ export function generate_coverage_by_source_markdown(
  * One-line transfer overhead note for parse groups.
  *
  * Compares each binding's default parse row (which materializes the full AST as JS
- * objects: the wire written, transcoded to the binary tape, handed over and decoded)
+ * objects: the tape written straight from the AST, handed over and decoded)
  * against its `-internal` variant (parse only, nothing written or handed over).
  * Ratio is `parse_ns / internal_ns` — read as "the default parse takes Nx as long as
  * the internal one." Not speedup form (this is intrinsically an overhead/cost ratio,

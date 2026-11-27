@@ -39,7 +39,8 @@ format = [
     "tsv_arena/format",
 ]
 # `parse_*` exports + the wire-JSON layer (@fuzdev/tsv-parse-wasm when alone), and the
-# `parse_tape_*` exports' transcoder (`tsv_arena/tape`, the binary parse wire).
+# `parse_tape_*` exports' writers: each language crate's tape copy (`_tape`), into
+# `tsv_arena/tape`'s parked sink.
 # The parse-only build drops the printers via link-level dead-code
 # elimination — no printer feature gates in the language crates.
 parse = [
@@ -47,6 +48,9 @@ parse = [
     "tsv_ts/json",
     "tsv_css/json",
     "tsv_svelte/json",
+    "tsv_ts/_tape",
+    "tsv_css/_tape",
+    "tsv_svelte/_tape",
     "dep:js-sys",
     "tsv_arena/tape",
 ]

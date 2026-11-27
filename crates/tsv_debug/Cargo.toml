@@ -86,8 +86,6 @@ _internal_audits = ["_internal_swallow_check", "_internal_comment_check", "_inte
 tsv_cli = { path = "../tsv_cli" }
 # `_tape`: the tape's format and schema tables, which `tape_to_json` reads (`src/tape.rs`).
 tsv_lang = { workspace = true, features = ["_tape"] }
-# The tape's transcoder: the `tape` command and the printer's tests.
-tsv_arena = { workspace = true, features = ["tape"] }
 tsv_svelte = { workspace = true, features = ["json", "locations", "_tape"] }
 tsv_ts = { workspace = true, features = ["json", "locations", "_tape", "_internal_debug_lex"] }
 tsv_css = { workspace = true, features = ["json", "locations", "_tape", "_internal_debug_lex"] }

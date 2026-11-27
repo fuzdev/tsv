@@ -103,9 +103,10 @@ export function artifact_freshness_checks(built: ReadonlySet<WasmVariant>): Arra
 }
 
 // Centers (the npm staging's `.wasm`): format 2,856,548 B, measured on one tree 2026-11-23;
-// parse 1,263,900 B and all 3,320,951 B, re-measured when the parse feature took the binary
-// parse wire's transcoder (`tsv_arena`'s `tape` feature and the `parse_tape_*` exports,
-// about 92 KB of each). All carries the type strip and the import records (the `strip` and
+// parse 1,380,933 B and all 3,438,190 B, re-measured when the `parse_tape_*` exports took the
+// wire writers' tape copies (each language crate's `_tape` feature) in place of the transcoder:
+// the tape copies link beside the JSON copies the JSON-wire exports still reach (about 117 KB
+// of each). All carries the type strip and the import records (the `strip` and
 // `imports` features, which the umbrella alone builds). Bounds are ±8% of each. The import
 // records are about 10 KB of `all`, and no part of format or parse.
 //
@@ -118,8 +119,8 @@ export function artifact_freshness_checks(built: ReadonlySet<WasmVariant>): Arra
 // elsewhere, not here.
 export const BOUNDS = {
 	format: { min: 2_628_000, max: 3_085_000 },
-	parse: { min: 1_163_000, max: 1_365_000 },
-	all: { min: 3_055_000, max: 3_587_000 }
+	parse: { min: 1_270_000, max: 1_491_000 },
+	all: { min: 3_163_000, max: 3_713_000 }
 };
 
 // all = format + parse. `all − format` is what the parse feature adds (parser
@@ -133,13 +134,13 @@ export const BOUNDS = {
 // bundles means a feature boundary shifted, not that code got smaller. The `strip` and
 // `imports` features ride `all` alone, so the type strip and the import records count in
 // both deltas: `all − format` is the parse wire, the type strip and the import records
-// together, the import records its smallest part — and the tape's transcoder (the parse
-// feature's `tsv_arena/tape`) counts in `all − format` alone, which it moved by ~92 KB while
+// together, the import records its smallest part — and the wire writers' tape copies (the
+// parse feature's `_tape`) count in `all − format` alone, which they moved by ~117 KB while
 // `all − parse` held.
 //
-// At the current centers: `all − format` 458,766 B; `all − parse` 2,057,051 B.
+// At the current centers: `all − format` 576,005 B; `all − parse` 2,057,257 B.
 export const DELTAS = {
-	format: { min: 422_000, max: 496_000 }, // all − format
+	format: { min: 530_000, max: 622_000 }, // all − format
 	parse: { min: 1_893_000, max: 2_222_000 } // all − parse
 };
 

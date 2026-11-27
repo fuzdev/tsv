@@ -735,8 +735,8 @@ export function get_benchmark_tasks(
 		// The payload-matched opponent to oxc-parser and yuku-parser, whose default ASTs
 		// are also span-only. Each row is the package's published `parse_<lang>(source)`
 		// over its binding — the facade's argument checks included, as every third-party
-		// row pays its own front door (`lib/tsv_api.ts`) — on the tape route: the wire
-		// transcoded to the binary tape in Rust, handed over as words (copied by N-API and
+		// row pays its own front door (`lib/tsv_api.ts`) — on the tape route: the tape written
+		// in Rust by the language's wire writer, handed over as words (copied by N-API and
 		// the FFI wrapper, a view of linear memory for wasm) and decoded by the generated
 		// decoder (`docs/tape_format.md`). A package's default
 		// call takes the bare row name, as every third-party row does and as the format

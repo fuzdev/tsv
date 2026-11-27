@@ -669,12 +669,13 @@ macro_rules! wire_json {
 /// `words` (`(offset, len)`, the address and word count [`tape_words_at`] reads off the words
 /// `parse_tape!` lends it), its exact bytes the header's length.
 ///
-/// The words are the thread's parked transcoder's own buffer (`tsv_arena::tape::with_transcoder`,
+/// The words are the thread's parked tape sink's own buffer (`tsv_arena::tape::with_tape_sink`,
 /// take and park, so a trap inside the export leaves the slot empty — the next call starts a
-/// fresh transcoder — rather than locked), so the one buffer the transcoder keeps is the one the
-/// host reads, and they stay where they are once the export returns. The view is built last,
-/// from the memory's buffer as it stands after every growth the call made, and reads through
-/// the safe typed-array constructor over that buffer, never `Uint32Array::view`.
+/// fresh sink — rather than locked), laid out where the writer wrote them, so the one buffer the
+/// sink keeps is the one the host reads, and they stay where they are once the export returns.
+/// The view is built last, from the memory's buffer as it stands after every growth the call
+/// made, and reads through the safe typed-array constructor over that buffer, never
+/// `Uint32Array::view`.
 ///
 /// **The view's lifetime is the host's to keep short.** It reads valid words until the next
 /// call into this instance: a tape export overwrites the buffer, and any growth of the memory
@@ -695,11 +696,11 @@ fn tape_words_at(words: &[u32], _len: usize) -> (u32, u32) {
     (words.as_ptr() as usize as u32, words.len() as u32)
 }
 
-/// A transcode the tape export could not finish, thrown as a plain `Error`: a wire the
-/// writers emit never fails one but on size (a source too long for the tape's signed string
-/// offsets).
+/// A tape the sink refused, thrown as a plain `Error`: a tape the writers write is refused only
+/// on size (a source too long for the tape's signed string offsets), or for a writer bug the
+/// sink caught.
 #[cfg(feature = "parse")]
-fn tape_failure(e: tsv_arena::tape::TapeError) -> Failure {
+fn tape_failure(e: tsv_arena::tape::SinkError) -> Failure {
     Failure::Thrown(err(format!("the parse does not fit a tape: {e}")))
 }
 

@@ -3,7 +3,7 @@
  * (`docs/tape_format.md`) and back, graded three ways.
  *
  * The Rust half is one `tsv_debug tape` process streaming each document's source, span-only wire
- * and the transcoder's tape (`tsv_arena::tape::Transcoder`) as NDJSON — no per-file spawn, no
+ * and the transcoder's tape (`tsv_debug::transcoder::Transcoder`) as NDJSON — no per-file spawn, no
  * sidecar. This half, per document:
  *
  * - **the producers agree**: the offline JS encoder (`tape_encode.ts`) writes the wire's tree to a

@@ -39,7 +39,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Wire-type drift](#wire-type-drift-check-checkast-types) | `check:ast-types` | the shipped `tsv_ast.d.ts`, generated from the AST schema table, not typing what the wire-JSON writers emit or the canonical parser's committed wire — plus a wire type the table has no entry for | `npm run check` |
 | [Package declarations](#package-declaration-check-typecheckpackages) | `typecheck:packages` | a staged package's published `.d.ts` failing a consumer's strict compile — a lib the consumer did not ask for (TS2550), a name star-export ambiguation drops (TS2308), a type a package must not export, a README example that does not compile | `scripts/publish.ts` Step 6 (all four packages); on demand (needs `npm run bench:install`, so NOT in `npm run check`) |
 | [Loc cross-grade](#loc-cross-grade-checkloc) | `check:loc` | tsv's loc wire and the shipped `locations.js` reconstruction of its span-only wire disagreeing on any fixture input — the two implementations of the one `loc` definition drifting apart | `npm run check` |
-| [Tape gate](#tape-gate-checktape) | `check:tape` | the offline JS tape encoder and the Rust transcoder writing different bytes for one fixture wire, or the shipped tape decoder — its fast path, or its iterative interpreter alone — reading back a tree that is not `JSON.parse`'s of the wire, key order included | `npm run check` |
+| [Tape gate](#tape-gate-checktape) | `check:tape` | the offline JS tape encoder and the Rust transcoder (the oracle) writing different bytes for one fixture wire, a wire writer's own tape (what the bindings ship) not printing back to its wire, or the shipped tape decoder — its fast path, or its iterative interpreter alone — reading back a tree that is not `JSON.parse`'s of the wire, key order included | `npm run check` |
 | [Tape corpus](#tape-corpus-leg-tapecorpus) | `tape:corpus` | the same, over real code | `npm run conformance` (release) |
 | [Pin agreement](#canonical-pin-agreement-audit-pinsaudit) | `pins:audit` | the five canonical-oracle pin sites disagreeing — including the lockfile, which alone pins the oracle's own transitive deps | `npm run check` |
 | [Checkout alignment](#checkout-alignment-audit-pinsauditcheckouts) | `pins:audit:checkouts` | a present `../svelte` / `../acorn-typescript` clone that is not the pinned version, or whose version file can't be read; checkout drift (warn — HEAD, or the `../corpora` snapshot's `collections/` tree id) | `npm run conformance` (preflight) |
@@ -1491,16 +1491,17 @@ npm run tape-shapes:update  # rewrite the fast-shape list from the fixture wire,
 document's span-only wire exactly, and that its two producers agree. Per document — each
 parseable input and format variant, the documents `check:loc` grades — the offline encoder
 (`scripts/tape_encode.ts`) writes the wire's tree to a tape byte-equal to the Rust
-transcoder's (`tsv_arena::tape::Transcoder`); the shipped decoder
+transcoder's (`tsv_debug::transcoder::Transcoder`, the oracle); the shipped decoder
 (`crates/tsv_wasm/npm/tape_decode.js`) reads it back to a tree deep-equal to `JSON.parse`'s,
 key order and `-0` included; so does its iterative interpreter alone, the path a stack
 overflow falls back to; and so does the decoder over the same wire written with every typed
 record entry-generic, so every entry's descriptors are read by the interpreter that serves the
 masks no fast shape covers. It also refuses a committed decoder generated from another table or
 shape list. For every document it grades the **direct** tape as well — the one its
-wire writer writes itself, its refs true offsets (tape_format.md §A direct writer): the Rust half
-holds it to the wire (it prints back byte for byte, and the transcoder canonicalizes that
-printback to the transcoded tape — a failure fails the run), and both decoder paths read it back
+wire writer writes itself, its refs true offsets (tape_format.md §A direct writer), the producer
+every binding ships: the Rust half holds its words to its bytes and it to the wire (it prints
+back byte for byte, and the transcoder canonicalizes that printback to the transcoded tape — a
+failure fails the run), and both decoder paths read it back
 to `JSON.parse`'s tree.
 
 **How.** One `tsv_debug tape` process (`cli/commands/tape.rs`) streams each document's source,
@@ -1526,8 +1527,9 @@ islands written under a comment attach outside any Svelte host.
   integer-like key; a wire with any of them still decodes right, but the two tapes may differ.
 - **The boundary a tape crosses** (a WASM view, an N-API buffer) is the package suites' and
   `engines:audit`'s to grade, not this gate's.
-- **The direct tape is graded through the writers, not the bindings**: no binding writes one yet,
-  so the packages' `parse_<lang>` still decode the transcoder's tape.
+- **The direct tape is graded through the writers, not the bindings**: each binding's tape export
+  is its language's writer's tape by the bindings' in-crate tests, and what a package hands over
+  decodes to the JSON wire's tree by the package suites.
 
 ## Tape Corpus Leg (`tape:corpus`)
 

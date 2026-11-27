@@ -1,7 +1,7 @@
 /**
  * The offline tape encoder: a wire tree (what `JSON.parse` makes of a parse export's JSON) and
  * its source to the tape `docs/tape_format.md` specifies, byte for byte the tape the Rust
- * transcoder (`tsv_arena::tape`) makes from the same wire's JSON text.
+ * transcoder (`tsv_debug::transcoder`, the oracle) makes from the same wire's JSON text.
  *
  * It is the format's executable reference on the JS side: `check:tape` encodes every fixture
  * document's wire with it, decodes the tape with the generated decoder, and compares the result

@@ -1,8 +1,8 @@
-//! The tape transcoder (`tsv_arena::tape::Transcoder`, `docs/tape_format.md`) over every fixture
-//! document's span-only wire: the tape prints back (`tsv_debug::tape::tape_to_json`) to the wire
-//! byte for byte, so the transcoder drops nothing the decoder would need to rebuild the tree —
-//! no number's spelling, no string, no key. `npm run check:tape` grades the same tapes against the
-//! offline JS encoder's and through the shipped decoder.
+//! The tape transcoder (`tsv_debug::transcoder::Transcoder`, `docs/tape_format.md`) over every
+//! fixture document's span-only wire: the tape prints back (`tsv_debug::tape::tape_to_json`) to
+//! the wire byte for byte, so the transcoder drops nothing the decoder would need to rebuild the
+//! tree — no number's spelling, no string, no key. `npm run check:tape` grades the same tapes
+//! against the offline JS encoder's and through the shipped decoder.
 //!
 //! The CSS wire writer's direct tape (its tape copy, `tsv_css::__private::write_tape`) is graded
 //! over every CSS document the fixture tree holds — each `.css` input and each `<style>` body —
@@ -18,12 +18,12 @@
 
 use std::path::Path;
 
-use tsv_arena::tape::Transcoder;
 use tsv_debug::tape::{
     bytes_difference, fixture_wires, grade_css_direct_tape, grade_direct_tape,
     grade_svelte_direct_tape, grade_ts_direct_tape, script_bodies, style_bodies, tape_to_json,
     wire_source,
 };
+use tsv_debug::transcoder::Transcoder;
 use tsv_lang::tape::TapeSink;
 
 #[test]

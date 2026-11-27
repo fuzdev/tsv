@@ -492,7 +492,7 @@ pub fn fixture_wires(root: &Path, mut each: impl FnMut(FixtureWire)) -> Result<u
 pub fn grade_css_direct_tape(
     source: &str,
     json: &[u8],
-    transcoder: &mut tsv_arena::tape::Transcoder,
+    transcoder: &mut crate::transcoder::Transcoder,
     sink: &mut tsv_lang::tape::TapeSink,
 ) -> Result<Vec<u8>, String> {
     let ast = tsv_css::__private::parse(source).map_err(|e| format!("parse: {e:#}"))?;
@@ -512,7 +512,7 @@ pub fn grade_ts_direct_tape(
     source: &str,
     goal: tsv_ts::Goal,
     json: &[u8],
-    transcoder: &mut tsv_arena::tape::Transcoder,
+    transcoder: &mut crate::transcoder::Transcoder,
     sink: &mut tsv_lang::tape::TapeSink,
 ) -> Result<Vec<u8>, String> {
     let ast =
@@ -532,7 +532,7 @@ pub fn grade_ts_direct_tape(
 pub fn grade_svelte_direct_tape(
     source: &str,
     json: &[u8],
-    transcoder: &mut tsv_arena::tape::Transcoder,
+    transcoder: &mut crate::transcoder::Transcoder,
     sink: &mut tsv_lang::tape::TapeSink,
 ) -> Result<Vec<u8>, String> {
     let ast = tsv_svelte::__private::parse(source).map_err(|e| format!("parse: {e:#}"))?;
@@ -540,9 +540,10 @@ pub fn grade_svelte_direct_tape(
     grade_direct_tape(sink, wire_source("svelte", source), json, transcoder)
 }
 
-/// The checks every direct tape is graded by, over the tape `sink` just took: it prints back
-/// to `json` byte for byte over `text` (the wire's source), and the transcoder makes the same
-/// tape of that printback as of `json`.
+/// The checks every direct tape is graded by, over the tape `sink` just took: its words (the
+/// form a binding hands its host, `TapeSink::finish_words`) are its bytes, it prints back to
+/// `json` byte for byte over `text` (the wire's source), and the transcoder, the oracle, makes
+/// the same tape of that printback as of `json`.
 ///
 /// # Errors
 ///
@@ -551,11 +552,22 @@ pub fn grade_direct_tape(
     sink: &mut tsv_lang::tape::TapeSink,
     text: &str,
     json: &[u8],
-    transcoder: &mut tsv_arena::tape::Transcoder,
+    transcoder: &mut crate::transcoder::Transcoder,
 ) -> Result<Vec<u8>, String> {
     let direct = sink
         .finish_bytes()
-        .map_err(|e| format!("the sink refused the direct tape: {e:?}"))?;
+        .map_err(|e| format!("the sink refused the direct tape: {e}"))?;
+    // the bindings' form, the words laid out in place, is the same tape
+    let (words, len) = sink
+        .finish_words()
+        .map_err(|e| format!("the sink refused the direct tape as words: {e}"))?;
+    let laid: Vec<u8> = words.iter().flat_map(|w| w.to_ne_bytes()).collect();
+    if words.len() != len.div_ceil(4)
+        || laid.get(..len) != Some(direct.as_slice())
+        || laid[len..].iter().any(|&b| b != 0)
+    {
+        return Err("the direct tape's words are not its bytes".to_owned());
+    }
     let printed = tape_to_json(&direct, text).map_err(|e| format!("print: {e}"))?;
     if let Some(d) = bytes_difference(&printed, json) {
         return Err(format!("the direct tape prints back differently {d}"));
@@ -654,7 +666,7 @@ pub fn base64(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tsv_arena::tape::Transcoder;
+    use crate::transcoder::Transcoder;
 
     #[test]
     fn base64_matches_the_rfc_vectors() {
