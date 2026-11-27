@@ -97,6 +97,36 @@ test('a string found in its scope is a source slice, one that is not is pooled',
 	assert.strictEqual(words[at + 3], 1);
 });
 
+test('a pool whose first entry starts with U+FEFF keeps it, in plain and loc mode', () => {
+	// the pool's first bytes are then EF BB BF, which a default `TextDecoder` drops as a BOM
+	const source = '`\\uFEFFa`';
+	const tree = program(source, {
+		type: 'TemplateLiteral',
+		start: 0,
+		end: 9,
+		expressions: [],
+		quasis: [
+			{
+				type: 'TemplateElement',
+				start: 1,
+				end: 8,
+				value: { raw: '\\uFEFFa', cooked: '\uFEFFa' },
+				tail: true
+			}
+		]
+	});
+	const { bytes } = round_trip(tree, source);
+	const pool_start =
+		4 * (TAPE_HEADER_WORDS + new DataView(bytes.buffer, bytes.byteOffset).getUint32(12, true));
+	assert.deepEqual(Array.from(bytes.subarray(pool_start, pool_start + 3)), [0xef, 0xbb, 0xbf]);
+	const cooked = (decoded: unknown): unknown =>
+		(
+			decoded as { body: [{ expression: { quasis: [{ value: { cooked: unknown } }] } }] }
+		).body[0].expression.quasis[0].value.cooked;
+	assert.strictEqual(cooked(decode_tape(bytes, source, 'typescript')), '\uFEFFa');
+	assert.strictEqual(cooked(decode_tape_iterative(bytes, source, 'typescript')), '\uFEFFa');
+});
+
 test('a nullable string field carries null as the null ref', () => {
 	const source = 'x`\\u`';
 	const tree = program(source, {

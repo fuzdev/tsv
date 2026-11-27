@@ -1,0 +1,41 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 34,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 33,
+				"name": "p",
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 3,
+						"end": 28,
+						"name": "data-attr",
+						"value": [
+							{
+								"start": 14,
+								"end": 27,
+								"type": "Text",
+								"raw": "&#xFEFF;value",
+								"data": "﻿value"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

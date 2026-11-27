@@ -1,0 +1,66 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 49,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 48,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 39,
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 10,
+					"end": 38,
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 16,
+							"end": 37,
+							"id": {
+								"type": "Identifier",
+								"start": 16,
+								"end": 22,
+								"name": "zwnbsp"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 25,
+								"end": 37,
+								"left": {
+									"type": "Literal",
+									"start": 25,
+									"end": 33,
+									"value": "﻿",
+									"raw": "'\\uFEFF'"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 36,
+									"end": 37,
+									"name": "x"
+								}
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

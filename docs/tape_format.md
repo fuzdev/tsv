@@ -152,7 +152,9 @@ Two words `[a, b]`, both in UTF-16 code units:
 
 - `a ≥ 0`: the source text `[a, b)`;
 - `a = -2³¹` (`i32::MIN`): `null` (`b` is `0`);
-- any other `a < 0`: the pool text `[-1 - a, b)`, the pool decoded once as UTF-8.
+- any other `a < 0`: the pool text `[-1 - a, b)`, the pool decoded once as UTF-8 — keeping a
+  leading `EF BB BF` as U+FEFF, since the pool is text, not a file, and its first entry may start
+  with that character.
 
 The **source** a tape is written against is the text the wire's offsets index: the parsed
 source, less a leading byte-order mark for a Svelte or CSS document, whose wires elide it as

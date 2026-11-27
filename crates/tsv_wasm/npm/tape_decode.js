@@ -50,7 +50,9 @@ const HEADER_BYTES = 32;
 const NULL_REF = -0x80000000;
 const MAX_ENTRIES = 1024;
 
-const utf8 = new TextDecoder();
+/** `ignoreBOM: true` *keeps* a leading U+FEFF (the option name is inverted): the pool is
+ * text, not a file, and a document whose first pooled value starts with U+FEFF must not lose it. */
+const utf8 = new TextDecoder('utf-8', { ignoreBOM: true });
 const F64 = new Float64Array(1);
 const F64_WORDS = new Uint32Array(F64.buffer);
 const NO_WORDS = new Uint32Array(0);
