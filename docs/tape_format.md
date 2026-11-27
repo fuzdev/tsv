@@ -234,19 +234,24 @@ knows what the transcoder has to search for, so it writes:
   a `strings` field (a directive's modifiers), and a self-describing record (`customElement`'s
   data) — through the sink's `t_value_list_open`, `t_list_ref` and `t_object_open` /
   `t_object_key` / `t_object_close`, a frame like a list's, so the sink counts the keys the
-  writer writes.
+  writer writes, each key leaving a tagged value pending that the next data call writes.
 
 Where the canonical rule finds a text's first occurrence in scope, the direct writer has the
 occurrence it read, so the two tapes differ only in refs and pool, and decode to one tree. The
 sink refuses a tape the writer left inconsistent — a key of an entry other than the open
 record's, a keyword written as its word, a record, list or self-describing record left open, a
-string outside the `strings` list that counts it — in every build, so no such tape is handed out.
+self-describing record's key with no value (before the next key or at the close), a boolean or a
+nested self-describing record written as its value with no key ahead of it, a string outside the
+`strings` list that counts it — in every build, so no such tape is handed out.
 Every count a tape carries (a list's items, a self-describing record's keys, a `strings` field's
 strings) is the sink's count of what the writer wrote through the counted forms (`t_object_key`,
 `t_list_ref`), never a number the writer hands in. What the sink cannot see is a field written
 positionally (a head's `start` and `end`, an element's `name`) whose place the schema moved, which
-the Svelte writer's tape copy checks against the schema at build time, and a key or string written
-as a plain ref where a counted form belongs, which only the roundtrip gates catch.
+the Svelte writer's tape copy checks against the schema at build time, a self-describing record's
+string or number value or embedded expression written with no key ahead of it (the sink writes it
+as plain words, which the decoder reads in a key's place) or a `null` value with none (the sink
+writes nothing), and a key or a string of a `strings` field written as a plain ref where its
+counted form belongs — which only the roundtrip gates catch.
 
 ### Grading a direct tape
 

@@ -44,8 +44,10 @@ pub enum SinkError {
     Name,
     /// A record, list or self-describing record closed with none open, left open at the
     /// finish, a field key or a mask bit with no record open on top, an object key with no
-    /// self-describing record open, a `strings` field's ref outside its list or a record
-    /// inside one, or a JSON-only path taken on the tape.
+    /// self-describing record open (or with the previous key's value not yet written), a
+    /// boolean or self-describing record written as that record's value with no key ahead of
+    /// it, a value its pending field cannot hold, a `strings` field's ref outside its list or
+    /// a record inside one, or a JSON-only path taken on the tape.
     Unbalanced,
 }
 
@@ -634,23 +636,29 @@ impl TapeWriter<'_> {
     /// [`Self::t_object_key`] and its tagged value after it, and closes it with
     /// [`Self::t_object_close`], which writes the count — so a count the writes do not make is
     /// unrepresentable, and an object left open refuses the tape. Under a declared
-    /// tagged-value field its object tag comes first.
+    /// tagged-value field its object tag comes first; as a value of an open self-describing
+    /// record with no key ahead of it, it refuses the tape.
     #[cfg(feature = "_tape_literals")]
     #[inline]
     pub fn t_object_open(&mut self) {
+        if self.pending.is_none() && self.sink.frames.last().is_some_and(|f| f.entry == OBJECT) {
+            self.fail(SinkError::Unbalanced);
+        }
         self.enter_record();
         self.count_item();
         self.sink.tape.push(super::HEADER_ESCAPE);
         self.push_frame(OBJECT);
     }
 
-    /// One key of the open self-describing record: counted, then its text's ref. The value
-    /// the writer writes next is a tagged value. With no such record on top it refuses the
-    /// tape.
+    /// One key of the open self-describing record: counted, then its text's ref, and a
+    /// tagged value pending — the writer's next data call (`string`, `bool`, a record opening)
+    /// writes the value behind its tag, so each key holds exactly one value. With no such
+    /// record on top, or a key still waiting for its value, it refuses the tape.
     #[cfg(feature = "_tape_literals")]
     #[inline]
     pub fn t_object_key(&mut self, key: &[u8]) {
-        if let Some(f) = self.sink.frames.last_mut()
+        if self.pending.is_none()
+            && let Some(f) = self.sink.frames.last_mut()
             && f.entry == OBJECT
         {
             f.count += 1;
@@ -658,6 +666,7 @@ impl TapeWriter<'_> {
             self.fail(SinkError::Unbalanced);
         }
         self.t_ref(key);
+        self.pending = Some((Enc::Value, super::NO_AUX));
     }
 
     /// The open self-describing record closes: its key count is written.
@@ -1204,9 +1213,8 @@ mod tests {
         let mut w = sink.writer(source, tables.positions(), LeadingBom::Elided);
         w.t_object_open();
         w.t_object_key(b"k");
-        w.t_tag(TAG_TRUE);
+        w.bool(true);
         w.t_object_key(b"l");
-        w.t_tag(TAG_OBJECT);
         w.t_object_open();
         w.t_object_close();
         w.t_object_close();
@@ -1223,6 +1231,8 @@ mod tests {
         // escape header, count, key `k` (two words), its tag, key `l`, its tag, nested record
         assert_eq!(body[0], super::super::HEADER_ESCAPE);
         assert_eq!(body[1], 2, "two keys written");
+        assert_eq!(body[4], TAG_TRUE, "`k`'s value behind its tag");
+        assert_eq!(body[7], TAG_OBJECT, "`l`'s value behind its tag");
         assert_eq!(body[8], super::super::HEADER_ESCAPE, "the nested record");
         assert_eq!(body[9], 0, "no keys written");
         // the directive's header, then its modifiers' count
@@ -1333,10 +1343,49 @@ mod tests {
             ),
         ]);
         #[cfg(feature = "_tape_literals")]
-        cases.extend::<[Case; 6]>([
+        cases.extend::<[Case; 10]>([
             (
                 "a self-describing record left open",
                 |w| w.t_object_open(),
+                SinkError::Unbalanced,
+            ),
+            (
+                "an object key with no value before the next key",
+                |w| {
+                    w.t_object_open();
+                    w.t_object_key(b"k");
+                    w.t_object_key(b"l");
+                    w.bool(true);
+                    w.t_object_close();
+                },
+                SinkError::Unbalanced,
+            ),
+            (
+                "an object key with no value at the close",
+                |w| {
+                    w.t_object_open();
+                    w.t_object_key(b"k");
+                    w.t_object_close();
+                },
+                SinkError::Unbalanced,
+            ),
+            (
+                "an object boolean with no key",
+                |w| {
+                    w.t_object_open();
+                    w.bool(true);
+                    w.t_object_close();
+                },
+                SinkError::Unbalanced,
+            ),
+            (
+                "an object's self-describing record value with no key",
+                |w| {
+                    w.t_object_open();
+                    w.t_object_open();
+                    w.t_object_close();
+                    w.t_object_close();
+                },
                 SinkError::Unbalanced,
             ),
             (

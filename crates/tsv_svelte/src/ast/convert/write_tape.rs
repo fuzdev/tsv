@@ -16,7 +16,7 @@ use std::borrow::Cow;
 use crate::ast;
 use crate::ast::convert::write_macros::{assert_positional_field, assert_positional_span};
 use tsv_lang::tape::Enc;
-use tsv_lang::tape::{TAG_FALSE, TAG_OBJECT, TAG_STRING, TAG_TRUE, TapeWriter};
+use tsv_lang::tape::{TAG_OBJECT, TapeWriter};
 use tsv_lang::{Comment, LocationMapper, Span};
 use tsv_ts::__private::CommentMode;
 use write::{Ctx, name_bytes};
@@ -232,8 +232,7 @@ fn string_literal<'a>(e: Option<&'a tsv_ts::ast::Expression>, ctx: &Ctx<'a>) -> 
 /// One key of the open self-describing record and its string value.
 fn string_member(w: &mut TapeWriter<'_>, key: &str, value: &str) {
     w.t_object_key(key.as_bytes());
-    w.t_tag(TAG_STRING);
-    w.t_ref(value.as_bytes());
+    w.string(value);
 }
 
 /// `customElement.props`: the statically-evaluated plain object `write_json.rs`'s twin
@@ -264,7 +263,6 @@ fn write_custom_element_props(
             continue;
         };
         w.t_object_key(key.name(ctx.source, ctx.view).as_bytes());
-        w.t_tag(TAG_OBJECT);
         w.t_object_open();
         for inner_prop in ctx.view.obj_props(inner.properties) {
             let ObjectProperty::Property(ip) = inner_prop else {
@@ -290,7 +288,7 @@ fn write_custom_element_props(
                 }
                 LiteralValue::Boolean(b) => {
                     w.t_object_key(key_name.as_bytes());
-                    w.t_tag(if *b { TAG_TRUE } else { TAG_FALSE });
+                    w.bool(*b);
                 }
                 _ => {}
             }
@@ -344,7 +342,6 @@ fn write_custom_element_field(w: &mut TapeWriter<'_>, attrs: &[ast::AttributeNod
             }) = props
             {
                 w.t_object_key(b"props");
-                w.t_tag(TAG_OBJECT);
                 write_custom_element_props(w, props_obj, ctx);
             }
             // `shadow`: the string `'open'`/`'none'`, or the raw `ObjectExpression` AST.
@@ -364,7 +361,6 @@ fn write_custom_element_field(w: &mut TapeWriter<'_>, attrs: &[ast::AttributeNod
                     },
                 ) => {
                     w.t_object_key(b"shadow");
-                    w.t_tag(TAG_OBJECT);
                     write_expression_embedded(w, shadow_expr, ctx.embed(CommentMode::Off));
                 }
                 _ => {}
@@ -372,7 +368,6 @@ fn write_custom_element_field(w: &mut TapeWriter<'_>, attrs: &[ast::AttributeNod
             // `extend`: the raw expression AST.
             if let Some(extend_expr) = extend {
                 w.t_object_key(b"extend");
-                w.t_tag(TAG_OBJECT);
                 write_expression_embedded(w, extend_expr, ctx.embed(CommentMode::Off));
             }
             w.t_object_close();
