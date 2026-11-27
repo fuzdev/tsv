@@ -65,8 +65,8 @@ Every fixture directory holds:
 `expected.json` is generated, never hand-written:
 
 ```bash
-deno task imports:fixtures:update [pattern...]     # write expected.json
-deno task imports:fixtures:validate [pattern...]   # oracle freshness + tsv (-v for diffs)
+npm run imports:fixtures:update -- [pattern...]     # write expected.json
+npm run imports:fixtures:validate -- [pattern...]   # oracle freshness + tsv (-v for diffs)
 cargo test --test imports_fixtures_tests           # tsv against the committed files
 ```
 

@@ -22,7 +22,7 @@ members = [
 version = "0.8.1"
 edition = "2024"
 # The toolchain CI tests (rust-toolchain.toml), stated for consumers as major.minor; it moves
-# with that pin, never apart (`deno task package:audit` grades that the two agree).
+# with that pin, never apart (`npm run package:audit` grades that the two agree).
 rust-version = "1.94"
 authors = ["fuz.dev"]
 license = "0BSD"
@@ -86,7 +86,7 @@ serde = { version = "1", features = ["derive"] }
 # — a literal like `1e20`/`0.000001` no longer gets reformatted through a float
 # formatter on both sides, which had masked `Number::toString` divergences. The
 # production wire writer (`JsonWriter`) never touches `Value`, and no crate meant
-# for publishing has a normal or build `serde_json` dependency (`deno task
+# for publishing has a normal or build `serde_json` dependency (`npm run
 # deps:audit`), so these features unify only into dev and tooling builds — never
 # into a consumer's `serde_json`, whose deserialization they would change.
 serde_json = { version = "1", features = ["preserve_order", "float_roundtrip", "arbitrary_precision"] }
@@ -123,7 +123,7 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(perf_ab_api, values("svelt
 # renamed under two callers, an enum that no longer existed). Denied so the next one
 # fails instead of joining a pile of known-broken links that hides it.
 #
-# This table is the day-to-day signal (IDE, a bare `cargo doc`). The GATE is `deno task
+# This table is the day-to-day signal (IDE, a bare `cargo doc`). The GATE is `npm run
 # docs:audit`, which re-states these as `RUSTDOCFLAGS` (`tsv_ffi` and `tsv_napi`, whose
 # own `[lints]` tables replace the workspace's whole, re-declare this table too, held to
 # it by `tests/lint_parity.rs`). It also runs with
@@ -203,7 +203,7 @@ useless_let_if_seq = "allow"
 # Lifetimes - explicit can be clearer
 elidable_lifetime_names = "allow"
 
-# Restriction lints (panic points need explicit #[allow] with justification)
+# Restriction lints (a panic point takes `#[expect(<lint>, reason = "…")]`)
 clone_on_ref_ptr = "warn"
 dbg_macro = "warn"
 expect_used = "warn"
@@ -248,8 +248,8 @@ codegen-units = 1
 panic = "abort"
 strip = true
 
-# The audit / corpus-tool profile, and the ONE build world every `deno task check`
-# audit shares — a profile alone does not make it one, so `deno task build:check`
+# The audit / corpus-tool profile, and the ONE build world every `npm run check`
+# audit shares — a profile alone does not make it one, so `npm run build:check`
 # builds `tsv_cli` and `tsv_debug` in a single feature resolution and the legs run
 # out of it (see deno.json `//build:check`; a narrower `-p tsv_cli` selection is a
 # second, duplicated compile of the whole stack). `panic = "unwind"` is the reason
@@ -274,7 +274,7 @@ strip = true
 #
 # The cost of this being one world: the cheap audits (`scan:audit`, `fanout:audit`,
 # `conformance:audit`) now need an optimized build too, so running one of THEM alone
-# on a cold tree is slower than a debug build would have been. In `deno task check`,
+# on a cold tree is slower than a debug build would have been. In `npm run check`,
 # where they always run alongside the rest, that build is already paid.
 [profile.corpus]
 inherits = "release"

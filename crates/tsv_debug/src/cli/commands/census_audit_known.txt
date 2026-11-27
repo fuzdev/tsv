@@ -12,5 +12,5 @@
 # A key found but not pinned FAILS (a new loss site). A pinned key that no longer fires
 # FAILS (fix landed — re-pin).
 #
-# Regenerate with `deno task census:audit:update`.
+# Regenerate with `npm run census:audit:update`.
 # shapes: 0

@@ -23,7 +23,7 @@ serde_json.workspace = true
 [features]
 # Default build — both halves: the full libtsv_ffi the bench perf rows load and
 # any FFI host links against. The format-only size build uses
-# `--no-default-features --features format` (deno task build:ffi:format), the
+# `--no-default-features --features format` (npm run build:ffi:format), the
 # native mirror of @fuzdev/tsv-format-wasm — it drops the wire-JSON layer.
 default = ["format", "parse"]
 # tsv_format_<lang> exports. Pulls the format path over the per-thread `DocArena` (tsv_arena/format).
@@ -126,7 +126,7 @@ unnecessary_literal_bound = "allow"
 equatable_if_let = "allow"
 useless_let_if_seq = "allow"
 elidable_lifetime_names = "allow"
-# Restriction lints (panic points need explicit #[allow] with justification)
+# Restriction lints (a panic point takes `#[expect(<lint>, reason = "…")]`)
 clone_on_ref_ptr = "warn"
 dbg_macro = "warn"
 expect_used = "warn"

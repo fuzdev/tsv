@@ -63,7 +63,7 @@ imports = ["_internal_exports", "tsv_ts/json"]
 # on — named once for the `cfg`s, rather than spelled at each as an `any` over the
 # families. On with any family; no build names it.
 _internal_exports = []
-# Test-only: compiles the `__panic_probe` export that `deno task test:napi`
+# Test-only: compiles the `__panic_probe` export that `npm run test:napi`
 # drives to prove the panic contract end to end (panic → thrown JS error →
 # addon still usable). Never enabled by a published build; `test_napi.ts` skips
 # the contract test when the export is absent.
@@ -156,7 +156,7 @@ unnecessary_literal_bound = "allow"
 equatable_if_let = "allow"
 useless_let_if_seq = "allow"
 elidable_lifetime_names = "allow"
-# Restriction lints (panic points need explicit #[allow] with justification)
+# Restriction lints (a panic point takes `#[expect(<lint>, reason = "…")]`)
 clone_on_ref_ptr = "warn"
 dbg_macro = "warn"
 expect_used = "warn"

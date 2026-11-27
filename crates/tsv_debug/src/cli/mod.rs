@@ -101,19 +101,19 @@ pub enum Subcommand {
     BuildVisitCensus(BuildVisitCensusCommand),
     // Requires the `_internal_comment_check` feature so default builds keep the comment ledger's
     // registration + record hooks compiled out (production-shaped profiles); the
-    // `comments:audit` deno task passes it.
+    // `comments:audit` task passes it.
     #[cfg(feature = "_internal_comment_check")]
     CommentAudit(CommentAuditCommand),
     // Same `_internal_comment_check` gate as `CommentAudit` — it drives the same ledger; the
-    // `gaps:audit` deno task passes the feature.
+    // `gaps:audit` task passes the feature.
     #[cfg(feature = "_internal_comment_check")]
     GapAudit(GapAuditCommand),
     // Same `_internal_comment_check` gate — the blank-injection audit drives the ledger for its
-    // ledger-clean invariant; the `blanks:audit` deno task passes the feature.
+    // ledger-clean invariant; the `blanks:audit` task passes the feature.
     #[cfg(feature = "_internal_comment_check")]
     BlankAudit(BlankAuditCommand),
     // Same `_internal_comment_check` gate — the ignore-directive audit drives the ledger via
-    // `pristine_format`; the `ignore:audit` deno task passes the feature.
+    // `pristine_format`; the `ignore:audit` task passes the feature.
     #[cfg(feature = "_internal_comment_check")]
     IgnoreAudit(IgnoreAuditCommand),
     // The fourth ratchet audit, grouped with the three above — but ungated: it formats each
@@ -168,7 +168,7 @@ pub enum Subcommand {
     Tape(TapeCommand),
     // Requires the `_internal_swallow_check` feature so default builds keep the
     // render-time swallow instrumentation compiled out (production-shaped
-    // profiles); the `swallow:audit` deno task passes it.
+    // profiles); the `swallow:audit` task passes it.
     #[cfg(feature = "_internal_swallow_check")]
     SwallowAudit(SwallowAuditCommand),
     Test262(Test262Command),

@@ -1260,7 +1260,7 @@ fn export_default_leftmost<'a>(
 /// That flag is a byte scan the parser ran over the SOURCE, and its `(` head arm looks
 /// THROUGH a shell, because the shell the arm was written for is one the printer STRIPS:
 /// `a < (arr[b - 1]) > c` prints as `a < arr[b - 1] > c`, so the two authorings of that one
-/// document owe one verdict (`deno task paren:audit`'s `< > operand` class enumerates
+/// document owe one verdict (`npm run paren:audit`'s `< > operand` class enumerates
 /// exactly that pair). Where the printer KEEPS the shell the look-through grades the wrong
 /// text — the content is no type, so the scan declines the pair, while the `(` it looked
 /// through is still in the output, and a `(`-headed region IS a type-argument list to a

@@ -460,7 +460,7 @@ pub(crate) struct WarmStores {
 /// The doc arena is caller-owned and reset between iterations (see `profile_file`);
 /// setup/teardown stays outside both timed regions.
 ///
-/// `examples/perf_ab.rs` (the `deno task perf:ab` driver) times these same phases in a
+/// `examples/perf_ab.rs` (the `npm run perf:ab` driver) times these same phases in a
 /// self-contained copy, so it compiles against older trees; a change to what is timed here
 /// belongs there too.
 fn profile_once(

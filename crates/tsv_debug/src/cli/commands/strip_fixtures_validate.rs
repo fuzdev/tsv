@@ -10,7 +10,7 @@ use argh::FromArgs;
 /// against the known-failure ratchet `strip_fixtures_known.txt` beside this command: a new
 /// one fails, and so does a pinned one that stopped failing. A broken fixture or a panic
 /// always fails. The same gate runs in `cargo test` (`tests/strip_fixtures_tests.rs`); the
-/// committed files' agreement with the oracles is `deno task strip:fixtures:oracle`'s.
+/// committed files' agreement with the oracles is `npm run strip:fixtures:oracle`'s.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "strip_fixtures_validate")]
 pub struct StripFixturesValidateCommand {

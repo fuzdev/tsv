@@ -54,7 +54,7 @@ pub(crate) const FIXTURES_FORMATTED_MIN: usize = 7_429;
 /// no scope escapes.
 ///
 /// A minimum rather than a two-sided pin because the fixtures tree is COMMITTED
-/// and grows with ordinary fixture PRs (`deno task check` must not fail per
+/// and grows with ordinary fixture PRs (`npm run check` must not fail per
 /// added fixture); only shrinkage fails. Consumers pass
 /// [`FIXTURES_FORMATTED_MIN`] and call this only on a full default run.
 ///
@@ -117,7 +117,7 @@ pub(crate) fn check_pinned_min(
 /// Complements [`check_formatted_min`], the **default-corpus** half: that one pins
 /// a number only the committed fixtures tree can meet, so every consumer gates it
 /// behind `default_paths` — which leaves every explicitly-pathed run (each corpus
-/// sweep, each ad-hoc triage run, and `canonicalize:audit`, the one `deno task
+/// sweep, each ad-hoc triage run, and `canonicalize:audit`, the one `npm run
 /// check` leg invoked with paths) relying on this floor alone. Zero is the one
 /// value that is vacuous at *every* scope, so this check needs no pin and is called
 /// unconditionally.

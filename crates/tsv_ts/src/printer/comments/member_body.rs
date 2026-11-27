@@ -60,7 +60,7 @@ pub(crate) enum MemberFreeze {
     /// `crates/tsv_debug/src/cli/commands/ignore_audit_known.txt`, and the plain type
     /// literal next door honors the same directive through [`Self::Span`]. Named here so
     /// the walk's shape does not hide it; switching this arm to `Span` is the fix, and it
-    /// needs its own fixture plus a `deno task ignore:audit:update` re-pin.
+    /// needs its own fixture plus an `npm run ignore:audit:update` re-pin.
     Never,
     /// The member's whole span, its terminator included.
     Span,

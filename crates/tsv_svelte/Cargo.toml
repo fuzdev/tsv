@@ -9,12 +9,12 @@ categories = ["development-tools", "parser-implementations", "web-programming"]
 keywords = ["svelte", "formatter", "parser", "prettier", "typescript"]
 license.workspace = true
 repository.workspace = true
-# This crate's agent notes stay in the repository; `deno task package:audit` grades the tarball.
+# This crate's agent notes stay in the repository; `npm run package:audit` grades the tarball.
 exclude = ["CLAUDE.md"]
 
 [package.metadata.docs.rs]
 # docs.rs builds this crate alone, at these features: the wire writers with `loc`, so the
-# whole parse surface is documented. `deno task docs:audit:docsrs` builds the same shape.
+# whole parse surface is documented. `npm run docs:audit:docsrs` builds the same shape.
 # One target: nothing here differs by platform.
 features = ["locations"]
 targets = ["x86_64-unknown-linux-gnu"]

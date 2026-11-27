@@ -4,11 +4,11 @@
 //! on the loc-bearing wire, and the shipped `crates/tsv_wasm/npm/locations.js`, which
 //! reconstructs it in JS from the span-only wire plus the source. Neither carries a
 //! hand-written expectation, so each is the other's drift check — and since the fixtures
-//! pin the span-only wire, the cross-grade is the only `deno task check` leg that grades
+//! pin the span-only wire, the cross-grade is the only `npm run check` leg that grades
 //! the JS reconstruction (`tests/loc_definition.rs` grades the Rust loc wire against an
 //! independent reference).
 //!
-//! This command is the Rust half of that leg (`deno task check:loc`,
+//! This command is the Rust half of that leg (`npm run check:loc`,
 //! `scripts/check_loc.ts`): one process that parses every fixture document once and streams
 //! one NDJSON record per document to stdout —
 //! `{"path", "language", "source", "loc", "span"}`, the two wires embedded verbatim — so

@@ -563,7 +563,7 @@ async fn classify_novel(
                 }
                 AuditSignatureCheck::Drift => {
                     return Some(Suggestion::Investigate(format!(
-                        "audit_signature_{suffix}.txt drift — prettier's chain from {filename} no longer matches the recorded chain. Run: deno task fixtures:update:formatted"
+                        "audit_signature_{suffix}.txt drift — prettier's chain from {filename} no longer matches the recorded chain. Run: npm run fixtures:update:formatted"
                     )));
                 }
                 AuditSignatureCheck::Error(reason) => {
@@ -590,7 +590,7 @@ async fn classify_novel(
                 }
                 AuditSignatureCheck::Drift => {
                     return Some(Suggestion::Investigate(
-                        "audit_signature.txt drift — prettier chain from output_prettier no longer matches recorded chain. Run: deno task fixtures:update:formatted".to_string()
+                        "audit_signature.txt drift — prettier chain from output_prettier no longer matches recorded chain. Run: npm run fixtures:update:formatted".to_string()
                     ));
                 }
                 AuditSignatureCheck::Error(reason) => {

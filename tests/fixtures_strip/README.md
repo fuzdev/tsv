@@ -42,8 +42,8 @@ oracle, `divergences.txt` naming that oracle (`ts-blank-space`, `node`), or hold
 Both claim files are generated, never hand-written, except under an override (below):
 
 ```bash
-deno task strip:fixtures:update [pattern...]   # write expected.* / refusal.txt
-deno task strip:fixtures:oracle [pattern...]   # re-check the committed files
+npm run strip:fixtures:update -- [pattern...]   # write expected.* / refusal.txt
+npm run strip:fixtures:oracle -- [pattern...]   # re-check the committed files
 ```
 
 The expected output is [ts-blank-space](https://github.com/bloomberg/ts-blank-space)'s,
@@ -57,7 +57,7 @@ refusal must make Node throw too. Every claimed output must also parse as a JS m
 oxc-parser in JS mode, semantic errors included, and keep the position contract under
 [Grading tsv](#grading-tsv), or the run fails and that fixture's claim is not written: the
 parse is the check that the output is JS at all. Both tasks run under Node and need
-`deno task bench:install`; ts-blank-space is pinned in `benches/js/package.json`, Node is
+`npm run bench:install`; ts-blank-space is pinned in `benches/js/package.json`, Node is
 whatever is installed, and the run prints both versions.
 
 **A U+2028 or U+2029 inside a string literal can't be fixtured.** The fold to LF turns it
@@ -135,7 +135,7 @@ override. The overrides:
 ## Grading tsv
 
 ```bash
-deno task strip:fixtures:validate [pattern...]   # also: -v, --update
+npm run strip:fixtures:validate -- [pattern...]   # also: -v, --update
 cargo test --test strip_fixtures_tests           # the same gate, in `cargo test`
 ```
 
@@ -159,7 +159,7 @@ not only inside a type-only range or at a hazard site, so deleted JS or a mispla
 Failures the strip does not yet fix are pinned in the ratchet snapshot
 `crates/tsv_debug/src/cli/commands/strip_fixtures_known.txt`: a new failure fails the gate,
 and so does a pinned one that stopped failing — re-pin with
-`deno task strip:fixtures:validate:update` once the change is deliberate. A broken fixture
+`npm run strip:fixtures:validate:update` once the change is deliberate. A broken fixture
 (an expected output that breaks the contract above or does not parse under `tsv_ts::__private::parse`,
 or a malformed `divergences.txt`) and a panic are never pinned. A reviewed claim is graded
 exactly like a generated one. That parse is a TypeScript one, so it shows the expected output

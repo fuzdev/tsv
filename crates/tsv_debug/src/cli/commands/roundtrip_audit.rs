@@ -89,7 +89,7 @@
 //! mirrors it), so a comment that legitimately trails past a `;` reads Clean, while its
 //! presence, kind and text stay pinned by the root `comments` array and the leaf check.
 //!
-//! ## `--gate` (the `deno task check` guard)
+//! ## `--gate` (the `npm run check` guard)
 //!
 //! `--gate` fails on the `*_unreparseable`, `*_node_loss` and `*_leaf_corruption`
 //! buckets (the divergent buckets are render-model noise over `tests/fixtures`). A
@@ -98,7 +98,7 @@
 //! `tsv_node_loss`); the leaf check rides `--gate --canonical-all` and every
 //! non-gate run, the same tier as divergence. Over `tests/fixtures` that guard
 //! is a **cheap tripwire**: the fixture idempotency/normalization invariants
-//! (`fixtures_validate` F1/N, also in `deno task check`) already make every
+//! (`fixtures_validate` F1/N, also in `npm run check`) already make every
 //! formatted output reparse, so the bucket is ~always 0 there and a regression
 //! that broke it would trip those checks too. The real yield is on **external
 //! corpora** — point it at `../prettier/tests/format/*` and real repos, where it
@@ -151,7 +151,7 @@ use super::{ResultOrder, spawn_work_stream, task_result};
 /// A bare run reports every finding bucket and exits 0. `--gate` reports only the
 /// reliable `*_unreparseable`, `*_node_loss` and `*_leaf_corruption` buckets and exits
 /// 1 on any (the divergent buckets are render-model noise over `tests/fixtures`); a
-/// bare `--gate` runs phase 1 only, the fast pure-Rust `deno task check` guard, which
+/// bare `--gate` runs phase 1 only, the fast pure-Rust `npm run check` guard, which
 /// classifies `tsv_unreparseable` and `tsv_node_loss`, while `--gate --canonical-all` is the thorough
 /// release-cadence form that also guards `canonical_unreparseable` (tsv's own parser
 /// accepting output the real parser rejects) and both leaf-corruption buckets.
@@ -166,7 +166,7 @@ pub struct RoundtripAuditCommand {
     /// the run reports every finding and exits 0. Bare `--gate` runs phase 1 only
     /// (pure Rust, no sidecar), which classifies tsv_unreparseable and
     /// tsv_node_loss; add `--canonical-all` for the canonical and leaf-corruption
-    /// guards too. This is the `deno task check` regression-guard mode.
+    /// guards too. This is the `npm run check` regression-guard mode.
     #[argh(switch)]
     gate: bool,
 

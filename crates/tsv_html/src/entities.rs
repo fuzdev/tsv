@@ -4,7 +4,7 @@
 //! - Source: <https://html.spec.whatwg.org/entities.json>, one entry per name holding the
 //!   characters it stands for
 //! - Generated from `src/entities.json` into the committed `src/entities_table.rs` (a perfect
-//!   hash table, see `entity`) by `deno task entities:update`; the generator runs as the
+//!   hash table, see `entity`) by `npm run entities:update`; the generator runs as the
 //!   `entities_table_is_fresh` test, which fails when the two disagree. The crate's `NOTICE`
 //!   attributes the list and states its license
 //! - Some names stand for **two** code points — a combining mark, a variation selector, or a

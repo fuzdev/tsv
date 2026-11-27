@@ -13,14 +13,14 @@ path = "src/main.rs"
 
 [features]
 # Opt-in: compiles tsv_lang's render-time swallow check into this binary and
-# enables the `swallow_audit` subcommand (the `swallow:audit` deno task passes
+# enables the `swallow_audit` subcommand (the `swallow:audit` task passes
 # it). Off by default so default tsv_debug builds — including `profile` and
 # `perf` sessions — measure production-shaped render code with no
 # instrumentation branch in the render loop.
 _internal_swallow_check = ["tsv_lang/_internal_swallow_check"]
 # Opt-in: compiles tsv_lang's print-once comment ledger into this binary and enables the
 # ledger-driven subcommands — `comment_audit`, `gap_audit`, `blank_audit`, `ignore_audit`
-# (the `comments:audit` / `gaps:audit` / `blanks:audit` / `ignore:audit` deno tasks pass
+# (the `comments:audit` / `gaps:audit` / `blanks:audit` / `ignore:audit` tasks pass
 # it). Off by default for the same reason as `_internal_swallow_check` — a default build carries no
 # registration in the format entry points and no record hook in the printers' comment seams.
 # Implies `_internal_swallow_check`: the ledger-armed format (`audit::properties::ledger_format`) also
@@ -70,7 +70,7 @@ _internal_ast_census = [
 ]
 # Umbrella that compiles the diagnostic seams into one binary and enables all five
 # gated subcommands: `swallow_audit` plus the ledger-driven `comment_audit` /
-# `gap_audit` / `blank_audit` / `ignore_audit`. EVERY audit deno task passes
+# `gap_audit` / `blank_audit` / `ignore_audit`. EVERY audit task passes
 # `--features _internal_audits` under `--profile corpus` — including the ones that need neither
 # seam (`scan:audit`, `fanout:audit`, `conformance:audit`, `render:audit`) — so all of
 # them share ONE `corpus+_internal_audits` build instead of splitting the workspace into a

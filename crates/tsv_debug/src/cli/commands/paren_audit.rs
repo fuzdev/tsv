@@ -85,7 +85,7 @@
 //! in real code: over the `../corpora` snapshot both relational rows are legitimately **0**,
 //! and that zero is the corpus's shape, not a class that stopped enumerating. The class lives
 //! in the fixture tree (`tests/fixtures/typescript/expressions/binary/relational_*`), so the
-//! **fixture-tree gate** — `deno task paren:audit`, which `deno task check` runs — is the one
+//! **fixture-tree gate** — `npm run paren:audit`, which `npm run check` runs — is the one
 //! invocation that passes the flag, and the **real-code leg** of `audit:corpus`
 //! (`benches/js/corpus_audit.ts`, publish Step 3c) deliberately does not: it grades every
 //! class it finds and holds only the total floor.

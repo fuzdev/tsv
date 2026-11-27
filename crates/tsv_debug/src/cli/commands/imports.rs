@@ -8,7 +8,7 @@
 //!
 //! ## `--stdin`: the import differential's tsv side
 //!
-//! `benches/js/imports_corpus.ts` (`deno task imports:corpus`) grades tsv's records against
+//! `benches/js/imports_corpus.ts` (`npm run imports:corpus`) grades tsv's records against
 //! oxc-parser's module record over the corpus, and asks this process for tsv's side: one
 //! NDJSON request per line on stdin, `{"path", "source"}` (the path picks the parser and the
 //! goal, as above; it is never read), answered by exactly one line on stdout, flushed before

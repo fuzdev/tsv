@@ -25,7 +25,7 @@
 //! that rule would newly trip. After it, plain glued comments are owned too, so the
 //! contrast vanishes and the probe passes vacuously — it is a development /
 //! characterization tool (and a guard to run *before* any future ownership-rule
-//! change), report-and-triage, not a `deno task check` gate.
+//! change), report-and-triage, not an `npm run check` gate.
 //!
 //! TypeScript-family files only; glued block comments concentrate in JSDoc-typed JS.
 
@@ -52,7 +52,7 @@ use super::skip_ascii_whitespace;
 #[argh(subcommand, name = "neutrality_audit")]
 pub struct NeutralityAuditCommand {
     /// exit 1 if any layout-non-neutral position is found (dev-loop convenience;
-    /// this is not a `deno task check` gate — see the module docs)
+    /// this is not an `npm run check` gate — see the module docs)
     #[argh(switch)]
     gate: bool,
 

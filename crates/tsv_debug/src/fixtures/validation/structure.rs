@@ -152,7 +152,7 @@ pub(super) fn validate_fixture_structure(
                 When using the expected_ours.json + expected_svelte.json pattern, both files must exist.\n\
                 - expected_ours.json: Our parser's AST (source of truth for our tests)\n\
                 - expected_svelte.json: the canonical parser's AST (documents the difference)\n\
-                Run: deno task fixtures:update:parsed".to_string()
+                Run: npm run fixtures:update:parsed".to_string()
             );
         }
 
@@ -226,7 +226,7 @@ pub(super) fn validate_fixture_structure(
         // Standard pattern: expected.json (required)
         if !has_expected {
             return Err("Missing expected.json (required for parser tests).\n\
-                Run: deno task fixtures:update:parsed"
+                Run: npm run fixtures:update:parsed"
                 .to_string());
         }
     }
@@ -260,7 +260,7 @@ pub(super) fn validate_fixture_structure(
             "{AUDIT_SIGNATURE_FILENAME} exists without {output_prettier_filename}.\n\
             The audit signature pins prettier's multi-pass chain anchored at output_prettier.*\n\
             and only applies when that file exists. Either:\n\
-            - Generate {output_prettier_filename} (run: deno task fixtures:update:formatted), or\n\
+            - Generate {output_prettier_filename} (run: npm run fixtures:update:formatted), or\n\
             - Delete {AUDIT_SIGNATURE_FILENAME} if no longer relevant."
         ));
     }
@@ -279,7 +279,7 @@ pub(super) fn validate_fixture_structure(
                 A per-variant signature pins prettier's chain anchored at the same-suffix\n\
                 unformatted_ours_* source; without it the file pins nothing. Either:\n\
                 - Add {source}, or\n\
-                - Delete {signature_name} (run: deno task fixtures:update:formatted)."
+                - Delete {signature_name} (run: npm run fixtures:update:formatted)."
             ));
         }
     }
@@ -295,7 +295,7 @@ pub(super) fn validate_fixture_structure(
                 A variant parse pin holds the canonical parser's AST of the same-stem variant\n\
                 file (P4); without a parseable one it pins nothing. Either:\n\
                 - Add {variant} (a variant both parsers accept), then run:\n\
-                  deno task fixtures:update:parsed, or\n\
+                  npm run fixtures:update:parsed, or\n\
                 - Delete {pin}."
             ));
         }
@@ -326,7 +326,7 @@ pub(super) fn validate_fixture_structure(
                 - Fold the two unformatted_ours_* sources into one variant (their prettier\n\
                   chains are the same chain), or\n\
                 - Give one source an authoring prettier's first pass answers differently,\n\
-                then run: deno task fixtures:update:formatted"
+                then run: npm run fixtures:update:formatted"
             ));
         }
         intermediate_contents.push((name, content));
@@ -744,7 +744,7 @@ pub(super) fn validate_fixture_structure(
             Found {} unformatted_prettier_*{input_ext} file(s) but no {}.\n\
             These files test that prettier normalizes to its canonical output.\n\
             Either:\n\
-            - Add {} (run: deno task fixtures:update:formatted), OR\n\
+            - Add {} (run: npm run fixtures:update:formatted), OR\n\
             - Remove unformatted_prettier_*{input_ext} files",
             output_prettier_filename,
             files.unformatted_prettier.len(),
@@ -894,7 +894,7 @@ fn validate_tsv_rejects_structure(
     if !has_expected_svelte {
         return Err(format!(
             "{TSV_REJECTS_FILENAME} fixture is missing expected_svelte.json (the canonical AST).\n\
-            The canonical parser must accept this input; run: deno task fixtures:update:parsed"
+            The canonical parser must accept this input; run: npm run fixtures:update:parsed"
         ));
     }
 

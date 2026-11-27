@@ -66,10 +66,10 @@ const SNAPSHOT_HEADER: &str = "\
 # seam, an empty block body, and an empty frozen verbatim body — are NOT here: they are
 # carved out structurally in `fabrication_audit.rs`.
 #
-# Regenerate with `deno task fabrication:audit:update`.
+# Regenerate with `npm run fabrication:audit:update`.
 ";
 
-const REPIN_HINT: &str = "deno task fabrication:audit:update";
+const REPIN_HINT: &str = "npm run fabrication:audit:update";
 
 /// One shape of invented blank: what brackets it, normalized.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]

@@ -61,10 +61,10 @@ const SNAPSHOT_HEADER: &str = "\
 # (`KNOWN_FAMILIES`) pins as ONE line, its label in the shape column, and covers one
 # counter's work exponent alone: any other finding on a member fails as NEW.
 #
-# Regenerate with `deno task fanout:audit:update`.
+# Regenerate with `npm run fanout:audit:update`.
 ";
 
-const REPIN_HINT: &str = "deno task fanout:audit:update";
+const REPIN_HINT: &str = "npm run fanout:audit:update";
 
 fn snapshot() -> Ratchet {
     Ratchet::colocated("fanout_audit_known.txt", SNAPSHOT_HEADER, REPIN_HINT)
@@ -1144,7 +1144,7 @@ impl BuildFanoutAuditCommand {
         if !fanout_probe::ENABLED {
             eprintln!(
                 "Error: build_fanout_audit needs the work counters: build with `--features \
-                 _internal_audits` (or `_internal_fanout_check`) — `deno task fanout:audit` does."
+                 _internal_audits` (or `_internal_fanout_check`) — `npm run fanout:audit` does."
             );
             return Err(CliError::Failed);
         }

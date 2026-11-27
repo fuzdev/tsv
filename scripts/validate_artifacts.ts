@@ -102,8 +102,8 @@ export function artifact_freshness_checks(built: ReadonlySet<WasmVariant>): Arra
 	);
 }
 
-// Centers (the npm staging's `.wasm`): format 2,856,548 B, measured on one tree 2026-11-23;
-// parse 1,108,762 B and all 3,171,082 B, re-measured when the packages dropped their JSON-wire
+// Centers (the npm staging's `.wasm`, each measured on one tree): format 2,856,548 B; parse
+// 1,108,762 B and all 3,171,082 B, re-measured when the packages dropped their JSON-wire
 // exports: the parse feature links the wire writers' tape copies (each language crate's `_tape`
 // feature) alone, and the JSON copies, which no export reaches, drop out at link time (about
 // 272 KB of each). All carries the type strip and the import records (the `strip` and

@@ -955,7 +955,7 @@ impl<'a> Printer<'a> {
     /// alignment caller supplies `force_multiline` from outside), and dropping a run on an
     /// unproven emptiness argument is how a comment goes missing. Measured: an
     /// `assert!(deferred.is_empty())` here survives the fixture suite and 3.5M comment
-    /// injections across 7898 files (`deno task gaps:audit`).
+    /// injections across 7898 files (`npm run gaps:audit`).
     fn push_width_aware_type_member(
         &self,
         member_parts: &mut DocBuf,

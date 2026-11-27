@@ -221,11 +221,11 @@ const TRIPLE_SEED: u64 = 0x7473_765f_6465_7074;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Scope {
     /// Every pair behind [`CHECK_HEADS`], [`CHECK_TRIPLES`] seeded triples, the commented
-    /// links and `check`'s sample of the prefix alphabet — what `deno task test:depth`
+    /// links and `check`'s sample of the prefix alphabet — what `npm run test:depth`
     /// grades inside `check`.
     Check,
     /// Every pair behind every one of [`HEADS`], [`SAMPLED_TRIPLES`] seeded triples, the
-    /// commented links and the whole prefix alphabet — what the shipped-profile run (`deno task test:depth:napi`, with
+    /// commented links and the whole prefix alphabet — what the shipped-profile run (`npm run test:depth:napi`, with
     /// `TSV_DEPTH_SWEEP=full`) and the WASM leg grade.
     Full,
 }

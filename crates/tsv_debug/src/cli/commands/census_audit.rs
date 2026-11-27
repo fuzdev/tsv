@@ -76,10 +76,10 @@ const SNAPSHOT_HEADER: &str = "\
 # A key found but not pinned FAILS (a new loss site). A pinned key that no longer fires
 # FAILS (fix landed — re-pin).
 #
-# Regenerate with `deno task census:audit:update`.
+# Regenerate with `npm run census:audit:update`.
 ";
 
-const REPIN_HINT: &str = "deno task census:audit:update";
+const REPIN_HINT: &str = "npm run census:audit:update";
 
 /// Which way a file's multiset moved.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]

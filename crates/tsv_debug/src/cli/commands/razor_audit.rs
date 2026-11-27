@@ -43,8 +43,8 @@ use super::profile::{is_svelte, resolve_seed_files_named};
 ///   gate in the repo and fell only to a hand-run ±1-char sweep.
 ///
 /// **The oracle must be structural, and that is measured, not assumed.** A raw text scan for
-/// "line starts with indent + a space" is unusable: 406 lines across the fixture tree's own
-/// *output* files already do, dominated by block-comment continuations (` *`, ` */`),
+/// "line starts with indent + a space" is unusable: hundreds of lines across the fixture
+/// tree's own *output* files already do, dominated by block-comment continuations (` *`, ` */`),
 /// expression alignment (` )`, ` }`), multiline attribute values and `<pre>` content — all
 /// legitimate. So the scan asks the **parse**: a violation is a space at a line head *inside a
 /// fragment `Text` node*, which excludes every one of those by node kind.
@@ -52,7 +52,7 @@ use super::profile::{is_svelte, resolve_seed_files_named};
 /// What only it can see: an F1 break in a fused element+tail measurement at an
 /// inline-sibling wrap — invisible to every other gate because the strayed pass is
 /// reachable only at widths no fixture happens to sit at
-/// (`inline_sibling_drop_tail_wide_long_prettier_divergence`). Gated in `deno task check`.
+/// (`inline_sibling_drop_tail_wide_long_prettier_divergence`). Gated in `npm run check`.
 ///
 /// Pure Rust — no sidecar. Defaults to `tests/fixtures`, `.svelte` seeds only (the class is
 /// Svelte inline layout; the TS and CSS printers have no fill-boundary bake).

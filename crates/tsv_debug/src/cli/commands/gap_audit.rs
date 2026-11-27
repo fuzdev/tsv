@@ -165,7 +165,7 @@ pub struct GapAuditCommand {
 
     /// print the full per-shape report even when the ratchet holds. A passing gate is
     /// summary-only by default — the several hundred shapes it already knows about are noise in
-    /// `deno task check`. Any run with something to act on reports regardless
+    /// `npm run check`. Any run with something to act on reports regardless
     #[argh(switch)]
     report: bool,
 
@@ -1044,7 +1044,7 @@ impl GapAuditCommand {
             report::print_json(&summary, &findings, &extra);
         } else if graded.as_ref().is_some_and(GateDiff::holds) && !self.report {
             // Nothing to act on: every shape is one the snapshot already pins, so the
-            // per-shape report is thousands of lines of noise in `deno task check`.
+            // per-shape report is thousands of lines of noise in `npm run check`.
             report::print_summary(&summary, &findings);
         } else {
             report::print_report(&summary, &findings);
@@ -1161,13 +1161,13 @@ impl GapAuditCommand {
             eprint_capped(new.iter(), shape_line);
             eprintln!(
                 "  Fix the drop, or — if it is genuinely pre-existing and merely newly \
-                 REACHED by a fixture — re-run `deno task gaps:audit:update`."
+                 REACHED by a fixture — re-run `npm run gaps:audit:update`."
             );
         }
         if !stale.is_empty() {
             eprintln!(
                 "\n✗ {} STALE snapshot entry/entries — these no longer fire. If you fixed \
-                 them, drop the lines (`deno task gaps:audit:update`):",
+                 them, drop the lines (`npm run gaps:audit:update`):",
                 stale.len()
             );
             eprint_capped(stale.iter(), shape_line);

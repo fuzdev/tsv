@@ -30,6 +30,6 @@ The width half of the class — where the break after the `>` is what commits th
 
 ## Variants
 
-`unformatted_ours_bare_chain` drops the outer pair — the authoring the divergence is about, and the one `deno task paren:audit`'s `< > chain` class synthesizes. tsv normalizes it back to `input.svelte`; prettier keeps it bare. It carries every cell but `k14` and `k15`, whose bare spelling is one tsv's own parser rejects (the `Parse`-side head over-rejection the catalog entry ends on, an input an author may write and acorn and tsc both read as the comparison chain), so no variant can claim a normalization from it.
+`unformatted_ours_bare_chain` drops the outer pair — the authoring the divergence is about, and the one `npm run paren:audit`'s `< > chain` class synthesizes. tsv normalizes it back to `input.svelte`; prettier keeps it bare. It carries every cell but `k14` and `k15`, whose bare spelling is one tsv's own parser rejects (the `Parse`-side head over-rejection the catalog entry ends on, an input an author may write and acorn and tsc both read as the comparison chain), so no variant can claim a normalization from it.
 
 See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Prettier bug index and [conformance_prettier_ts.md](../../../../../../docs/conformance_prettier_ts.md) §TypeScript (Relational chain type-argument parens).

@@ -304,7 +304,7 @@ pub(super) fn report_rank(rollup: &ByNodeRollup, top: usize, json: bool) {
     let top_hits: usize = rollup.clusters.iter().take(n).map(|c| c.hits).sum();
     lines.push(format!(
         "\ntop-{n} clusters cover {top_gaps}/{} distinct gaps ({}%) · {top_hits}/{} findings · \
-         ranked by distinct gaps (whitespace-run deduped) · regenerate via `deno task gaps:audit:rank`",
+         ranked by distinct gaps (whitespace-run deduped) · regenerate via `npm run gaps:audit:rank`",
         rollup.grand_total_gaps,
         pct_of(top_gaps, rollup.grand_total_gaps),
         rollup.grand_total

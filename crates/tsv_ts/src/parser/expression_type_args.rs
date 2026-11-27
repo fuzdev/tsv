@@ -104,7 +104,7 @@ use tsv_lang::source_scan::{TriviaProfile, skip_trivia};
 ///   the broken form is one only the printer produces.
 /// - **Independence.** [`Relex`] must agree with ITSELF across the redundant-paren
 ///   spellings of one program: `a < X > c` and `a < (X) > c` are one document, so they owe
-///   one verdict. Gated by `deno task paren:audit` (its `< > chain` and `< > operand`
+///   one verdict. Gated by `npm run paren:audit` (its `< > chain` and `< > operand`
 ///   classes). This is soundness's dual: a `(` arm that graded nothing would give a
 ///   parenthesized operand a pair its bare twin lacks.
 ///
@@ -2136,7 +2136,7 @@ const TYPE_PREFIX_WORDS: &[&[u8]] = &[
 ///
 /// A redundant `(` SHELL the printer strips is not part of the head: `x < ((a || b)) > c`
 /// grades the content its own shell-free twin does, so the two authorings of one chain reach
-/// one verdict (`deno task paren:audit`'s `< > operand` class enumerates exactly that pair),
+/// one verdict (`npm run paren:audit`'s `< > operand` class enumerates exactly that pair),
 /// and [`TypeArgScan::Relex`]'s look-through has the same rule to agree with. The chain of
 /// them is located by ONE descent over the head's leading `(`s and then walked once from the
 /// innermost — never by re-walking the body per shell, which is quadratic in the nesting the

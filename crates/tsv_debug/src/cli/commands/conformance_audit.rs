@@ -52,7 +52,7 @@ use tsv_ignore::{IgnoreStack, PathKind};
 ///    catalog for the language you're touching, listed in its §Catalogs table", so an
 ///    unindexed member is unreachable that way even with every other check green.
 ///
-/// Exits non-zero on any finding. Part of `deno task check`.
+/// Exits non-zero on any finding. Part of `npm run check`.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "conformance_audit")]
 pub struct ConformanceAuditCommand {

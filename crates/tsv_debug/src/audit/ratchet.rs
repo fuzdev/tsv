@@ -89,7 +89,7 @@ pub(crate) struct Ratchet {
     /// The `#`-comment header the render prepends verbatim. Owns the file's
     /// self-documentation, so it travels with the consumer, not the ratchet.
     header: &'static str,
-    /// The command that regenerates the snapshot (e.g. `deno task gaps:audit:update`)
+    /// The command that regenerates the snapshot (e.g. `npm run gaps:audit:update`)
     /// — quoted in the read-failure message so it stays actionable.
     repin_hint: &'static str,
 }

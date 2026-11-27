@@ -97,8 +97,8 @@
 //! tests nothing its own input does not. A gap carrying a **newline** is left alone
 //! either way: own-line-ness is authorship, not volume. See `docs/audits.md`.
 //!
-//! Pure Rust — no sidecar, no formatter run. Part of `deno task check` (via
-//! `deno task variants:audit`).
+//! Pure Rust — no sidecar, no formatter run. Part of `npm run check` (via
+//! `npm run variants:audit`).
 
 use crate::audit::vacuity::{check_graded_nonzero, check_pinned_min};
 use crate::cli::CliError;

@@ -308,7 +308,7 @@ impl<'a> Printer<'a> {
     /// three different ways and only the block heads got it right.
     ///
     /// Getting this wrong is not subtle in one direction and invisible in the other: too
-    /// eager and a `//` swallows the closer (`deno task swallow:audit` gates it), too lazy
+    /// eager and a `//` swallows the closer (`npm run swallow:audit` gates it), too lazy
     /// and the closer is indented one level too deep — cosmetic, idempotent, and therefore
     /// invisible to every standing gate, so it is fixture-pinned instead
     /// ([`expr_trailing_indented_content`](../../../../../tests/fixtures/svelte/syntax/comments/expr_trailing_indented_content_prettier_divergence/)).

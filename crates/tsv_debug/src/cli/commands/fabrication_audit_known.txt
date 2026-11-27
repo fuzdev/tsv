@@ -9,5 +9,5 @@
 # seam and an empty block body — are NOT here: they are carved out structurally in
 # `fabrication_audit.rs`.
 #
-# Regenerate with `deno task fabrication:audit:update`.
+# Regenerate with `npm run fabrication:audit:update`.
 # shapes: 0

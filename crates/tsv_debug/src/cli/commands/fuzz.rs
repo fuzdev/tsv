@@ -636,7 +636,7 @@ fn tape_check(src: &str, parser: ParserType) -> (bool, Option<String>) {
 /// Write the `locations` wire of `src` — the `{locations: true}` / `--locations`
 /// product, with its line table — parsed the way [`f1_check`] parses it. Returns
 /// whether the input parsed (the leg graded it); the bytes are discarded, since the
-/// leg's property is that writing them does not panic (`deno task check:loc` grades
+/// leg's property is that writing them does not panic (`npm run check:loc` grades
 /// their content over the fixtures).
 fn locations_wire(src: &str, parser: ParserType) -> bool {
     let wire = match parser {
@@ -1133,7 +1133,7 @@ impl FuzzCommand {
                 // reflows the whitespace skeleton, and structural reparse is
                 // `roundtrip_audit`'s gate anyway (it has the canonical confirmation
                 // this compare lacks). It is still REPORTED: over a real-code corpus
-                // (`deno task idempotency:sweep`) there are no `unformatted_*` files,
+                // (`npm run idempotency:sweep`) there are no `unformatted_*` files,
                 // so every one of these wants triage — and a count with no paths is
                 // not actionable. The seed path IS the reproduction (an unmutated file
                 // on disk), so record that rather than dumping the input.

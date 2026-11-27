@@ -57,7 +57,7 @@ struct Violation {
 /// default (`tests/fixtures`) run — a corpus that SHRANK, or a registration that partly
 /// collapsed, still reports "no findings" and would otherwise pass. A minimum, not a
 /// two-sided pin, because the fixtures tree is COMMITTED and grows with ordinary fixture
-/// PRs (`deno task check` must not fail per added fixture); shrinkage/collapse fails.
+/// PRs (`npm run check` must not fail per added fixture); shrinkage/collapse fails.
 /// Re-pin to current when it trips. Same ritual as
 /// [`FIXTURES_FORMATTED_MIN`](crate::audit::vacuity::FIXTURES_FORMATTED_MIN) and
 /// `benches/js/lib/gate_counts.ts`.

@@ -24,7 +24,7 @@
 //! `tests/css_property_comment_colon_idempotent.rs` extends it across value
 //! kinds), so it can only live in an `unformatted_*` variant, which makes no AST
 //! claim. The corpus differential
-//! (`deno task corpus:compare:parse --all`, over
+//! (`npm run corpus:compare:parse -- --all`, over
 //! `prettier/tests/format/css/comments/declaration.css`) is the standing gate, and
 //! its `css_declaration_tokenization` matcher absorbs the whole shifted `comments`
 //! array of such a document — so the two claims underneath it, tsv's reading and

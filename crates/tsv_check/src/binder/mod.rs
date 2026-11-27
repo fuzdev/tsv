@@ -334,14 +334,17 @@ impl BoundFile {
 }
 
 /// The `require_node_id` miss path, isolated so its deliberate panic carries the
-/// one `#[expect(clippy::panic)]` the crate's restriction-lint posture requires
-/// (panic points need an explicit allow + justification). A miss means the SoA
-/// walk did not id a node a flow consumer reached — an internal invariant break
-/// that must abort, not a recoverable data error.
+/// one `#[expect(clippy::panic, reason)]` the crate's restriction-lint posture
+/// requires of a panic point. A miss means the SoA walk did not id a node a flow
+/// consumer reached — an internal invariant break that must abort, not a
+/// recoverable data error.
 #[cold]
 #[inline(never)]
 #[track_caller]
-#[expect(clippy::panic)]
+#[expect(
+    clippy::panic,
+    reason = "an unmapped node is an internal invariant break that must abort"
+)]
 fn node_id_miss(address: NodeAddr, kind: NodeKind) -> ! {
     panic!(
         "require_node_id: ({address:#x}, {kind:?}) not covered by the SoA walk — a flow \

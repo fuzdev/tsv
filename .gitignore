@@ -56,7 +56,7 @@ node_modules
 
 # A bench run's scratch directory — what its processes hand each other (specs,
 # results, the timed file sets). A clean run removes its own; one whose child failed
-# keeps it to reproduce from, as does one killed outright — `deno task bench:clean`.
+# keeps it to reproduce from, as does one killed outright — `npm run bench:clean`.
 /benches/js/results/.run-*/
 
 # Env

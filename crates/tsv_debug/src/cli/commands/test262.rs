@@ -34,7 +34,7 @@ pub struct Test262Command {
 
     /// gate mode: fail only on a POSITIVE-parse regression (or a shift in the
     /// pinned positive-pass count); negative failures (the deferred early-error
-    /// frontier) are reported, not gated. The release gate — `deno task
+    /// frontier) are reported, not gated. The release gate — `npm run
     /// conformance:test262` and publish Step 3b.
     #[argh(switch)]
     gate: bool,
@@ -302,7 +302,7 @@ impl Test262Command {
         // docs/conformance_test262.md), so a full run's non-zero exit is a
         // diagnostic, not a release regression; gate mode ignores negative_failed
         // and fails only on a positive regression or a shift in the pinned
-        // positive-pass count. This is what `deno task conformance:test262` and
+        // positive-pass count. This is what `npm run conformance:test262` and
         // publish Step 3b run.
         if self.gate {
             let mut gate_failed = false;

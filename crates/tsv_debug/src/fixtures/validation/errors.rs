@@ -381,7 +381,7 @@ impl ValidationError {
             Self::ParserExpectedJsonOutdated
             | Self::ParserExpectedOursOutdated
             | Self::ParserExpectedSvelteOutdated => {
-                "Run: deno task fixtures:update:parsed <pattern>"
+                "Run: npm run fixtures:update:parsed -- <pattern>"
             }
             Self::ParserError(_) => "Verify input is valid syntax; if valid, fix the parser",
             Self::ParserErrorInDivergence(_) => {
@@ -390,7 +390,7 @@ impl ValidationError {
             Self::CanonicalParserSidecarFailure(_) => {
                 "Re-run; if it persists, check the sidecar: cargo run -p tsv_debug check"
             }
-            Self::ParserVariantPinOutdated(_) => "Run: deno task fixtures:update:parsed <pattern>",
+            Self::ParserVariantPinOutdated(_) => "Run: npm run fixtures:update:parsed -- <pattern>",
             Self::ParserVariantOursDiffers { .. } => {
                 "Fix the parser to match the pin (the canonical parser's AST of that variant)"
             }
@@ -415,7 +415,7 @@ impl ValidationError {
                 }
             }
             Self::FormatterOutputPrettierOutdated => {
-                "Run: deno task fixtures:update:formatted <pattern>"
+                "Run: npm run fixtures:update:formatted -- <pattern>"
             }
             Self::FormatterInputDiffersFromPrettier(input_file) => {
                 match InputType::from_filepath(input_file) {
@@ -434,19 +434,19 @@ impl ValidationError {
                 }
             }
             Self::FormatterAuditSignatureOutdated(AuditSignatureStaleness::Drift) => {
-                "Run: deno task fixtures:update:formatted <pattern> (regenerates audit_signature.txt)"
+                "Run: npm run fixtures:update:formatted -- <pattern> (regenerates audit_signature.txt)"
             }
             Self::FormatterAuditSignatureOutdated(AuditSignatureStaleness::Collapsed) => {
-                "Run: deno task fixtures:update:formatted <pattern> (deletes audit_signature.txt), then re-evaluate whether the _prettier_divergence designation still applies"
+                "Run: npm run fixtures:update:formatted -- <pattern> (deletes audit_signature.txt), then re-evaluate whether the _prettier_divergence designation still applies"
             }
             Self::FormatterAuditSignatureMalformed(_) => {
-                "Delete and regenerate: deno task fixtures:update:formatted <pattern>"
+                "Delete and regenerate: npm run fixtures:update:formatted -- <pattern>"
             }
             Self::FormatterAuditSignatureWalkFailed(_) => {
                 "Investigate prettier error or non-converging chain; check input syntax. On a truncated chain, fixtures:update:formatted keeps the existing signature rather than regenerating"
             }
             Self::FormatterUnpinnedPrettierChain => {
-                "Run: deno task fixtures:update:formatted <pattern> (writes the audit_signature.txt that pins the multi-pass chain)"
+                "Run: npm run fixtures:update:formatted -- <pattern> (writes the audit_signature.txt that pins the multi-pass chain)"
             }
             Self::FormatterError(_) => "Fix the formatter implementation",
             Self::FormatterErrorInDivergence(_) => {
@@ -456,10 +456,10 @@ impl ValidationError {
                 "Delete prettier_nonconvergent.txt and re-evaluate the _prettier_divergence designation (prettier formats input stably now)"
             }
             Self::NonconvergentMarkerButPrettierConverges(_) => {
-                "Delete prettier_nonconvergent.txt and document the divergence normally (output_prettier.* / audit_signature.txt): deno task fixtures:update:formatted <pattern>"
+                "Delete prettier_nonconvergent.txt and document the divergence normally (output_prettier.* / audit_signature.txt): npm run fixtures:update:formatted -- <pattern>"
             }
             Self::RejectsMarkerButPrettierAccepts(_) => {
-                "Delete prettier_rejects.txt and document the divergence normally (output_prettier.*): deno task fixtures:update:formatted <pattern>"
+                "Delete prettier_rejects.txt and document the divergence normally (output_prettier.*): npm run fixtures:update:formatted -- <pattern>"
             }
             Self::RejectsMarkerWrongMessage { .. } => {
                 "Update prettier_rejects.txt with the new error substring (the upstream bug morphed), or re-examine whether the fixture still belongs"
@@ -534,7 +534,7 @@ impl ValidationError {
                 "Check prettier_intermediate_* content - should converge to input after re-formatting"
             }
             Self::NormalizationPrettierIntermediateMissingSource(_) => {
-                "Add corresponding unformatted_ours_* file, or run: deno task fixtures:update:formatted <pattern> (removes orphaned intermediates)"
+                "Add corresponding unformatted_ours_* file, or run: npm run fixtures:update:formatted -- <pattern> (removes orphaned intermediates)"
             }
             Self::NormalizationPrettierIntermediateToVariantMismatch(_) => {
                 "Update prettier_intermediate_to_variant_* to match prettier's actual first-pass output"
@@ -549,7 +549,7 @@ impl ValidationError {
                 "Check that the file's second prettier pass produces content matching some variant_* or prettier_variant_* sibling"
             }
             Self::NormalizationPrettierIntermediateToVariantMissingSource(_) => {
-                "Add corresponding unformatted_ours_* file, or run: deno task fixtures:update:formatted <pattern> (removes orphaned intermediates)"
+                "Add corresponding unformatted_ours_* file, or run: npm run fixtures:update:formatted -- <pattern> (removes orphaned intermediates)"
             }
             Self::NormalizationPrettierIntermediateToVariantNoVariantTarget(_) => {
                 "Add a variant_* or prettier_variant_* file documenting the convergence target"
@@ -567,7 +567,7 @@ impl ValidationError {
                 "Check that the file's second prettier pass produces content matching some divergent_variant_* sibling (if it matches a variant_*/prettier_variant_*, use prettier_intermediate_to_variant_*)"
             }
             Self::NormalizationPrettierIntermediateToDivergentVariantMissingSource(_) => {
-                "Add corresponding unformatted_ours_* file, or run: deno task fixtures:update:formatted <pattern> (removes orphaned intermediates)"
+                "Add corresponding unformatted_ours_* file, or run: npm run fixtures:update:formatted -- <pattern> (removes orphaned intermediates)"
             }
             Self::NormalizationPrettierIntermediateToDivergentVariantNoVariantTarget(_) => {
                 "Add a divergent_variant_* file documenting the convergence target"
@@ -576,25 +576,25 @@ impl ValidationError {
                 "Document prettier's output: add a variant_* / prettier_variant_* / divergent_variant_* (or prettier_intermediate*_*) sibling matching it, or update the existing one if prettier changed"
             }
             Self::UnpinnedPrettierChain(_, UnpinnedChainReason::MultiPass) => {
-                "Run: deno task fixtures:update:formatted <pattern> (writes the prettier_intermediate*_* or audit_signature_<suffix>.txt this chain needs)"
+                "Run: npm run fixtures:update:formatted -- <pattern> (writes the prettier_intermediate*_* or audit_signature_<suffix>.txt this chain needs)"
             }
             Self::UnpinnedPrettierChain(_, UnpinnedChainReason::StableFormOursRejects) => {
-                "Run: deno task fixtures:update:formatted <pattern> (writes audit_signature_<suffix>.txt — the marker of last resort)"
+                "Run: npm run fixtures:update:formatted -- <pattern> (writes audit_signature_<suffix>.txt — the marker of last resort)"
             }
             Self::VariantChainSignatureOutdated(_, AuditSignatureStaleness::Drift) => {
-                "Run: deno task fixtures:update:formatted <pattern> (regenerates audit_signature_<suffix>.txt)"
+                "Run: npm run fixtures:update:formatted -- <pattern> (regenerates audit_signature_<suffix>.txt)"
             }
             Self::VariantChainSignatureOutdated(_, AuditSignatureStaleness::Collapsed) => {
-                "Prettier now holds the unformatted_ours_* source itself stable — the source is a prettier fixed point, so pin it as a prettier_variant_* / variant_* instead. Run: deno task fixtures:update:formatted <pattern> (deletes the signature)"
+                "Prettier now holds the unformatted_ours_* source itself stable — the source is a prettier fixed point, so pin it as a prettier_variant_* / variant_* instead. Run: npm run fixtures:update:formatted -- <pattern> (deletes the signature)"
             }
             Self::VariantChainSignatureMalformed(_, _) => {
-                "Delete and regenerate: deno task fixtures:update:formatted <pattern>"
+                "Delete and regenerate: npm run fixtures:update:formatted -- <pattern>"
             }
             Self::VariantChainSignatureWalkFailed(_, _) => {
-                "Investigate prettier error or non-converging chain; check the source variant's syntax. Then: deno task fixtures:update:formatted <pattern>"
+                "Investigate prettier error or non-converging chain; check the source variant's syntax. Then: npm run fixtures:update:formatted -- <pattern>"
             }
             Self::VariantChainSignatureSuperseded(_) => {
-                "A single-form marker now expresses this output, so the chain pin is redundant. Run: deno task fixtures:update:formatted <pattern> (deletes the signature)"
+                "A single-form marker now expresses this output, so the chain pin is redundant. Run: npm run fixtures:update:formatted -- <pattern> (deletes the signature)"
             }
             Self::DuplicateUnformattedWithinFixture(_)
             | Self::DuplicatePrettierVariantWithinFixture(_) => {

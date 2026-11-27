@@ -386,7 +386,7 @@ pub fn print_validation_results(summary: &ValidationSummary, verbose: bool) {
                                 .rsplit('/')
                                 .next()
                                 .unwrap_or(&result.fixture_path);
-                            println!("    Investigate: deno task fixtures:audit {fixture_name}");
+                            println!("    Investigate: npm run fixtures:audit -- {fixture_name}");
                         }
                     }
                 }

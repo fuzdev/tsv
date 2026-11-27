@@ -3,13 +3,13 @@
 //!
 //! ## Why this exists
 //!
-//! The fixture render-equivalence check (the R rules, `deno task fixtures:validate`)
+//! The fixture render-equivalence check (the R rules, `npm run fixtures:validate`)
 //! asks this question of `tests/fixtures` — a **curated** corpus whose whitespace
 //! variants are hand-authored to be render-equivalent in the first place. That is a
 //! regression guard, not a discovery tool: it is close to the least likely place for
 //! a render change to hide. The exposure is **real code**, where the formatter meets
 //! authorings nobody curated — the same gap `audit:corpus` exists to close for the
-//! content-loss class ("the extension-robustness bar `deno task check`'s fixture-only
+//! content-loss class ("the extension-robustness bar `npm run check`'s fixture-only
 //! scope is structurally blind to").
 //!
 //! This command is that corpus-scale arm: for every `.svelte` file, compare the

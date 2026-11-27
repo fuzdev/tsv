@@ -22,7 +22,7 @@ Cases (in order):
    case that says fusing the prefix **moves** the guarded boundary rather than retiring it: the
    unit now begins at the comment, so its leading boundary is the one in front of the *comment*,
    and breaking there would inject a rendered space just as breaking inside it would. Found by the
-   seeded fuzzer (`deno task fuzz:audit`) mutating cases 1–3, and reachable by nothing else here —
+   seeded fuzzer (`npm run fuzz:audit`) mutating cases 1–3, and reachable by nothing else here —
    the mangled form is a fixed point, so idempotency is blind to it.
 5. **Mid-run after a wide word, and terminal** — the unit's leading boundary sits inside a
    multi-word fill rather than just after the run's first word, and nothing follows the unit. The

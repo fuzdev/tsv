@@ -23,7 +23,7 @@ by arithmetic: its closing tag sits at print width, so the tail does not fit aft
 A **block-styled** element puts `</a>` back at the content indent, where the tail *does* fit — so
 the same document would format to the dropped tail and reformat to the hugged one, forever. No
 existing gate could see it: the strayed pass is only reachable at widths no fixture happened to sit
-at, which is why it took the width sweep (`deno task razor:audit`) to surface.
+at, which is why it took the width sweep (`npm run razor:audit`) to surface.
 
 The per-width answer is the only convergeable one here, and it is what every neighbouring shape
 already gave: the tail boundary's **space** spelling after a multiline inline element is a fill

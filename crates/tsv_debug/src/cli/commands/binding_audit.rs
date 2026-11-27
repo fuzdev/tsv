@@ -87,7 +87,7 @@ pub struct BindingAuditCommand {
     /// gate mode: report only HARD findings — an owned cast/annotation comment
     /// that re-binds — and exit 1 on any. Soft findings (plain glued comments)
     /// are counted but non-fatal. Without it the run reports every finding and
-    /// exits 0. This is the `deno task check` regression-guard mode.
+    /// exits 0. This is the `npm run check` regression-guard mode.
     #[argh(switch)]
     gate: bool,
 

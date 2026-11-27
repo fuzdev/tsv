@@ -20,7 +20,7 @@ use super::profile::{lang_token, resolve_seed_files};
 /// audit: it formats each seed and counts the columns of every output line.
 ///
 /// **No other gate covers this, and two bugs proved the cost.** Both emitted an over-width
-/// line, one was also non-idempotent, and `deno task check` stayed green throughout — every
+/// line, one was also non-idempotent, and `npm run check` stayed green throughout — every
 /// standing gate is blind by construction. F1 / fuzz / round-trip see a fixed point that
 /// reparses. The ledger and census see every comment intact. The injection ratchets perturb
 /// comment gaps, blank lines and directives; none measures a column. `authoring:audit` asks
@@ -124,10 +124,10 @@ const SNAPSHOT_HEADER: &str = "\
 # §Print Width Philosophy before pinning). A pinned shape that no longer fires
 # FAILS (a fix landed, or the fixture that carried it moved — re-pin).
 #
-# Regenerate with `deno task width:audit:update`.
+# Regenerate with `npm run width:audit:update`.
 ";
 
-const REPIN_HINT: &str = "deno task width:audit:update";
+const REPIN_HINT: &str = "npm run width:audit:update";
 
 /// One shape of over-width line: which language, how the line opens and ends, and whether a
 /// comment closes between the two.

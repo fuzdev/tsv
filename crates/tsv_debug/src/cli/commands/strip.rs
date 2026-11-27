@@ -6,7 +6,7 @@
 //!
 //! ## `--stdin`: the strip differential's tsv side
 //!
-//! `benches/js/strip_corpus.ts` (`deno task strip:corpus`) grades tsv's strip against
+//! `benches/js/strip_corpus.ts` (`npm run strip:corpus`) grades tsv's strip against
 //! ts-blank-space over the corpus, and asks this process for tsv's side: one NDJSON request
 //! per line on stdin, `{"source"}`, answered by exactly one line on stdout, flushed before
 //! the next request is read:

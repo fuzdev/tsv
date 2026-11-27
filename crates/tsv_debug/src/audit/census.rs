@@ -60,7 +60,7 @@
 //! and a `{:else}` / `{/if}` clause is a shape the parser owns (`{:else}{#if}` and
 //! `{:else if}` are one wire), so only the opening heads count.
 //!
-//! The consumer is `census_audit` (`deno task census:audit`), which formats each
+//! The consumer is `census_audit` (`npm run census:audit`), which formats each
 //! pristine seed, runs `comment_census` on both sides, and ratchets the per-file
 //! deltas.
 

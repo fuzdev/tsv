@@ -7,10 +7,10 @@
 //! are pinned in the ratchet snapshot
 //! `crates/tsv_debug/src/cli/commands/strip_fixtures_known.txt`: a new failure fails this
 //! test, and so does a pinned one that stopped failing (re-pin with
-//! `deno task strip:fixtures:validate:update`). A broken fixture or a panic always fails.
+//! `npm run strip:fixtures:validate:update`). A broken fixture or a panic always fails.
 //!
 //! The committed files' agreement with the oracles (ts-blank-space, Node's
-//! `module.stripTypeScriptTypes`) is `deno task strip:fixtures:oracle`'s, which needs
+//! `module.stripTypeScriptTypes`) is `npm run strip:fixtures:oracle`'s, which needs
 //! node_modules and so stays out of this test.
 
 use tsv_debug::strip_fixtures::{REPIN_HINT, run_gate};

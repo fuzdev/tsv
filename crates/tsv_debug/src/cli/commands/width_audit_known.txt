@@ -38,7 +38,7 @@
 # §Print Width Philosophy before pinning). A pinned shape that no longer fires
 # FAILS (a fix landed, or the fixture that carried it moved — re-pin).
 #
-# Regenerate with `deno task width:audit:update`.
+# Regenerate with `npm run width:audit:update`.
 # shapes: 43
 svelte	'	-	'
 svelte	'	-	*/

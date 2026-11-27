@@ -10,7 +10,7 @@
 # (`KNOWN_FAMILIES`) pins as ONE line, its label in the shape column, and covers one
 # counter's work exponent alone: any other finding on a member fails as NEW.
 #
-# Regenerate with `deno task fanout:audit:update`.
+# Regenerate with `npm run fanout:audit:update`.
 # shapes: 3
 work	chain links holding `<` or `<<` (scans, n^2)	K73
 work	k285_leading_block_comment_run	K285
