@@ -1644,20 +1644,29 @@ pub fn build_program_doc(
 /// renders at whatever indentation the host's doc gives it, so verbatim text — a template
 /// literal's quasis, a non-indentable block comment's interior, a `prettier-ignore` slice —
 /// keeps its columns while every break the printer owns is indented. The contract is
-/// [`build_program_doc`]'s: `source` is the whole host document, `program` was parsed at
+/// [`build_program_doc`]'s: `source` is the whole host document, the program was parsed at
 /// host-absolute offsets ([`parse_embedded`]), and `line_table` is the host's.
+///
+/// The program comes WITH its stores, as a [`Parsed`]: a nested body is parsed into stores
+/// of its own, never the host document's, and taking the pair whole makes reading it through
+/// the host's view a type error rather than a wrong read.
 pub fn build_program_body_doc(
     arena: &DocArena,
-    program: &Program,
-    view: AstView<'_>,
+    parsed: &Parsed,
     source: &str,
     line_table: LineTable<'_>,
     embed: EmbedContext,
 ) -> Option<DocId> {
-    let (body, has_output) =
-        with_program_printer(arena, program, view, source, line_table, embed, |printer| {
-            printer.build_program_body_doc(program)
-        });
+    let program = &parsed.program;
+    let (body, has_output) = with_program_printer(
+        arena,
+        program,
+        parsed.view(),
+        source,
+        line_table,
+        embed,
+        |printer| printer.build_program_body_doc(program),
+    );
     has_output.then_some(body)
 }
 

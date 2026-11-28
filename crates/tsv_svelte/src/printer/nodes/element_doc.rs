@@ -18,7 +18,7 @@ use crate::printer::classification::element::has_raw_content;
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
 use tsv_lang::doc::{DocBuf, arena::DocId};
-use tsv_ts::ast::AstStores;
+use tsv_ts::ast::{AstStores, Parsed};
 
 /// How content relates to an element boundary (opening or closing tag)
 ///
@@ -1341,7 +1341,7 @@ impl<'a> Printer<'a> {
         let program =
             tsv_ts::__private::parse_embedded(content, base_offset, host_nesting, &mut stores)
                 .ok()?;
-        self.build_nested_script_body_doc(&program, stores.view())
+        self.build_nested_script_body_doc(&Parsed { program, stores })
     }
 
     /// The body doc of a `<script>` nested in markup: the program's own doc
@@ -1355,23 +1355,22 @@ impl<'a> Printer<'a> {
     /// The embed is [`tsv_lang::EmbedContext::line_owning`], the top-level `<script>`'s: a
     /// nested body's statements end their own lines too, and its closing tag takes a fresh
     /// one, so a `//` deferred to a line end still lands in JS.
-    fn build_nested_script_body_doc(
-        &self,
-        program: &tsv_ts::ast::Program,
-        view: tsv_ts::ast::AstView<'_>,
-    ) -> Option<DocId> {
+    fn build_nested_script_body_doc(&self, parsed: &Parsed) -> Option<DocId> {
         // The body is raw text to the canonical parser, so the host's `Root.comments` holds
         // none of its comments: they are this island's, registered here under the host
-        // source they are spanned against (the MERGED view, the one the TS printer emits).
+        // source they are spanned against (the MERGED view, the one the TS printer emits),
+        // read through the body's own stores as the printer reads them.
         #[cfg(feature = "_internal_comment_check")]
         tsv_lang::comment_ledger::register_parsed(
             self.source,
-            &tsv_lang::merge_nestled_block_comments(self.source, view.comments(program.comments)),
+            &tsv_lang::merge_nestled_block_comments(
+                self.source,
+                parsed.view().comments(parsed.program.comments),
+            ),
         );
         tsv_ts::__private::build_program_body_doc(
             self.d(),
-            program,
-            view,
+            parsed,
             self.source,
             self.line_table(),
             tsv_lang::EmbedContext::line_owning(),
