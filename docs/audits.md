@@ -410,13 +410,13 @@ both need the canonical parser, so they are conformance-tier at best. Standing f
 - **`terminators`** (sampled), over `tests/fixtures` — every standing finding is a SPAN
   finding: the `loc` differences a terminator adds all fall in the `two_line_classes` row,
   since tsv's `loc` counts `\n` alone (the `{@debug}` identifier's `loc` under a lone `<CR>`
-  among them). Two groups:
-  - class-member, heritage-clause and type-literal shapes whose reading turns on a line
-    break before the next token — a lone terminator is one to acorn — the family the
-    `static_member_ladder` / `extends_instantiation_linebreak` matchers document for `\n`;
-  - the An+B residue the CSS finding left behind — `REGEX_NTH_OF` is a JS regex and tsv's
-    An+B scanner is ASCII, so a `<LS>`/`<PS>` in an `:nth-*()` argument diverges; enumerated
-    and pinned in [css_boundary_whitespace.rs](../tests/css_boundary_whitespace.rs).
+  among them). They are class-member, heritage-clause and type-literal shapes whose reading
+  turns on a line break before the next token — a lone terminator is one to acorn — the family
+  the `static_member_ladder` / `extends_instantiation_linebreak` matchers document for `\n`
+  (and `type_args_tsc_follower`'s `+` / `-` past a line break after a type-argument list).
+  (The An+B scanner now steps each grammar's own whitespace class —
+  [css_boundary_whitespace.rs](../tests/css_boundary_whitespace.rs) — and leaves no `:nth-*()`
+  finding.)
 
   The unquoted-attribute-value terminator is a **whitespace-class** question, not a terminator
   one: it must spell Svelte's JS `\s` (all nineteen non-ASCII members plus VT), not a raw BYTE
