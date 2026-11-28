@@ -503,8 +503,10 @@ fn write_type_element(w: &mut Sink<'_>, elem: &ast::TSTypeElement, ctx: &Ctx<'_>
             }
             // acorn quirk: omits `computed` when the key is the `new` keyword
             // and the signature is neither computed nor readonly.
-            let is_new_key = matches!(&ctx.view.expr(p.key).kind, ast::ExpressionKind::Identifier(id)
-                if id.name(ctx.source, ctx.view) == "new");
+            let is_new_key = matches!(
+                &ctx.view.expr(p.key).kind,
+                ast::ExpressionKind::Identifier(id) if id.name(ctx.source, ctx.view) == "new"
+            );
             if !p.computed && !p.readonly && is_new_key {
                 keyed!(w, "TSPropertySignature", ",\"key\":");
             } else {

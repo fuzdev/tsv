@@ -2084,16 +2084,18 @@ impl<'a> Parser<'a> {
             TokenKind::Keyword(KeywordKind::This) => {
                 let (start, end) = self.current_pos();
                 self.advance()?;
-                Ok(self.push_ret(Expression { span: Span::new(start as u32, end as u32), kind: ExpressionKind::ThisExpression(ThisExpression {
-                    }) },
-                ))
+                Ok(self.push_ret(Expression {
+                    span: Span::new(start as u32, end as u32),
+                    kind: ExpressionKind::ThisExpression(ThisExpression {}),
+                }))
             }
             TokenKind::Keyword(KeywordKind::Super) => {
                 let (start, end) = self.current_pos();
                 self.advance()?;
-                Ok(self.push_ret(Expression { span: Span::new(start as u32, end as u32), kind: ExpressionKind::Super(Super {
-                    }) },
-                ))
+                Ok(self.push_ret(Expression {
+                    span: Span::new(start as u32, end as u32),
+                    kind: ExpressionKind::Super(Super {}),
+                }))
             }
             TokenKind::ParenOpen => {
                 // Could be: arrow function `() => ...` or parenthesized expression `(expr)`
@@ -2140,8 +2142,9 @@ impl<'a> Parser<'a> {
                     Span::new(self.span_pos(pattern_end + 1), self.span_pos(lexer_end));
                 // Precompute the pattern's visual width so the "simple call argument"
                 // width check stays source-free; saturate to the field's u16 range.
-                let pattern_width = visual_width(&self.source[lexer_start + 1..pattern_end], TAB_WIDTH)
-                    .min(u16::MAX as usize) as u16;
+                let pattern_width =
+                    visual_width(&self.source[lexer_start + 1..pattern_end], TAB_WIDTH)
+                        .min(u16::MAX as usize) as u16;
 
                 // Advance past the regex token by reading the next token. The regex relex
                 // bypasses advance_inner() (the lexer was resynced by read_regex_literal), so
@@ -2183,10 +2186,10 @@ impl<'a> Parser<'a> {
                     },
                 ))
             }
-            // TypeScript type keywords and contextual keywords are valid identifiers in expression context.
-            // `void` is not one: it is an ECMAScript ReservedWord, the unary operator, so a bare
-            // `void` reaching a primary (a `new` callee, a decorator head, a heritage atom) is a
-            // syntax error, as `typeof` is.
+            // TypeScript type keywords and contextual keywords are valid identifiers in
+            // expression context. `void` is not one: it is an ECMAScript ReservedWord, the unary
+            // operator, so a bare `void` reaching a primary (a `new` callee, a decorator head, a
+            // heritage atom) is a syntax error, as `typeof` is.
             TokenKind::Keyword(KeywordKind::Number)
             | TokenKind::Keyword(KeywordKind::String)
             | TokenKind::Keyword(KeywordKind::Boolean)

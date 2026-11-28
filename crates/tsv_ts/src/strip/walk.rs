@@ -110,8 +110,8 @@ pub(crate) struct Walk<'s, 'b> {
     /// The refusal with the earliest start — the one ts-blank-space reports first.
     refusal: Option<(UnsupportedConstruct, Span)>,
     /// The end of the last JS node marked (`Walk::mark`), `None` where nothing is marked yet (the
-    /// start of the program, and of a function body): ts-blank-space's `semicolonNeeded` (module docs), read through
-    /// `Walk::semicolon_needed`.
+    /// start of the program, and of a function body): ts-blank-space's `semicolonNeeded` (module
+    /// docs), read through `Walk::semicolon_needed`.
     marked_end: Option<u32>,
     /// The end of the innermost statement-list element (statement or class member) — where
     /// a statement-final `as` / `satisfies` would otherwise let the next line continue it.
@@ -1704,7 +1704,10 @@ impl<'s, 'b> Walk<'s, 'b> {
     }
 
     fn is_this_parameter(&self, param: &Expression) -> bool {
-        matches!(&param.kind, ExpressionKind::Identifier(id) if id.name(self.src.text, self.view) == "this")
+        matches!(
+            &param.kind,
+            ExpressionKind::Identifier(id) if id.name(self.src.text, self.view) == "this"
+        )
     }
 
     /// A class: decorators stay, `abstract`, type parameters, superclass type arguments

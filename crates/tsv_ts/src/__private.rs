@@ -909,15 +909,16 @@ pub fn push_escaped_name(stores: &mut AstStores, name: &str) -> EscapedNameId {
 /// host that keeps parts of it (a `{#snippet}` head's wrapper, whose parameters and type
 /// parameters the block takes).
 ///
-/// A read, not a view: the row borrows `stores` itself, so a host that appends to them copies
-/// the fields it keeps out first.
+/// The row borrows `stores` (`'s`), so a host that appends to them copies the fields it keeps
+/// out first.
 pub fn first_function_declaration<'s>(
     stores: &'s AstStores,
     program: &Program,
 ) -> Option<&'s FunctionDeclaration> {
-    let &first = stores.stmt_lists.slice(program.body).first()?;
-    match stores.stmts.get(first).kind {
-        StatementKind::FunctionDeclaration(func) => Some(stores.fn_decl_row(func)),
+    let view = stores.view();
+    let &first = view.stmt_list(program.body).first()?;
+    match view.stmt(first).kind {
+        StatementKind::FunctionDeclaration(func) => Some(view.fn_decl(func)),
         _ => None,
     }
 }

@@ -307,11 +307,13 @@ impl<'a> Parser<'a> {
         let arrow = push_row(
             &mut self.stores.payloads.arrow_fns,
             ArrowFunctionExpression {
-                type_parameters: None, // Generic arrows like <T>() => {} are handled by parse_generic_arrow_function()
+                // Generic arrows like <T>() => {} are handled by parse_generic_arrow_function()
+                type_parameters: None,
                 params,
                 body,
                 return_type,
-                r#async: false, // Non-async arrow function; async ones are parsed via parse_async_arrow_function
+                // Non-async arrow function; async ones are parsed via parse_async_arrow_function
+                r#async: false,
                 params_start: Some(params_start as u32),
                 arrow_token,
             },
@@ -372,7 +374,8 @@ impl<'a> Parser<'a> {
         }))
     }
 
-    /// Parse async arrow function after 'async' has been consumed: `() => ...`, `x => ...`, or `<T>() => ...`
+    /// Parse async arrow function after 'async' has been consumed: `() => ...`, `x => ...`, or
+    /// `<T>() => ...`
     pub(super) fn parse_async_arrow_function_after_async(
         &mut self,
         start: usize,

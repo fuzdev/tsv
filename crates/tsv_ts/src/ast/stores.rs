@@ -392,14 +392,6 @@ pub struct AstStores {
 }
 
 impl AstStores {
-    /// The function declaration `id` names, borrowed from the stores rather than through a
-    /// view: for the crate's own read of a row whose parts a host keeps
-    /// ([`crate::__private::first_function_declaration`]).
-    #[inline]
-    pub(crate) fn fn_decl_row(&self, id: FnDeclId) -> &FunctionDeclaration {
-        self.payloads.fn_decls.get(id)
-    }
-
     /// A row for the escaped name `text` spells: the id an [`IdentName`] carries for a name
     /// its span cannot spell.
     ///
