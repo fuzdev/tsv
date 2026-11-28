@@ -29,23 +29,12 @@
  *   through `parsed_ref`), every parse with no `Bump`; the strip driver parses with
  *   `parse_with_goal_or_fallback_into` and strips with `strip_into`, into TypeScript's warm
  *   stores.
- * - `svelte_bump` (a tree whose Svelte parse still takes the `Bump` beside the stores): as the
- *   current generation, the Svelte parse handed the `Bump` too.
- * - `css_bump` (a tree whose CSS has stores but whose parse still takes the `Bump`): as
- *   `svelte_bump`, the CSS parse handed the `Bump` too.
- * - `css_no_stores` (a tree whose strip takes no `Bump` and whose CSS has no stores): as the
- *   current generation for TypeScript and the strip; Svelte parses into the stores
- *   `tsv_ts::__private::WarmStores` keeps, and CSS into the `Bump` alone (`parse_folded`).
- * - `strip_bump` (a tree with the handle whose `strip_into` still takes the `Bump` for its
- *   edits): as `css_no_stores`, the strip handed the `Bump` too; the format driver's calls
- *   are that generation's.
- * - `no_warm_stores` (a tree whose `parse_folded_into` takes no `Bump`, without the handle): as
- *   `css_no_stores`, the stores kept in an `Option` of the driver's own.
- * - `ts_parse_bump` (a tree with `parse_folded_into` whose TypeScript parse still takes the
- *   `Bump`): as `no_warm_stores`, every one of those parses handed the `Bump` too.
- * - `no_stores` (any older tree, `main` before the stores among them): every language parses
- *   into the `Bump` alone (`parse_folded`, then `format_folded_in`), and the strip driver calls
- *   `parse_with_goal_or_fallback` and `strip_in`.
+ * - `no_stores` (an older tree, `main` before the stores and the tags `v0.6.0` through `v0.8.1`
+ *   among them): every language parses into the `Bump` alone (`parse_folded`, then
+ *   `format_folded_in`), and the strip driver calls `parse_with_goal_or_fallback` and `strip_in`.
+ *
+ * The trees of the stores' port between the two have no arm of their own: one is refused
+ * before it builds (`tree_driver_api`).
  *
  * Both reuse one AST `Bump` and one `DocArena` across files and iterations, reset outside the
  * timed regions, so a side with stores keeps them warm as a side without them keeps its
@@ -231,48 +220,37 @@ function driver_of(lang: Lang, path: DriverPath): DriverKind {
 const STRIP_ENTRY_POINT = '^pub fn strip_in(to)?[<(]';
 
 /** The pattern (`git grep -E`) whose match in a crate's `Cargo.toml` says the crate depends on
- * `bumpalo`; among the trees these generations cover, a tsv_ts manifest where it matches no line
- * has a strip that takes no `Bump`, and a tsv_css or tsv_svelte one a parse that takes none — no
- * item of the crate can name the type. The manifest rather than a line of `strip_into`, whose
- * declaration spans lines and whose body any edit may respell: the compiler holds the
- * dependency's absence to its meaning. Anchored at the line start, where a dependency is
+ * `bumpalo`: a tsv_svelte manifest where it matches no line has a parse that takes no `Bump`,
+ * since no item of the crate can name the type, and every tree older than the stores' port that
+ * a driver arm builds against depends on it. The manifest rather than a line of the
+ * parse, whose declaration spans lines and whose body any edit may respell: the compiler holds
+ * the dependency's absence to its meaning. Anchored at the line start, where a dependency is
  * declared, so a comment cannot answer for it. */
 const DEPENDS_ON_BUMPALO = '^bumpalo([.]|[[:space:]]*=)';
 
-/** The pattern (`git grep -E`) whose match in a tree's `crates/tsv_css/src` says its CSS parses
- * into stores: the declaration of `__private::parse_folded_into`, the warm parse a tree whose
- * CSS has none does not declare. Anchored at the line start, where the item is declared, so a
- * comment or doc line naming it cannot answer for it. */
-const CSS_PARSE_INTO_STORES = '^pub fn parse_folded_into[<(]';
-
-/** The pattern (`git grep -E`) whose match in a tree's `crates/tsv_ts/src` says it has the warm
- * handle the drivers of its generation park through: `WarmStores`'s declaration, anchored at the
- * line start where the item is declared, so a comment or doc line naming it cannot answer for
- * it. */
-const WARM_STORES_HANDLE = '^pub struct WarmStores [{]';
-
-/** The pattern (`git grep -E`) whose match in a tree's `crates/tsv_ts/src` says its TypeScript
- * parse takes no `Bump`: `__private::parse_folded_into`'s body, the folded parse handing the
- * fallback parse the stores alone. A body line rather than a declaration, because the
- * declaration that lost the parameter spans lines; anchored at the line start behind its
- * indent, where no comment or doc line begins. */
-const TS_PARSE_WITHOUT_BUMP =
-	'^ +folded\\.parse_with\\([|]text[|] parse_with_goal_or_fallback_into\\(text, goal, stores\\)\\)$';
+/** The pattern (`git grep -E`) whose match in a tree's `crates/tsv_ts/src` says it has the
+ * stores: the declaration of `__private::parse_folded_into`, the warm parse. No tree older than
+ * the stores' port declares it (every tag through `v0.8.1` among them), and every tree of the
+ * port does, where `parse_folded` still takes the `Bump` but builds fresh stores on every call —
+ * so a `no_stores` driver would build against one and time what no generation's arm means.
+ * Anchored at the line start, where the item is declared, so a comment or doc line naming it
+ * cannot answer for it. */
+const TS_PARSE_INTO_STORES = '^pub fn parse_folded_into[<(]';
 
 /** One entry-point generation the drivers have an arm for: the `perf_ab_api` cfg value that
  * selects its arm (`null` for the current tree's, the unmarked arm), the `git grep -E` pattern
  * whose match in `path` says a tree is of it — with `absent`, a `path` with lines none of which
- * it matches (`probe_matches`) — (`null` for the oldest, which every tree no newer probe matches
- * is), and what its arms call, for the report. */
+ * it matches (`probe_matches`) — and what its arms call, for the report. */
 export interface DriverApi {
 	cfg: string | null;
-	probe: { pattern: string; path: string; absent?: true } | null;
+	probe: { pattern: string; path: string; absent?: true };
 	calls: string;
 }
 
 /** The generations the drivers' `api` arms cover, newest first; a side takes the first whose
- * probe its tree matches (`tree_driver_api`), each probe anchored at the line start as
- * `STRIP_ENTRY_POINT` is. The first is the current tree's and must stay
+ * probe its tree matches (`tree_driver_api`), and a tree none matches — one of the stores'
+ * port — is refused, each probe anchored at the line start as `STRIP_ENTRY_POINT` is. The
+ * first is the current tree's and must stay
  * so: when a change moves an entry point a driver calls, its arm takes a new `perf_ab_api`
  * value, gets an entry here below a new first entry whose probe tells the two apart, and the
  * workspace's `check-cfg` list names the value (`perf_ab.rs`'s module doc). */
@@ -284,44 +262,8 @@ export const DRIVER_APIS: ReadonlyArray<DriverApi> = [
 			'warm stores: every language parses into stores a WarmStores handle of its own crate parks between iterations, with no Bump; the strip takes no Bump'
 	},
 	{
-		cfg: 'svelte_bump',
-		probe: { pattern: DEPENDS_ON_BUMPALO, path: 'crates/tsv_css/Cargo.toml', absent: true },
-		calls:
-			'warm stores: every language parses into stores a WarmStores handle of its own crate parks between iterations (TypeScript and CSS with no Bump, Svelte beside it); the strip takes no Bump'
-	},
-	{
-		cfg: 'css_bump',
-		probe: { pattern: CSS_PARSE_INTO_STORES, path: 'crates/tsv_css/src' },
-		calls:
-			'warm stores: every language parses into stores a WarmStores handle of its own crate parks between iterations (TypeScript with no Bump, Svelte and CSS beside it); the strip takes no Bump'
-	},
-	{
-		cfg: 'css_no_stores',
-		probe: { pattern: DEPENDS_ON_BUMPALO, path: 'crates/tsv_ts/Cargo.toml', absent: true },
-		calls:
-			'warm stores: TypeScript and Svelte parse into stores a WarmStores handle parks between iterations (TypeScript with no Bump), CSS into the Bump; the strip takes no Bump'
-	},
-	{
-		cfg: 'strip_bump',
-		probe: { pattern: WARM_STORES_HANDLE, path: 'crates/tsv_ts/src' },
-		calls:
-			'warm stores: TypeScript and Svelte parse into stores a WarmStores handle parks between iterations (TypeScript with no Bump), CSS into the Bump; the strip takes the Bump for its edits'
-	},
-	{
-		cfg: 'no_warm_stores',
-		probe: { pattern: TS_PARSE_WITHOUT_BUMP, path: 'crates/tsv_ts/src' },
-		calls:
-			'warm stores: TypeScript and Svelte parse into stores parked between iterations (TypeScript with no Bump), CSS into the Bump'
-	},
-	{
-		cfg: 'ts_parse_bump',
-		probe: { pattern: '^pub fn parse_folded_into[<(]', path: 'crates/tsv_ts/src' },
-		calls:
-			'warm stores: TypeScript and Svelte parse into stores parked between iterations, through the Bump; CSS into the Bump'
-	},
-	{
 		cfg: 'no_stores',
-		probe: null,
+		probe: { pattern: TS_PARSE_INTO_STORES, path: 'crates/tsv_ts/src', absent: true },
 		calls: 'no stores: every parse into the Bump alone'
 	}
 ];
@@ -559,18 +501,21 @@ export function tree_has_strip(git: SpawnProgram, cwd: FsReadDir, tree: string):
 	return tree_matches(git, cwd, tree, STRIP_ENTRY_POINT, 'crates/tsv_ts/src');
 }
 
-/** The first of `DRIVER_APIS` whose probe `tree` matches, run in `cwd`. */
+/** The first of `DRIVER_APIS` whose probe `tree` matches, run in `cwd`; a tree none matches
+ * is refused, before either side builds. */
 export async function tree_driver_api(
 	git: SpawnProgram,
 	cwd: FsReadDir,
 	tree: string
 ): Promise<DriverApi> {
 	for (const api of DRIVER_APIS) {
-		if (api.probe === null || (await probe_matches(git, cwd, tree, api.probe))) {
-			return api;
-		}
+		if (await probe_matches(git, cwd, tree, api.probe)) return api;
 	}
-	throw new HarnessError('DRIVER_APIS ends in a probed generation, so a tree can match none');
+	throw new HarnessError(
+		`tree ${tree} is of no generation the drivers have an arm for: a tree of the stores' ` +
+			'port, whose tsv_svelte still depends on bumpalo while its tsv_ts declares ' +
+			"parse_folded_into (or a tree missing either crate's sources), has none"
+	);
 }
 
 /** Whether `tree` is of a probe's generation, run in `cwd`: `pattern` matches a line under
@@ -580,7 +525,7 @@ async function probe_matches(
 	git: SpawnProgram,
 	cwd: FsReadDir,
 	tree: string,
-	{ pattern, path, absent }: NonNullable<DriverApi['probe']>
+	{ pattern, path, absent }: DriverApi['probe']
 ): Promise<boolean> {
 	if (absent !== true) return await tree_matches(git, cwd, tree, pattern, path);
 	return (

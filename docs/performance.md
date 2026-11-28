@@ -957,29 +957,19 @@ What changes between trees is the entry points the drivers call, as the parse mo
 generation of tree, and shares everything else. The task probes each side's tree for its
 generation and builds the matching arm: the current tree's is the unmarked one, and an older
 generation's is selected by a `perf_ab_api` cfg passed to the example's own compilation (`cargo
-rustc … -- --cfg`, so no library is built differently). On a tree with the warm parse
-(`tsv_ts::__private::parse_folded_into`), TypeScript and Svelte parse into stores kept warm across
-files, taken before each timed region and parked after it in a slot the driver owns, as the CLI's
-`Formatter` keeps them. The current tree's driver holds one such slot per language, through each
+rustc … -- --cfg`, so no library is built differently). The current tree's driver parses every
+language into stores kept warm across files, taken before each timed region and parked after it in
+a slot the driver owns, as the CLI's `Formatter` keeps them: one slot per language, through each
 language crate's own `__private::WarmStores` (a Svelte document's holds its own half, a TypeScript
-half and a CSS half), which names no store type, so the stores can change beneath it without a new arm.
-Every parse takes its stores alone. A tree whose Svelte parse still takes the
-`Bump` beside its stores (`perf_ab_api = "svelte_bump"`) hands it the `Bump`; one whose CSS parse
-does too (`perf_ab_api = "css_bump"`) hands it to both; a tree whose CSS has no
-stores (`perf_ab_api = "css_no_stores"`) parses CSS into the `Bump` alone and Svelte into the stores
-`tsv_ts::__private::WarmStores` keeps; a tree with the stores but no such handle
-(`perf_ab_api = "no_warm_stores"`) keeps them in an `Option` of the driver's own. The TypeScript
-parse takes the stores alone from that generation on, where an older warm-parse tree's
-(`perf_ab_api = "ts_parse_bump"`) also took the `Bump`. The strip takes no `Bump` in the current
-tree, where a tree with the handle whose strip still took it for its edits
-(`perf_ab_api = "strip_bump"`) hands it the `Bump`; only the strip driver has an arm for that
-generation, the format driver's calls being a `css_no_stores` tree's.
-On a tree older than the stores every language parses into the `Bump` alone, which is kept warm
-the same way. The report names each side's generation, and a run whose
-sides differ says so: its rows then compare two call paths as well as two libraries. A change
-that moves an entry point a driver calls moves that driver's current arm to a new `perf_ab_api`
-value, adds the probe that tells the generations apart (`DRIVER_APIS` in `scripts/perf_ab.ts`) and
-names the value in the workspace's `check-cfg` list.
+half and a CSS half), which names no store type, so the stores can change beneath it without a new
+arm. Every parse takes its stores alone, and so does the strip. On a tree older than the stores
+(`perf_ab_api = "no_stores"`, the tags `v0.6.0` through `v0.8.1` among them) every language
+parses into the `Bump` alone, which is kept warm the same way. The trees of the stores' port between the two
+have no arm: one is refused before it builds. The report names each side's generation, and a run
+whose sides differ says so: its rows then compare two call paths as well as two libraries. A
+change that moves an entry point a driver calls moves that driver's current arm to a new
+`perf_ab_api` value, adds the probe that tells the generations apart (`DRIVER_APIS` in
+`scripts/perf_ab.ts`) and names the value in the workspace's `check-cfg` list.
 
 So a side with the warm parse is measured on the warm path alone: stores reused across files in a
 slot the caller owns, as the CLI's `Formatter` runs them (the bindings run the same take and park
