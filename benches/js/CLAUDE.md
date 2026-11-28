@@ -964,7 +964,8 @@ unchanged); pass `--force` after changing harvest/grading LOGIC, which the stamp
 `svelte-styles` is stamped too, on the `../corpora` snapshot's `collections/` tree id (not its
 commit — a tooling commit there moves no corpus byte), its exact block pin
 (`SVELTE_STYLES_BLOCKS_PIN`), and the perf view's entry list (a collection joining or leaving the
-bench changes what the harvest reads with no checkout moving): an unchanged triple skips the walk, and a
+bench changes what the harvest reads with no checkout moving), and the loader's filter fingerprint
+(`corpus_filter_fingerprint`, below): unchanged inputs skip the walk, and a
 moved count fails before writing like every other harvest.
 
 **Two groups, because the corpus VIEWS decide who needs which cache.**

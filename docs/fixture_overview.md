@@ -715,18 +715,21 @@ cargo run -p tsv_debug line_width tests/fixtures/css/values/functions/gradient_l
 
 # Output shows:
 # Line 1: 7 chars (0 tabs = 0, content = 7) ✓
-# Line 4: 101 chars (3 tabs = 6, content = 95) ✗ EXCEEDS print_width (100)
-# Line 5: 100 chars (3 tabs = 6, content = 94) ⚠️ EXACTLY print_width (100)
+# Line 2: 7 chars (1 tabs = 2, content = 5) ✓
+# Line 3: 48 chars (2 tabs = 4, content = 44) ✓
+# Line 4: 100 chars (2 tabs = 4, content = 96) ⚠️  EXACTLY print_width (100)
 # ...
-# Summary: 3/35 lines exceed print_width (100)
+# Summary: 0/17 lines exceed print_width (100)
 ```
+
+A line over the limit is marked `✗ EXCEEDS print_width (100)` and counted in the summary.
 
 **Measure specific line:**
 
 ```bash
-cargo run -p tsv_debug line_width input.svelte --line 4
-# Line 4: 101 chars (3 tabs = 6, content = 95) ✗ EXCEEDS print_width (100)
-#   			clip-path: polygon(...);
+cargo run -p tsv_debug line_width tests/fixtures/css/values/functions/gradient_long/input.svelte --line 4
+# Line 4: 100 chars (2 tabs = 4, content = 96) ⚠️  EXACTLY print_width (100)
+#   		background: linear-gradient(0deg, #000 0%, #111 20%, ... #55555 100%);
 ```
 
 **Tab width calculation:**

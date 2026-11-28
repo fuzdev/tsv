@@ -130,7 +130,7 @@ Things the published numbers measure that aren't quite what they look like.
   thinnest sample: most Svelte-ecosystem CSS is authored inside `.svelte` `<style>`
   blocks, and the standalone files are mostly CSS-framework source (daisyUI,
   Skeleton, Open Props), so the corpus adds the `svelte_styles` harvest — those
-  blocks extracted and concatenated per repo into naturally-sized files. Those harvest
+  blocks extracted and concatenated per snapshot collection into naturally-sized files. Those harvest
   bytes are also timed inside the svelte rows (rows are never summed, so this is
   disclosure, not distortion), and CSS per-file ratios stay the noisiest.
   The harvest dedents each block by the one level it carried inside `<style>`, so
@@ -252,7 +252,7 @@ Things the published numbers measure that aren't quite what they look like.
   this bench, and no npm package ships the C FFI. Under Node and Bun the native row
   is the shipped N-API addon, which is the row the site's headlines read.
   (b) The async impls (`prettier`, `oxfmt`) are `await`ed per file
-  (`process_corpus_async`), carrying a per-file microtask cost the sync impls
+  (`sweep` in `benches/js/bench_row.ts`, through `task.run_async`), carrying a per-file microtask cost the sync impls
   skip. The opt-in **`tsv-forced-async`** control row (`BENCH_FORCED_ASYNC=1` —
   the same native engine routed through the awaited path) quantifies it: the
   delta is within run-to-run noise even on a sub-ms-per-file engine, so the async
