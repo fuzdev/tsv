@@ -1082,6 +1082,32 @@ self-referential ownership — `unsafe_code = "forbid"`). Identifier and element
 names are **span-identity** — recovered from `source[span]` at each consumer, with the rare
 escaped name carried as pool text — so no name-table lifetime lands on the AST or the parser.
 
+**A handle is checked for its family and its bounds, and for nothing else.** An id, a run or a
+pool handle means something only to the stores that minted it, and only until they reset (a
+park resets them). The type system refuses a handle of the wrong family, and a read past the
+store's end fails; a same-family id kept past a reset, or minted by another document's stores,
+that lands in bounds reads some other row, silently, in every ordinary build. Only the `_internal_store_check` feature (in the `_internal_audits`
+umbrella; `tsv_lang::store::STORE_CHECK` says whether a build carries it) catches either, by
+stamping an instance and a generation on every store, pool and handle and comparing them on
+each read and each equality test. It widens every handle, so a build carrying it never
+supplies a performance number. An id dies with its parse: no id minted for one document may be
+read after the stores move on, warm stores (a `Formatter`'s, a thread's parked slot) included.
+
+**A memo keys a row by its address only when the row is read in place.** Every row is `Copy`,
+so a node read by value is a copy on the stack, and the next copy, of another node, can reuse
+its slot: a memo keyed by that address answers the first node's question for the second,
+silently. The TypeScript printer's address-keyed memos (the chain share map, the leading-edge
+descent's memo) key a `NodeAddr`, minted only by `NodeAddr::of` over a reference an accessor
+returned (or a field of one) and bounded by a sealed trait to the row types some memo keys, so
+a `&&Expression` or an id slot is refused at compile time; what the bound cannot see, a
+by-value copy, a debug build catches, asserting the address lies in a store row
+(`AstStores::holds_address`). The Svelte printer's fragment memos (the edge index
+`fragment_edges`, the glue cache, the root's `format-ignore` pairing) key a run of fragment
+nodes by its slice's address the same way (`NodeSliceAddr`, `NodeSliceKey`), asserted in
+debug builds against `SvelteView::holds_node_address`, so a reader hands them a slice of the
+store, never one over a copied node. A build without debug assertions (every release-style
+profile but `corpus-debug`) carries neither guard.
+
 **Inline-by-value layout, size-minimized only at the variants that set an enum's
 width.** A node holds its children inline by value where they were owned inline
 before; only genuinely recursive children and the rare wide payloads sit behind an id.
