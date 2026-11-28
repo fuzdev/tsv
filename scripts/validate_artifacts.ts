@@ -1,6 +1,7 @@
 /**
- * Validates the built WASM artifacts: binary sizes against expected ranges, and the
- * third-party `NOTICE` each npm package must ship (`THIRD_PARTY_NOTICE`).
+ * Validates the built WASM artifacts: binary sizes against expected ranges, SIMD in each
+ * bundle (`wasm_simd_census`), and the third-party `NOTICE` each npm package must ship
+ * (`THIRD_PARTY_NOTICE`).
  *
  * Size bounds are deliberately tight (~±8%) so a legitimate size change
  * fails here and gets acknowledged by updating the constants below — a
@@ -48,6 +49,7 @@ import {
 import { handle_source_tree } from './handle_source_tree.ts';
 import { THIRD_PARTY_NOTICE } from './npm_metadata.ts';
 import { format_size } from './size.ts';
+import { wasm_simd_census } from './wasm_simd.ts';
 
 /** What `run_validate_artifacts` reaches. */
 export interface ValidateArtifactsDeps {
@@ -267,6 +269,38 @@ export async function run_validate_artifacts(deps: ValidateArtifactsDeps): Promi
 			);
 		} else {
 			pass(`all - ${variant} (npm) = ${format_size(delta)}`);
+		}
+	}
+
+	// --- SIMD ---
+	//
+	// `+simd128` reaches the wasm32 build only through `.cargo/config.toml`'s target rustflags,
+	// which a host `RUSTFLAGS` or `CARGO_ENCODED_RUSTFLAGS` (even set empty) replaces; the build
+	// still succeeds, sizes inside its band, and ships slower. The package tasks unset both, and
+	// this is the check on the bytes: a bundle with no function declaring a `v128` local was
+	// built without SIMD. At least one is the contract, not a count.
+
+	print('\n=== WASM SIMD ===');
+
+	for (const variant of VARIANTS) {
+		const label = `${variant}/npm`;
+		if (sizes[variant] === undefined) {
+			skip(`${label} SIMD — not built`);
+			continue;
+		}
+		try {
+			const { functions, v128_functions } = wasm_simd_census(
+				await checkout.read(bundle_path(variant))
+			);
+			if (v128_functions > 0) {
+				pass(`${label}: ${v128_functions} of ${functions} functions declare a v128 local`);
+			} else {
+				fail(
+					`${label}: none of ${functions} functions declares a v128 local — built without simd128 (a host RUSTFLAGS or CARGO_ENCODED_RUSTFLAGS, even empty, replaces .cargo/config.toml's wasm32 rustflags; rebuild with both unset)`
+				);
+			}
+		} catch (error) {
+			fail(`${label}: SIMD census threw: ${error}`);
 		}
 	}
 

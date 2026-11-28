@@ -234,7 +234,7 @@ npm run publish:crates                   # dry run: registry read, semver-checks
 npm run test:npm[:parse|:all]            # build the npm package + Node tests against it (:all adds CLI tests; `:run` skips the rebuild — freshness-guarded)
 npm run test:napi:npm                    # stage the napi loader + host platform package + Node tests on the packaged shape (`:run` as above)
 npm run test:bun -- [--require-bun] [format|parse|all|napi] # the parse-failure table over the staged packages under Bun; warn-skips without bun
-npm run validate:artifacts               # wasm size bounds + each package's third-party NOTICE (fails if nothing is built or the build is STALE)
+npm run validate:artifacts               # wasm size bounds + SIMD + each package's third-party NOTICE (fails if nothing is built or the build is STALE)
 ```
 
 #### crates.io

@@ -137,6 +137,7 @@
 		"scripts/typecheck_packages_test.ts",
 		"scripts/validate_artifacts_test.ts",
 		"scripts/validate_napi_artifact_test.ts",
-		"scripts/wasm_pack_env_test.ts"
+		"scripts/wasm_pack_env_test.ts",
+		"scripts/wasm_simd_test.ts"
 	]
 }

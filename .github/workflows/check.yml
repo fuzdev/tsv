@@ -198,7 +198,7 @@ jobs:
       - name: Build packages
         run: npm run build:packages
 
-      - name: Validate artifact sizes
+      - name: Validate artifacts
         run: npm run validate:artifacts
 
       # All three published shapes differ (format excludes convert, parse

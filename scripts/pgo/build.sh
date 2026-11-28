@@ -47,11 +47,22 @@
 # Any RUSTFLAGS already set are kept in front (the musl row's
 # `-C target-feature=-crt-static`). Each build's output goes to
 # <pgo-dir>/logs/build-<phase>-<world>.log; a failure prints its tail.
+#
+# A set CARGO_ENCODED_RUSTFLAGS (even empty) is refused: cargo reads it ahead of
+# RUSTFLAGS, so the profile flags would be dropped without a word — an
+# uninstrumented build that trains nothing, or a use build without its profile.
+# Refusing rather than unsetting keeps whatever flags it carried from vanishing
+# silently too; pass them through RUSTFLAGS instead.
 
 set -eu
 
 phase=${1:?usage: build.sh <instrument|use> <pgo-dir>}
 dir=${2:?usage: build.sh <instrument|use> <pgo-dir>}
+
+if [ "${CARGO_ENCODED_RUSTFLAGS+x}" = x ]; then
+	echo "build.sh: CARGO_ENCODED_RUSTFLAGS is set, and cargo would read it instead of the PGO RUSTFLAGS — unset it (pass extra flags through RUSTFLAGS)" >&2
+	exit 2
+fi
 
 mkdir -p "$dir/logs"
 # An absolute path rustc can read: on Windows (Git Bash) `pwd -W` gives the

@@ -4,7 +4,8 @@
  * skipped, a half-built npm staging failed, and nothing built refused; the staleness guard,
  * which dates each npm staging by the shared staged-package checks, refuses a stale or missing
  * artifact, and only warns under `stale_ok`; and a deno-target bundle, the bench's alone, never
- * read.
+ * read; and each bundle's SIMD census, a bundle without a `v128` local or one that doesn't parse
+ * failed.
  */
 
 import { deepStrictEqual, strictEqual } from 'node:assert';
@@ -32,6 +33,19 @@ const T_LATER = T_BUILT + 60_000;
 const VARIANTS: ReadonlyArray<WasmVariant> = ['format', 'parse', 'all'];
 const NOTICE = 'the WHATWG notice\n';
 
+/** A bundle as the census reads it: two functions, one declaring a `v128` local
+ * (`wasm_simd_test.ts` grades the reader itself). */
+const SIMD_MODULE = new Uint8Array([
+	...[0x00, 0x61, 0x73, 0x6d, 0x01, 0x00, 0x00, 0x00], // the header
+	...[0x01, 0x04, 0x01, 0x60, 0x00, 0x00], // one type, `() -> ()`
+	...[0x03, 0x03, 0x02, 0x00, 0x00], // two functions of it
+	...[0x0a, 0x0b, 0x02], // the code section, two bodies:
+	...[0x04, 0x01, 0x01, 0x7f, 0x0b], // an `i32` local
+	...[0x04, 0x01, 0x01, 0x7b, 0x0b] // a `v128` local
+]);
+/** `SIMD_MODULE` with its `v128` local an `i32`: what a build without `simd128` reads as. */
+const SCALAR_MODULE = SIMD_MODULE.with(SIMD_MODULE.length - 2, 0x7f);
+
 const npm_dir = (variant: WasmVariant): string => `crates/tsv_wasm/pkg/${variant}/npm`;
 const npm_bundle = (variant: WasmVariant): string => `${npm_dir(variant)}/tsv_wasm_bg.wasm`;
 /** The bench's deno-target bundle, which the validation never reads. */
@@ -55,7 +69,7 @@ const make_checkout = async (
 	built: ReadonlyArray<WasmVariant> = VARIANTS
 ): Promise<FsDir & AsyncDisposable> => {
 	const root = await fs.temp_dir('tsv_validate_artifacts_test_');
-	const write = async (path: string, content: string, ms: number): Promise<void> => {
+	const write = async (path: string, content: string | Uint8Array, ms: number): Promise<void> => {
 		const dir = path.split('/').slice(0, -1).join('/');
 		if (dir !== '') await root.mkdir(dir, { recursive: true });
 		await root.write(path, content);
@@ -77,6 +91,7 @@ const make_checkout = async (
 		await write(deno_bundle(variant), 'wasm', T_BUILT);
 		for (const check of wasm_package_checks(variant))
 			await write(check.staged, check.staged, T_BUILT);
+		await write(npm_bundle(variant), SIMD_MODULE, T_BUILT);
 		await write(
 			`${npm_dir(variant)}/package.json`,
 			JSON.stringify({ files: ['index.js', THIRD_PARTY_NOTICE.published] }),
@@ -149,6 +164,10 @@ const FULL_OUT = [
 	'  PASS: all/npm: 3.17 MB (3171082 B)',
 	'  PASS: all - format (npm) = 314.5 KB',
 	'  PASS: all - parse (npm) = 2.06 MB',
+	'\n=== WASM SIMD ===',
+	'  PASS: format/npm: 1 of 2 functions declare a v128 local',
+	'  PASS: parse/npm: 1 of 2 functions declare a v128 local',
+	'  PASS: all/npm: 1 of 2 functions declare a v128 local',
 	'\n=== Third-party notice ===',
 	'  PASS: format/npm — package.json files declares NOTICE',
 	'  PASS: format/npm — NOTICE is crates/tsv_html/NOTICE verbatim',
@@ -156,7 +175,7 @@ const FULL_OUT = [
 	'  PASS: parse/npm — NOTICE is crates/tsv_html/NOTICE verbatim',
 	'  PASS: all/npm — package.json files declares NOTICE',
 	'  PASS: all/npm — NOTICE is crates/tsv_html/NOTICE verbatim',
-	'\n=== Artifact validation: 11 passed, 0 failed, 0 skipped ==='
+	'\n=== Artifact validation: 14 passed, 0 failed, 0 skipped ==='
 ];
 
 test('a fresh, fully built checkout passes every check and prints each one', async () => {
@@ -223,6 +242,25 @@ test("a subset's distance below `all` outside its band fails", async () => {
 	strictEqual(wide.code, 1);
 });
 
+test('a bundle without a v128 local fails naming the override, one that is not wasm fails', async () => {
+	await using root = await make_checkout();
+	await root.write(npm_bundle('parse'), SCALAR_MODULE);
+	await touch(root, npm_bundle('parse'), T_BUILT);
+	await root.write(npm_bundle('all'), 'not wasm');
+	await touch(root, npm_bundle('all'), T_BUILT);
+	const { code, out, err } = await run(sized(root.readonly()));
+	strictEqual(code, 1);
+	deepStrictEqual(err, []);
+	deepStrictEqual(
+		out.filter((line) => line.startsWith('  FAIL')),
+		[
+			"  FAIL: parse/npm: none of 2 functions declares a v128 local — built without simd128 (a host RUSTFLAGS or CARGO_ENCODED_RUSTFLAGS, even empty, replaces .cargo/config.toml's wasm32 rustflags; rebuild with both unset)",
+			'  FAIL: all/npm: SIMD census threw: Error: wasm: not a version-1 WebAssembly module'
+		]
+	);
+	strictEqual(out.at(-1), '\n=== Artifact validation: 12 passed, 2 failed, 0 skipped ===');
+});
+
 test('a package whose NOTICE is missing, differs, or is undeclared fails that check', async () => {
 	await using root = await make_checkout();
 	await root.write(`${npm_dir('format')}/${THIRD_PARTY_NOTICE.published}`, 'another notice\n');
@@ -240,7 +278,7 @@ test('a package whose NOTICE is missing, differs, or is undeclared fails that ch
 			'  FAIL: all/npm — package.json files declares NOTICE returned wrong output'
 		]
 	);
-	strictEqual(out.at(-1), '\n=== Artifact validation: 8 passed, 3 failed, 0 skipped ===');
+	strictEqual(out.at(-1), '\n=== Artifact validation: 11 passed, 3 failed, 0 skipped ===');
 });
 
 test('an unbuilt variant is skipped, and its deltas with it', async () => {
@@ -252,16 +290,20 @@ test('an unbuilt variant is skipped, and its deltas with it', async () => {
 	deepStrictEqual(err, []);
 	deepStrictEqual(
 		out.filter((line) => line.includes('SKIP') || line.includes('parse')),
-		['  SKIP: parse/npm — not built', '  SKIP: parse/npm NOTICE — not built']
+		[
+			'  SKIP: parse/npm — not built',
+			'  SKIP: parse/npm SIMD — not built',
+			'  SKIP: parse/npm NOTICE — not built'
+		]
 	);
-	strictEqual(out.at(-1), '\n=== Artifact validation: 7 passed, 0 failed, 2 skipped ===');
+	strictEqual(out.at(-1), '\n=== Artifact validation: 9 passed, 0 failed, 3 skipped ===');
 });
 
 test('nothing built fails, saying so on stderr', async () => {
 	await using root = await make_checkout([]);
 	const { code, out, err } = await run(sized(root.readonly()));
 	strictEqual(code, 1);
-	strictEqual(out.at(-1), '\n=== Artifact validation: 0 passed, 0 failed, 6 skipped ===');
+	strictEqual(out.at(-1), '\n=== Artifact validation: 0 passed, 0 failed, 9 skipped ===');
 	deepStrictEqual(err, [
 		'FAIL: no artifacts found to validate — run `npm run build:npm:format` etc. first'
 	]);
@@ -373,9 +415,10 @@ test('an npm staging holding its bundle without its manifest fails, whatever els
 		out.filter((line) => !line.startsWith('  PASS')),
 		[
 			'=== WASM binary sizes ===',
+			'\n=== WASM SIMD ===',
 			'\n=== Third-party notice ===',
 			'  FAIL: all/npm — package.json files declares NOTICE returned wrong output',
-			'\n=== Artifact validation: 10 passed, 1 failed, 0 skipped ==='
+			'\n=== Artifact validation: 13 passed, 1 failed, 0 skipped ==='
 		]
 	);
 });
@@ -395,7 +438,7 @@ test('a staged manifest that does not parse fails its check, and the run grades 
 		),
 		true
 	);
-	strictEqual(out.at(-1), '\n=== Artifact validation: 10 passed, 1 failed, 0 skipped ===');
+	strictEqual(out.at(-1), '\n=== Artifact validation: 13 passed, 1 failed, 0 skipped ===');
 });
 
 test('a staged file the checks name that is missing is fatal under `stale_ok` too', async () => {
