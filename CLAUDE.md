@@ -258,8 +258,8 @@ npm run conformance:ts-fixtures        # tsv's TS parser vs acorn-typescript's t
 npm run conformance:ts-repo            # tsv's TS parser vs ALL of ../typescript/tests/cases; oracle = tsc's .errors.txt baselines
 #                                        + tsc's LIVE parser. Freshness-checked ledgers (sanctioned = kept, known = to fix); only an
 #                                        UNTRACKED over-rejection fails. ./docs/conformance_tsc.md
-npm run conformance                    # pre-release aggregate: pin- and oracle-freshness preflights (fixtures:validate, `check`'s
-#                                        live fixture leg again, + compile:fixtures:validate, the oracle freshness `check` lacks), the
+npm run conformance                    # pre-release aggregate: pin- and oracle-freshness preflights (bench:pins:suites +
+#                                        compile:fixtures:validate, the compile-oracle freshness `check` lacks), the
 #                                        svelte-styles harvest, strip:corpus + imports:corpus, then in one Node process the three
 #                                        gates above + corpus:compare:parse/format --all, then render:audit (./docs/tasks.md §`conformance`)
 npm run conformance:test262            # tsv's JS parser vs test262 POSITIVES (pure Rust, `test262 --gate`; exact POSITIVE_PASSED_PIN);

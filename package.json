@@ -103,7 +103,7 @@
 		"corpus:stats": "node benches/js/roots/corpus_stats.ts",
 		"idempotency:sweep": "node benches/js/roots/idempotency_sweep.ts",
 		"audit:corpus": "node benches/js/roots/corpus_audit.ts",
-		"conformance": "npm run pins:audit:checkouts && npm run bench:pins:suites && npm run fixtures:validate && npm run compile:fixtures:validate && npm run bench:harvest:svelte-styles && npm run build:napi:corpus && npm run build:check && npm run strip:corpus:run && npm run imports:corpus:run && npm run tape:corpus:run && PRETTIER_DEBUG=1 node benches/js/roots/conformance.ts",
+		"conformance": "npm run pins:audit:checkouts && npm run bench:pins:suites && npm run compile:fixtures:validate && npm run bench:harvest:svelte-styles && npm run build:napi:corpus && npm run build:check && npm run strip:corpus:run && npm run imports:corpus:run && npm run tape:corpus:run && PRETTIER_DEBUG=1 node benches/js/roots/conformance.ts",
 		"conformance:all": "npm run conformance:test262 && npm run conformance",
 		"imports:fixtures:validate": "cargo run -p tsv_debug --quiet imports_fixtures_validate",
 		"imports:fixtures:update": "cargo run -p tsv_debug --quiet imports_fixtures_update",
