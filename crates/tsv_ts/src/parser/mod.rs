@@ -4134,9 +4134,9 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse a single expression, WITHOUT requiring it to fill the input slice — the raw
-    /// parse the pattern path builds on: `parse_pattern_with_comments` parses here, converts
-    /// the result to a Svelte pattern, then enforces end-of-input itself. (Expression tags
-    /// use `parse_expression_with_comments`, which requires full consumption via
+    /// parse the pattern path builds on: `crate::__private::parse_pattern` parses here,
+    /// converts the result to a Svelte pattern, then enforces end-of-input itself. (Expression
+    /// tags use `crate::__private::parse_expression`, which requires full consumption via
     /// `expect_end_of_input`.)
     pub(crate) fn parse_expression_unbounded(&mut self) -> Result<ExprId, Error> {
         Ok(self.parse_expression()?.id())
@@ -4264,7 +4264,7 @@ impl<'a> Parser<'a> {
 
     /// Convert an expression to a Svelte block or tag pattern — an `{#each}` context, a
     /// `{:then}` / `{:catch}` value, a `{@const}` id
-    /// (`crate::__private::parse_pattern_with_comments`).
+    /// (`crate::__private::parse_pattern`).
     ///
     /// This converts ObjectExpression to ObjectPattern, ArrayExpression to ArrayPattern,
     /// etc., under Svelte's reading of the pattern as an assignment target. A

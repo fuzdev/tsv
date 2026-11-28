@@ -13,7 +13,7 @@ and the reason it needs its own fixture: the two heads reach the annotation by
 different routes. `{#each}` bounds the pattern before the annotation and parses
 the annotation itself, so the pattern node's span stops at the bare binding;
 `{:then}` / `{:catch}` hand the whole binding to one sub-parse
-(`parse_pattern_with_comments`), which swallows the annotation. An **identifier**
+(`parse_pattern`), which swallows the annotation. An **identifier**
 binding is where the two part company — its span stays on the bare name in both
 routes, so a window anchored on that span would end before the annotation and
 leave its comment attached nowhere. The window runs to the end of the binding

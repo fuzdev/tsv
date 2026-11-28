@@ -608,7 +608,7 @@ pub fn parse_bare_name_closed(
 
 /// A Svelte block pattern that is one plain name, `name` sitting at `base_offset` — the
 /// `item` of `{#each xs as item}`, a `{:then value}`, a `{@const x = …}` — pushed onto `stores`
-/// as the `Identifier` row [`parse_pattern_with_comments`] builds for it, or `None`, and
+/// as the `Identifier` row [`parse_pattern`] builds for it, or `None`, and
 /// nothing pushed, for every other pattern, which takes that parse.
 ///
 /// The host has already read `name` as the whole binding (an identifier, its extent bounded),
@@ -828,9 +828,8 @@ fn assert_pattern_parse_builds_tree(
     expr: ExprId,
 ) {
     let mut scratch = AstStores::default();
-    let (parsed, comments) =
-        parse_pattern_with_comments(name, base_offset, host_nesting, &mut scratch)
-            .expect("a bare pattern name parses");
+    let (parsed, comments) = parse_pattern(name, base_offset, host_nesting, &mut scratch)
+        .expect("a bare pattern name parses");
     assert!(
         comments.is_empty(),
         "a bare pattern name holds no comment: {name:?}"
@@ -874,7 +873,7 @@ fn assert_pattern_parse_builds_tree(
 ///
 /// As [`parse_embedded`]'s: positioned in the host document, with no point until the
 /// host fills its context.
-pub fn parse_pattern_with_comments(
+pub fn parse_pattern(
     source: &str,
     base_offset: usize,
     host_nesting: u32,
@@ -1081,7 +1080,7 @@ pub fn pattern_binding_end(view: AstView<'_>, pattern: &Expression) -> u32 {
 /// after simple identifiers (e.g., `{#each items as x: number}`).
 /// The source must start with `:`.
 ///
-/// The comments come back for the same reason [`parse_pattern_with_comments`]'s do: this is
+/// The comments come back for the same reason [`parse_pattern`]'s do: this is
 /// a **sub-parse of the host document**, so a comment it consumes exists nowhere else. A
 /// caller that drops them drops the comment outright — it never reaches the root `comments`
 /// array, so the print-once ledger cannot see it either (a comment that was never
@@ -1216,7 +1215,7 @@ pub fn parse_type_extent(
 /// host fills its context. A refusal `host_check` returns fails the parse it judged like
 /// any other error, so it is reported only where no list was given up to tsc's comparison;
 /// otherwise the acorn re-read decides, as at [`parse_embedded`].
-pub fn parse_statement_with_comments(
+pub fn parse_statement(
     source: &str,
     base_offset: usize,
     host_nesting: u32,

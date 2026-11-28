@@ -896,12 +896,7 @@ impl<'a> SvelteParser<'a> {
         base_offset: usize,
     ) -> Result<ExprId, Error> {
         let (pattern, comments) = self.with_island_stores(|this, stores| {
-            tsv_ts::__private::parse_pattern_with_comments(
-                source,
-                base_offset,
-                this.island_nesting(),
-                stores,
-            )
+            tsv_ts::__private::parse_pattern(source, base_offset, this.island_nesting(), stores)
         })?;
         debug_assert!(
             tsv_ts::__private::pattern_type_annotation(
@@ -956,7 +951,7 @@ impl<'a> SvelteParser<'a> {
         host_check: impl Fn(&Self, AstView<'_>, &tsv_ts::ast::Statement) -> Result<(), Error>,
     ) -> Result<tsv_ts::ast::Statement, Error> {
         let (stmt, comments) = self.with_island_stores(|this, stores| {
-            tsv_ts::__private::parse_statement_with_comments(
+            tsv_ts::__private::parse_statement(
                 source,
                 base_offset,
                 this.island_nesting(),
