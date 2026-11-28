@@ -1,7 +1,7 @@
 //! Contiguous stores of parsed rows, the typed handles that index them, and the scratch stack
 //! that builds their child lists.
 //!
-//! A [`Store`] is a `Vec` holding the rows of one family. Slot 0 of a written store holds a row
+//! A [`Store`] is a `Vec` holding the rows of one type. Slot 0 of a written store holds a row
 //! that no id names, so an [`Id`] carries its row index directly: `Option<Id>` takes its niche
 //! from `NonZero`, and a read decodes nothing. A store allocates nothing until its first write,
 //! which writes its first row twice, into slot 0 and slot 1, so no row type needs a sentinel
@@ -17,12 +17,14 @@
 //! a flush nor a store's first write clones one. A frame is a [`ListMark`] held in a local of
 //! the code building the list, so nested lists are last-in-first-out by construction and
 //! nothing counts depth.
-//! A rewind needs only the mark taken before the speculation. A mark is typed by its family, so
-//! a mark of one buffer cannot be handed to another's.
+//! A rewind needs only the mark taken before the speculation. A mark is typed by its row type,
+//! so a mark of one buffer cannot be handed to another's.
 //!
-//! Ids and runs are parameterized by a family, a `'static` type stated once per row type
-//! through [`Row`]: the row type itself, or a tag of its own where the row carries a lifetime
-//! that the rows and stores holding the handle cannot name; see there for the choices.
+//! Ids, runs and marks are parameterized by the row type itself: an id of an `Expression` row
+//! is an `Id<Expression>`, so a list of ids stores in `Store<Id<Expression>>` and is read
+//! through a `Run<Id<Expression>>`, and a list with holes through a `Run<Option<..>>`, with no
+//! parallel API. Every row a language crate stores is lifetime-free, so a handle names no
+//! lifetime and the rows and stores holding one need none.
 //!
 //! [`TextPool`] holds strings a span of the source cannot express. A [`PoolText`] is its handle,
 //! and `Option<PoolText>` tells an absent string from a present empty one. A pool and its
@@ -31,14 +33,14 @@
 //! its first non-empty write.
 //!
 //! Handles are only meaningful to the store that minted them, until it resets. The type system
-//! catches a handle of the wrong family and nothing more: a same-family id retained across a
-//! [`Store::reset`], or minted by another store, reads some other row, in bounds. The
-//! `_internal_store_check` feature catches both, by stamping an instance and a generation on
-//! stores, pools and the handles they mint and comparing them on each read and each equality
-//! test. It also keeps a shadow stack of live marks on each `ListBuf`, so a mark already flushed,
-//! rewound past or reset fails at the flush, truncate or frame read it reaches. It widens every
-//! handle and changes layout and codegen, so a build carrying it never supplies a performance
-//! number. Off, the stamps do not exist: no field, no comparison.
+//! catches a handle of the wrong row type or pool family and nothing more: a same-type id
+//! retained across a [`Store::reset`], or minted by another store, reads some other row, in
+//! bounds. The `_internal_store_check` feature catches both, by stamping an instance and a
+//! generation on stores, pools and the handles they mint and comparing them on each read and
+//! each equality test. It also keeps a shadow stack of live marks on each `ListBuf`, so a mark
+//! already flushed, rewound past or reset fails at the flush, truncate or frame read it
+//! reaches. It widens every handle and changes layout and codegen, so a build carrying it never
+//! supplies a performance number. Off, the stamps do not exist: no field, no comparison.
 //!
 //! Every failed read ends in one zero-argument `#[cold]` function, never in `[]`, so that an
 //! inlined accessor carries no panic setup of its own at each site.
@@ -282,60 +284,16 @@ mod stamp {
     }
 }
 
-/// The family of a row type: the `'static` type its [`Id`]s and [`Run`]s are parameterized by.
-///
-/// A row that carries a lifetime names a family tag of its own, an uninhabited `enum`:
-///
-/// ```ignore
-/// pub enum NodeTag {}
-/// impl Row for Node<'_> { type Family = NodeTag; }
-/// pub type NodeId = Id<NodeTag>;
-/// ```
-///
-/// A lifetime-free row needs no tag and is its own family, so a list of ids stores in
-/// `Store<ExprId>` and is read through a `Run<ExprId>`, and a list with holes through
-/// `Run<Option<ExprId>>`, with no parallel API.
-///
-/// Every row type the language crates store is lifetime-free, so each is its own family; a tag
-/// is for a row that carries a lifetime, as this module's tests' `Node<'a>` does.
-///
-/// One family belongs to exactly one row type, lifetimes aside. The type system cannot stop two
-/// row types claiming the same tag, and an id of one would then read the other's store.
-pub trait Row {
-    /// The family; `'static`, so no handle can name a row's lifetime.
-    type Family: 'static;
-}
-
-impl<F: 'static> Row for Id<F> {
-    type Family = Self;
-}
-
-impl<T: Row> Row for Option<T> {
-    type Family = Option<T::Family>;
-}
-
-impl<F: 'static> Row for PoolText<F> {
-    type Family = Self;
-}
-
-impl Row for crate::Comment {
-    type Family = Self;
-}
-
-impl Row for crate::Span {
-    type Family = Self;
-}
-
 /// A typed handle to one row of a [`Store`], minted by [`Store::push`]: the row's index,
-/// `Option<Id<F>>` keeping the width of an `Id<F>`.
-pub struct Id<F> {
+/// `Option<Id<T>>` keeping the width of an `Id<T>`.
+pub struct Id<T> {
     index: NonZeroU32,
     #[cfg(feature = "_internal_store_check")]
     stamp: stamp::Stamp,
-    family: PhantomData<fn() -> F>,
+    row: PhantomData<fn() -> T>,
 }
 
-impl<F> Id<F> {
+impl<T> Id<T> {
     /// The row index this id carries; a store's first row is `1`.
     #[inline]
     pub fn index(self) -> usize {
@@ -343,17 +301,18 @@ impl<F> Id<F> {
     }
 }
 
-// Not derived: a derive would bound each impl on `F`, which is a row type or an uninhabited tag.
-impl<F> Clone for Id<F> {
+// Not derived: a derive would bound each impl on `T`, the row type, which need not be `Copy`,
+// `Eq` or `Hash` for its handle to be.
+impl<T> Clone for Id<T> {
     #[inline]
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<F> Copy for Id<F> {}
+impl<T> Copy for Id<T> {}
 
-impl<F> PartialEq for Id<F> {
+impl<T> PartialEq for Id<T> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         #[cfg(feature = "_internal_store_check")]
@@ -362,42 +321,42 @@ impl<F> PartialEq for Id<F> {
     }
 }
 
-impl<F> Eq for Id<F> {}
+impl<T> Eq for Id<T> {}
 
-impl<F> Hash for Id<F> {
+impl<T> Hash for Id<T> {
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.index.hash(state);
     }
 }
 
-impl<F> fmt::Debug for Id<F> {
+impl<T> fmt::Debug for Id<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Id({})", self.index)
     }
 }
 
 /// An [`Id`] carried as a function's success payload, widened on 64-bit so that a
-/// `Result<IdRet<F>, Error>` returns in two registers where a `Result<Id<F>, Error>`, with
+/// `Result<IdRet<T>, Error>` returns in two registers where a `Result<Id<T>, Error>`, with
 /// mismatched payload widths, returns through memory. Elsewhere, and in a checked build, an
-/// `Id<F>` as it stands.
+/// `Id<T>` as it stands.
 #[repr(transparent)]
-pub struct IdRet<F> {
+pub struct IdRet<T> {
     #[cfg(all(target_pointer_width = "64", not(feature = "_internal_store_check")))]
     word: NonZeroU64,
     #[cfg(not(all(target_pointer_width = "64", not(feature = "_internal_store_check"))))]
-    id: Id<F>,
-    family: PhantomData<fn() -> F>,
+    id: Id<T>,
+    row: PhantomData<fn() -> T>,
 }
 
 #[cfg(all(target_pointer_width = "64", not(feature = "_internal_store_check")))]
-impl<F> IdRet<F> {
+impl<T> IdRet<T> {
     /// Widens `id` to the return word.
     #[inline]
-    pub fn wrap(id: Id<F>) -> Self {
+    pub fn wrap(id: Id<T>) -> Self {
         Self {
             word: id.index.into(),
-            family: PhantomData,
+            row: PhantomData,
         }
     }
 
@@ -407,11 +366,11 @@ impl<F> IdRet<F> {
     /// is a shorter sequence than the range test `NonZeroU32::try_from` makes of the whole
     /// word, and a word that does not fit a `u32` is no state `wrap` can produce.
     #[inline]
-    pub fn id(self) -> Id<F> {
+    pub fn id(self) -> Id<T> {
         match NonZeroU32::new(self.word.get() as u32) {
             Some(index) => Id {
                 index,
-                family: PhantomData,
+                row: PhantomData,
             },
             None => store_miss(),
         }
@@ -419,43 +378,43 @@ impl<F> IdRet<F> {
 }
 
 #[cfg(not(all(target_pointer_width = "64", not(feature = "_internal_store_check"))))]
-impl<F> IdRet<F> {
+impl<T> IdRet<T> {
     /// Wraps `id` unchanged.
     #[inline]
-    pub fn wrap(id: Id<F>) -> Self {
+    pub fn wrap(id: Id<T>) -> Self {
         Self {
             id,
-            family: PhantomData,
+            row: PhantomData,
         }
     }
 
     /// The id this carries.
     #[inline]
-    pub fn id(self) -> Id<F> {
+    pub fn id(self) -> Id<T> {
         self.id
     }
 }
 
-impl<F> Clone for IdRet<F> {
+impl<T> Clone for IdRet<T> {
     #[inline]
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<F> Copy for IdRet<F> {}
+impl<T> Copy for IdRet<T> {}
 
 /// Consecutive rows of a [`Store`], minted by a [`ListBuf`] flush and read as a plain slice
-/// by [`Store::slice`]. `Option<Run<F>>` keeps the width of a `Run<F>`.
-pub struct Run<F> {
+/// by [`Store::slice`]. `Option<Run<T>>` keeps the width of a `Run<T>`.
+pub struct Run<T> {
     start: NonZeroU32,
     len: u32,
     #[cfg(feature = "_internal_store_check")]
     stamp: stamp::Stamp,
-    family: PhantomData<fn() -> F>,
+    row: PhantomData<fn() -> T>,
 }
 
-impl<F> Run<F> {
+impl<T> Run<T> {
     /// The empty run. A read of it answers empty before it reaches the rows, so it reads in
     /// every store, one never written included.
     pub const EMPTY: Self = Self {
@@ -463,7 +422,7 @@ impl<F> Run<F> {
         len: 0,
         #[cfg(feature = "_internal_store_check")]
         stamp: stamp::Stamp::NONE,
-        family: PhantomData,
+        row: PhantomData,
     };
 
     /// The number of rows in the run.
@@ -501,7 +460,7 @@ impl<F> Run<F> {
             len: (range.end - range.start) as u32,
             #[cfg(feature = "_internal_store_check")]
             stamp: self.stamp,
-            family: PhantomData,
+            row: PhantomData,
         }
     }
 
@@ -514,16 +473,16 @@ impl<F> Run<F> {
     }
 }
 
-impl<F> Clone for Run<F> {
+impl<T> Clone for Run<T> {
     #[inline]
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<F> Copy for Run<F> {}
+impl<T> Copy for Run<T> {}
 
-impl<F> PartialEq for Run<F> {
+impl<T> PartialEq for Run<T> {
     #[inline]
     fn eq(&self, other: &Self) -> bool {
         #[cfg(feature = "_internal_store_check")]
@@ -532,9 +491,9 @@ impl<F> PartialEq for Run<F> {
     }
 }
 
-impl<F> Eq for Run<F> {}
+impl<T> Eq for Run<T> {}
 
-impl<F> fmt::Debug for Run<F> {
+impl<T> fmt::Debug for Run<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Run({}, {})", self.start, self.len)
     }
@@ -550,7 +509,7 @@ pub struct Store<T> {
     stamp: stamp::Stamp,
 }
 
-impl<T: Row> Default for Store<T> {
+impl<T> Default for Store<T> {
     fn default() -> Self {
         Self::new()
     }
@@ -567,7 +526,7 @@ impl<T: Row> Default for Store<T> {
 #[doc(hidden)]
 pub const ONE_SHOT_PARK_CAP_BYTES: usize = 1 << 20;
 
-impl<T: Row> Store<T> {
+impl<T> Store<T> {
     /// An empty store. Allocates nothing until its first write.
     pub fn new() -> Self {
         Self::with_capacity(0)
@@ -585,7 +544,7 @@ impl<T: Row> Store<T> {
     /// Appends `row` and mints its id. On a store's first write `row` lands in slot 0 and a
     /// copy of it in slot 1, the slot the id names.
     #[inline]
-    pub fn push(&mut self, row: T) -> Id<T::Family>
+    pub fn push(&mut self, row: T) -> Id<T>
     where
         T: Copy,
     {
@@ -599,7 +558,7 @@ impl<T: Row> Store<T> {
             index,
             #[cfg(feature = "_internal_store_check")]
             stamp: self.stamp,
-            family: PhantomData,
+            row: PhantomData,
         }
     }
 
@@ -608,7 +567,7 @@ impl<T: Row> Store<T> {
     /// [`Store::push`] is (append, then mint, the row stored straight into its slot): a mint
     /// that needs the row by reference first would spill it to the stack on every call.
     #[inline]
-    pub fn push_as_run(&mut self, row: T) -> Run<T::Family>
+    pub fn push_as_run(&mut self, row: T) -> Run<T>
     where
         T: Copy,
     {
@@ -623,19 +582,19 @@ impl<T: Row> Store<T> {
             len: 1,
             #[cfg(feature = "_internal_store_check")]
             stamp: self.stamp,
-            family: PhantomData,
+            row: PhantomData,
         }
     }
 
     /// The row `id` names. A miss ends in the shared cold path.
     #[inline]
-    pub fn get(&self, id: Id<T::Family>) -> &T {
+    pub fn get(&self, id: Id<T>) -> &T {
         self.view().get(id)
     }
 
     /// The rows of `run` as a plain slice, with one range check for the whole run.
     #[inline]
-    pub fn slice(&self, run: Run<T::Family>) -> &[T] {
+    pub fn slice(&self, run: Run<T>) -> &[T] {
         self.view().slice(run)
     }
 
@@ -768,11 +727,7 @@ impl<T: Row> Store<T> {
     /// from the row `first` names when the store is not yet written. `first` is asked only
     /// then.
     #[inline]
-    fn mint_run<'r>(
-        &mut self,
-        count: usize,
-        first: impl FnOnce() -> Option<&'r T>,
-    ) -> Run<T::Family>
+    fn mint_run<'r>(&mut self, count: usize, first: impl FnOnce() -> Option<&'r T>) -> Run<T>
     where
         T: Copy + 'r,
     {
@@ -785,7 +740,7 @@ impl<T: Row> Store<T> {
             len,
             #[cfg(feature = "_internal_store_check")]
             stamp: self.stamp,
-            family: PhantomData,
+            row: PhantomData,
         }
     }
 }
@@ -806,10 +761,10 @@ impl<T> Clone for StoreView<'_, T> {
 
 impl<T> Copy for StoreView<'_, T> {}
 
-impl<'a, T: Row> StoreView<'a, T> {
+impl<'a, T> StoreView<'a, T> {
     /// The row `id` names. A miss ends in the shared cold path.
     #[inline]
-    pub fn get(self, id: Id<T::Family>) -> &'a T {
+    pub fn get(self, id: Id<T>) -> &'a T {
         #[cfg(feature = "_internal_store_check")]
         self.stamp.check(id.stamp);
         match self.rows.get(id.index.get() as usize) {
@@ -820,7 +775,7 @@ impl<'a, T: Row> StoreView<'a, T> {
 
     /// The rows of `run` as a plain slice, with one range check for the whole run.
     #[inline]
-    pub fn slice(self, run: Run<T::Family>) -> &'a [T] {
+    pub fn slice(self, run: Run<T>) -> &'a [T] {
         if run.len == 0 {
             return &[];
         }
@@ -834,33 +789,33 @@ impl<'a, T: Row> StoreView<'a, T> {
 }
 
 /// A position on a [`ListBuf`]: the start of one open list frame, or the point a rewind returns
-/// to. Held in a local of the code building the list. Parameterized by the family so a mark of
-/// one list buffer cannot be handed to another's.
+/// to. Held in a local of the code building the list. Parameterized by the row type so a mark
+/// of one list buffer cannot be handed to another's.
 #[must_use]
-pub struct ListMark<F> {
+pub struct ListMark<T> {
     top: u32,
     #[cfg(feature = "_internal_store_check")]
     seq: u64,
-    family: PhantomData<fn() -> F>,
+    row: PhantomData<fn() -> T>,
 }
 
-impl<F> ListMark<F> {
+impl<T> ListMark<T> {
     #[inline]
     fn index(self) -> usize {
         self.top as usize
     }
 }
 
-impl<F> Clone for ListMark<F> {
+impl<T> Clone for ListMark<T> {
     #[inline]
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<F> Copy for ListMark<F> {}
+impl<T> Copy for ListMark<T> {}
 
-impl<F> fmt::Debug for ListMark<F> {
+impl<T> fmt::Debug for ListMark<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "ListMark({})", self.top)
     }
@@ -992,10 +947,10 @@ impl<T> ListBuf<T> {
     }
 }
 
-impl<T: Row> ListBuf<T> {
+impl<T> ListBuf<T> {
     /// Opens a frame at the current top of the stack.
     #[inline]
-    pub fn mark(&self) -> ListMark<T::Family> {
+    pub fn mark(&self) -> ListMark<T> {
         let mut group = MarkGroup::new();
         let mark = self.mark_in(&mut group);
         group.check();
@@ -1006,7 +961,7 @@ impl<T: Row> ListBuf<T> {
     /// [`MarkGroup`]): the mark is faithful only once [`MarkGroup::check`] has returned, so hand
     /// it on after that, never before.
     #[inline]
-    pub fn mark_in(&self, group: &mut MarkGroup) -> ListMark<T::Family> {
+    pub fn mark_in(&self, group: &mut MarkGroup) -> ListMark<T> {
         let height = self.items.len();
         debug_assert!(
             u32::try_from(height).is_ok(),
@@ -1017,7 +972,7 @@ impl<T: Row> ListBuf<T> {
             top: height as u32,
             #[cfg(feature = "_internal_store_check")]
             seq: self.live.open(),
-            family: PhantomData,
+            row: PhantomData,
         }
     }
 
@@ -1025,7 +980,7 @@ impl<T: Row> ListBuf<T> {
     /// mark at or below the top is not detected here; the check build catches it at the
     /// flush, truncate or frame read it reaches.
     #[inline]
-    pub fn len_since(&self, mark: ListMark<T::Family>) -> usize {
+    pub fn len_since(&self, mark: ListMark<T>) -> usize {
         match self.items.len().checked_sub(mark.index()) {
             Some(count) => count,
             None => store_miss(),
@@ -1036,7 +991,7 @@ impl<T: Row> ListBuf<T> {
     /// built, as [`ListBuf::len_since`] counts it. A mark above the top of the stack misses; the
     /// check build also refuses a stale one, as [`ListBuf::truncate`] does.
     #[inline]
-    pub fn frame(&self, mark: ListMark<T::Family>) -> &[T] {
+    pub fn frame(&self, mark: ListMark<T>) -> &[T] {
         #[cfg(feature = "_internal_store_check")]
         self.live.require(mark.seq);
         match self.items.get(mark.index()..) {
@@ -1050,7 +1005,7 @@ impl<T: Row> ListBuf<T> {
     /// below it. A mark above the top of the stack misses; the check build also refuses a stale
     /// one, as [`ListBuf::frame`] does.
     #[inline]
-    pub fn frame_mut(&mut self, mark: ListMark<T::Family>) -> &mut [T] {
+    pub fn frame_mut(&mut self, mark: ListMark<T>) -> &mut [T] {
         #[cfg(feature = "_internal_store_check")]
         self.live.require(mark.seq);
         match self.items.get_mut(mark.index()..) {
@@ -1070,7 +1025,7 @@ impl<T: Row> ListBuf<T> {
     /// [`ListBuf::truncate`] clears above its mark and a pop leaves alone. A caller that pops
     /// below an inner mark owns that mark.
     #[inline]
-    pub fn pop(&mut self, mark: ListMark<T::Family>) -> Option<T> {
+    pub fn pop(&mut self, mark: ListMark<T>) -> Option<T> {
         #[cfg(feature = "_internal_store_check")]
         self.live.require(mark.seq);
         if self.len_since(mark) == 0 {
@@ -1085,7 +1040,7 @@ impl<T: Row> ListBuf<T> {
     /// another way ([`push_run_of_one`]) — as a flush of the empty frame would, but with no
     /// work in a release build. The check build requires the frame empty and pops the mark.
     #[inline]
-    pub fn close_empty(&mut self, mark: ListMark<T::Family>) {
+    pub fn close_empty(&mut self, mark: ListMark<T>) {
         #[cfg(feature = "_internal_store_check")]
         self.live.close_empty(mark.seq, self.len_since(mark));
         #[cfg(not(feature = "_internal_store_check"))]
@@ -1095,7 +1050,7 @@ impl<T: Row> ListBuf<T> {
     /// Rewinds the stack to `mark`, discarding every element above it. `mark` stays usable, so
     /// a checkpoint can be rewound to more than once.
     #[inline]
-    pub fn truncate(&mut self, mark: ListMark<T::Family>) {
+    pub fn truncate(&mut self, mark: ListMark<T>) {
         #[cfg(feature = "_internal_store_check")]
         self.live.pop_above(mark.seq);
         #[cfg(not(feature = "_internal_ast_census"))]
@@ -1108,7 +1063,7 @@ impl<T: Row> ListBuf<T> {
     /// Copies the frame above `mark` into `into` as one block and truncates the stack back to
     /// `mark`. An empty frame returns [`Run::EMPTY`] and does not touch `into`.
     #[inline]
-    pub fn flush_copy(&mut self, mark: ListMark<T::Family>, into: &mut Store<T>) -> Run<T::Family>
+    pub fn flush_copy(&mut self, mark: ListMark<T>, into: &mut Store<T>) -> Run<T>
     where
         T: Copy,
     {
@@ -1120,11 +1075,7 @@ impl<T: Row> ListBuf<T> {
     /// copy of a frame whose length is known only at run time is a `memcpy` call whatever
     /// the length. A longer frame takes the block copy.
     #[inline]
-    pub fn flush_copy_short(
-        &mut self,
-        mark: ListMark<T::Family>,
-        into: &mut Store<T>,
-    ) -> Run<T::Family>
+    pub fn flush_copy_short(&mut self, mark: ListMark<T>, into: &mut Store<T>) -> Run<T>
     where
         T: Copy,
     {
@@ -1141,10 +1092,10 @@ impl<T: Row> ListBuf<T> {
     #[inline(always)]
     fn flush_copy_frame(
         &mut self,
-        mark: ListMark<T::Family>,
+        mark: ListMark<T>,
         into: &mut Store<T>,
         one_row_arm: bool,
-    ) -> Run<T::Family>
+    ) -> Run<T>
     where
         T: Copy,
     {
@@ -1429,7 +1380,7 @@ impl fmt::Write for PoolWriter<'_> {
 /// row. A free function over the store's field path, so a caller can push while it holds a
 /// disjoint borrow of the other stores.
 #[inline]
-pub fn push_row<T: Row + Copy>(store: &mut Store<T>, row: T) -> Id<T::Family> {
+pub fn push_row<T: Copy>(store: &mut Store<T>, row: T) -> Id<T> {
     #[cfg(feature = "_internal_ast_census")]
     crate::ast_census_probe::mint::<T>(1);
     store.push(row)
@@ -1441,11 +1392,11 @@ pub fn push_row<T: Row + Copy>(store: &mut Store<T>, row: T) -> Id<T::Family> {
 /// [`push_row`] is, so a caller can flush while it holds a disjoint borrow of the other
 /// stores.
 #[inline]
-pub fn flush_run<T: Row + Copy>(
+pub fn flush_run<T: Copy>(
     scratch: &mut ListBuf<T>,
     store: &mut Store<T>,
-    mark: ListMark<T::Family>,
-) -> Run<T::Family> {
+    mark: ListMark<T>,
+) -> Run<T> {
     let run = scratch.flush_copy_short(mark, store);
     #[cfg(feature = "_internal_ast_census")]
     crate::ast_census_probe::mint::<T>(run.len());
@@ -1456,7 +1407,7 @@ pub fn flush_run<T: Row + Copy>(
 /// seen end after its first element, minted without the scratch frame [`flush_run`] would
 /// copy it out of. A free function over the store's field path, as [`push_row`] is.
 #[inline]
-pub fn push_run_of_one<T: Row + Copy>(store: &mut Store<T>, row: T) -> Run<T::Family> {
+pub fn push_run_of_one<T: Copy>(store: &mut Store<T>, row: T) -> Run<T> {
     #[cfg(feature = "_internal_ast_census")]
     crate::ast_census_probe::mint::<T>(1);
     store.push_as_run(row)
@@ -1466,11 +1417,11 @@ pub fn push_run_of_one<T: Row + Copy>(store: &mut Store<T>, row: T) -> Run<T::Fa
 /// read before the push, beside the id, for the header of the node that wraps the id. A debug
 /// build re-reads the stored row, which checks only that storing the row kept its span.
 #[inline]
-pub fn push_spanned<T: Row + Copy>(
+pub fn push_spanned<T: Copy>(
     store: &mut Store<T>,
     row: T,
     span_of: fn(&T) -> crate::Span,
-) -> (crate::Span, Id<T::Family>) {
+) -> (crate::Span, Id<T>) {
     let span = span_of(&row);
     let id = push_row(store, row);
     debug_assert_eq!(
@@ -1485,57 +1436,51 @@ pub fn push_spanned<T: Row + Copy>(
 mod tests {
     use super::*;
 
-    enum Alpha {}
-
     /// The family of the test pools.
     enum Words {}
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-    struct Node<'a>(&'a str);
+    struct Node(&'static str);
 
-    impl Row for Node<'_> {
-        type Family = Alpha;
-    }
-
-    fn store() -> Store<Node<'static>> {
+    fn store() -> Store<Node> {
         Store::new()
     }
 
     /// An id with an arbitrary index: only the mint and the round trip read one this way.
-    fn id_at(index: u32) -> Id<Alpha> {
+    fn id_at(index: u32) -> Id<Node> {
         Id {
             index: NonZeroU32::new(index).expect("a test index"),
             #[cfg(feature = "_internal_store_check")]
             stamp: stamp::Stamp::NONE,
-            family: PhantomData,
+            row: PhantomData,
         }
     }
 
-    fn texts<'a>(store: &'a Store<Node<'a>>, run: Run<Alpha>) -> Vec<&'a str> {
+    fn texts(store: &Store<Node>, run: Run<Node>) -> Vec<&'static str> {
         store.slice(run).iter().map(|node| node.0).collect()
     }
 
     // `const` so a wrong width fails the build. Stamped handles are wider on purpose, and the
     // niches hold either way.
     const _: () = {
-        assert!(STORE_CHECK || size_of::<Id<Alpha>>() == 4);
-        assert!(STORE_CHECK || size_of::<Run<Alpha>>() == 8);
+        assert!(STORE_CHECK || size_of::<Id<Node>>() == 4);
+        assert!(STORE_CHECK || size_of::<Run<Node>>() == 8);
         assert!(STORE_CHECK || size_of::<PoolText<Words>>() == 8);
-        assert!(STORE_CHECK || size_of::<ListMark<Alpha>>() == 4);
+        assert!(STORE_CHECK || size_of::<ListMark<Node>>() == 4);
         #[cfg(target_pointer_width = "64")]
         {
-            assert!(STORE_CHECK || size_of::<IdRet<Alpha>>() == 8);
-            assert!(STORE_CHECK || size_of::<Result<IdRet<Alpha>, crate::Error>>() == 16);
-            assert!(STORE_CHECK || size_of::<StoreView<'static, Id<Alpha>>>() == 16);
-            assert!(STORE_CHECK || size_of::<Store<Id<Alpha>>>() == 24);
-            assert!(STORE_CHECK || size_of::<ListBuf<Id<Alpha>>>() == 24);
+            assert!(STORE_CHECK || size_of::<IdRet<Node>>() == 8);
+            assert!(STORE_CHECK || size_of::<Result<IdRet<Node>, crate::Error>>() == 16);
+            assert!(STORE_CHECK || size_of::<StoreView<'static, Id<Node>>>() == 16);
+            assert!(STORE_CHECK || size_of::<Store<Id<Node>>>() == 24);
+            assert!(STORE_CHECK || size_of::<ListBuf<Id<Node>>>() == 24);
             assert!(STORE_CHECK || size_of::<TextPool<Words>>() == 24);
         }
     };
 
     const _: () = {
-        assert!(size_of::<Option<Id<Alpha>>>() == size_of::<Id<Alpha>>());
-        assert!(size_of::<Option<Run<Alpha>>>() == size_of::<Run<Alpha>>());
+        assert!(size_of::<Option<Id<Node>>>() == size_of::<Id<Node>>());
+        assert!(size_of::<Option<Run<Node>>>() == size_of::<Run<Node>>());
         assert!(size_of::<Option<PoolText<Words>>>() == size_of::<PoolText<Words>>());
     };
 
@@ -1621,9 +1566,9 @@ mod tests {
         let nodes = store();
         assert!(nodes.rows.is_empty());
         assert_eq!(nodes.rows.capacity(), 0);
-        let nodes: Store<Node<'static>> = Store::default();
+        let nodes: Store<Node> = Store::default();
         assert_eq!(nodes.rows.capacity(), 0);
-        let sized: Store<Node<'static>> = Store::with_capacity(8);
+        let sized: Store<Node> = Store::with_capacity(8);
         assert!(sized.rows.is_empty());
         assert_eq!(sized.rows.capacity(), 8);
     }
@@ -1673,22 +1618,22 @@ mod tests {
         scratch.push(Node("a"));
         scratch.push(Node("b"));
         scratch.flush_copy(mark, &mut nodes);
-        assert!(first_alloc_rows::<Node<'static>>() > 4);
-        assert!(nodes.rows.capacity() >= first_alloc_rows::<Node<'static>>());
+        assert!(first_alloc_rows::<Node>() > 4);
+        assert!(nodes.rows.capacity() >= first_alloc_rows::<Node>());
 
-        let mut ids: Store<Id<Alpha>> = Store::new();
+        let mut ids: Store<Id<Node>> = Store::new();
         let mut scratch = ListBuf::new();
         let mark = scratch.mark();
         scratch.push(id_at(1));
         scratch.flush_copy(mark, &mut ids);
-        assert!(ids.rows.capacity() >= first_alloc_rows::<Id<Alpha>>());
-        assert!(STORE_CHECK || first_alloc_rows::<Id<Alpha>>() == FIRST_ALLOC_BYTES / 4);
+        assert!(ids.rows.capacity() >= first_alloc_rows::<Id<Node>>());
+        assert!(STORE_CHECK || first_alloc_rows::<Id<Node>>() == FIRST_ALLOC_BYTES / 4);
     }
 
     #[test]
     fn a_first_flush_into_enough_capacity_keeps_the_allocation() {
-        let wanted = first_alloc_rows::<Node<'static>>() + 8;
-        let mut sized: Store<Node<'static>> = Store::with_capacity(wanted);
+        let wanted = first_alloc_rows::<Node>() + 8;
+        let mut sized: Store<Node> = Store::with_capacity(wanted);
         let (before, capacity) = (sized.rows.as_ptr(), sized.rows.capacity());
         let mut scratch = ListBuf::new();
         let mark = scratch.mark();
@@ -1716,12 +1661,12 @@ mod tests {
 
     #[test]
     fn a_first_flush_into_too_little_capacity_grows_to_the_first_allocation() {
-        let mut sized: Store<Node<'static>> = Store::with_capacity(2);
+        let mut sized: Store<Node> = Store::with_capacity(2);
         let mut scratch = ListBuf::new();
         let mark = scratch.mark();
         scratch.push(Node("a"));
         scratch.flush_copy(mark, &mut sized);
-        assert!(sized.rows.capacity() >= first_alloc_rows::<Node<'static>>());
+        assert!(sized.rows.capacity() >= first_alloc_rows::<Node>());
     }
 
     // `count + 1` against `count` in the reserve is capacity only: a short reserve grows once
@@ -1729,7 +1674,7 @@ mod tests {
     #[test]
     fn a_first_flush_past_the_first_allocation_lands_intact() {
         const WORDS: [&str; 5] = ["p", "q", "r", "s", "t"];
-        let count = first_alloc_rows::<Node<'static>>() + 5;
+        let count = first_alloc_rows::<Node>() + 5;
         let mut nodes = store();
         let mut scratch = ListBuf::new();
         let mark = scratch.mark();
@@ -1763,12 +1708,12 @@ mod tests {
     #[test]
     fn the_empty_run_reads_empty_in_a_store_never_written() {
         let nodes = store();
-        assert_eq!(Run::<Alpha>::EMPTY.start.get(), 1);
+        assert_eq!(Run::<Node>::EMPTY.start.get(), 1);
         assert!(nodes.rows.is_empty());
         assert_eq!(nodes.slice(Run::EMPTY), &[]);
         assert_eq!(nodes.view().slice(Run::EMPTY), &[]);
-        assert!(Run::<Alpha>::EMPTY.is_empty());
-        assert_eq!(Run::<Alpha>::EMPTY.len(), 0);
+        assert!(Run::<Node>::EMPTY.is_empty());
+        assert_eq!(Run::<Node>::EMPTY.len(), 0);
     }
 
     #[test]
@@ -1825,10 +1770,6 @@ mod tests {
     /// minimum capacity: the band where an amortized reserve after a push sizes past a flush.
     #[derive(Clone, Copy)]
     struct WideRow([u8; 160]);
-
-    impl Row for WideRow {
-        type Family = WideRow;
-    }
 
     #[test]
     fn a_wide_run_pushed_as_one_primes_as_a_one_row_flush_does() {
@@ -1912,15 +1853,11 @@ mod tests {
     #[test]
     fn every_flush_places_the_same_rows() {
         const NAMES: [&str; 5] = ["a", "b", "c", "d", "e"];
-        type Rows = Vec<Node<'static>>;
+        type Rows = Vec<Node>;
         fn flushed(
             written: bool,
             len: usize,
-            flush: impl FnOnce(
-                &mut ListBuf<Node<'static>>,
-                ListMark<Alpha>,
-                &mut Store<Node<'static>>,
-            ) -> Run<Alpha>,
+            flush: impl FnOnce(&mut ListBuf<Node>, ListMark<Node>, &mut Store<Node>) -> Run<Node>,
         ) -> (Rows, (u32, usize), Rows) {
             let mut nodes = store();
             if written {
@@ -1949,7 +1886,7 @@ mod tests {
                 let run = if len > 0 {
                     (u32::try_from(rows_before).unwrap(), len)
                 } else {
-                    (Run::<Alpha>::EMPTY.start.get(), 0)
+                    (Run::<Node>::EMPTY.start.get(), 0)
                 };
                 let expected = (rows, run, vec![Node("below")]);
                 assert_eq!(
@@ -1971,21 +1908,21 @@ mod tests {
         let mut nodes = store();
         let a = nodes.push(Node("a"));
         let b = nodes.push(Node("b"));
-        let mut ids: Store<Id<Alpha>> = Store::new();
+        let mut ids: Store<Id<Node>> = Store::new();
         let mut scratch = ListBuf::new();
         let mark = scratch.mark();
         scratch.push(a);
         scratch.push(b);
-        let run: Run<Id<Alpha>> = scratch.flush_copy(mark, &mut ids);
+        let run: Run<Id<Node>> = scratch.flush_copy(mark, &mut ids);
         assert_eq!(ids.slice(run), &[a, b]);
 
         // A list with holes is the same store shape over an `Option` of the id.
-        let mut holes: Store<Option<Id<Alpha>>> = Store::new();
+        let mut holes: Store<Option<Id<Node>>> = Store::new();
         let mut scratch = ListBuf::new();
         let mark = scratch.mark();
         scratch.push(Some(a));
         scratch.push(None);
-        let run: Run<Option<Id<Alpha>>> = scratch.flush_copy(mark, &mut holes);
+        let run: Run<Option<Id<Node>>> = scratch.flush_copy(mark, &mut holes);
         assert_eq!(holes.slice(run), &[Some(a), None]);
     }
 
@@ -2127,9 +2064,9 @@ mod tests {
 
     #[test]
     fn a_group_mark_is_the_checked_mark() {
-        let mut scratch: ListBuf<Node<'_>> = ListBuf::new();
+        let mut scratch: ListBuf<Node> = ListBuf::new();
         scratch.push(Node("a"));
-        let mut deeper: ListBuf<Node<'_>> = ListBuf::new();
+        let mut deeper: ListBuf<Node> = ListBuf::new();
         deeper.push(Node("b"));
         deeper.push(Node("c"));
         let mut group = MarkGroup::new();
@@ -2143,7 +2080,7 @@ mod tests {
 
     #[test]
     fn a_group_mark_keeps_a_height_past_sixteen_bits() {
-        let mut scratch: ListBuf<Node<'_>> = ListBuf::new();
+        let mut scratch: ListBuf<Node> = ListBuf::new();
         for _ in 0..=u16::MAX {
             scratch.push(Node("a"));
         }
@@ -2368,7 +2305,7 @@ mod tests {
 
     #[test]
     fn a_pop_on_a_never_written_buffer_is_none() {
-        let mut scratch: ListBuf<Node<'static>> = ListBuf::new();
+        let mut scratch: ListBuf<Node> = ListBuf::new();
         let mark = scratch.mark();
         assert_eq!(scratch.pop(mark), None);
         assert_eq!(scratch.items.capacity(), 0);
@@ -2723,7 +2660,7 @@ mod tests {
         assert_eq!(texts(&nodes, outer_run), ["a", "e"]);
     }
 
-    fn run_of(nodes: &mut Store<Node<'static>>, words: &[&'static str]) -> Run<Alpha> {
+    fn run_of(nodes: &mut Store<Node>, words: &[&'static str]) -> Run<Node> {
         let mut scratch = ListBuf::new();
         let mark = scratch.mark();
         for &word in words {
@@ -2746,7 +2683,7 @@ mod tests {
         for at in 0..=4 {
             assert_eq!(run.sub_run(at..at), Run::EMPTY);
         }
-        assert_eq!(Run::<Alpha>::EMPTY.sub_run(0..0), Run::EMPTY);
+        assert_eq!(Run::<Node>::EMPTY.sub_run(0..0), Run::EMPTY);
         let tail = run.sub_run(1..4);
         assert_eq!(texts(&nodes, tail.sub_run(1..3)), ["c", "d"]);
     }
@@ -2780,7 +2717,7 @@ mod tests {
         let row = nodes.get(first);
         assert!(nodes.holds_address((&raw const *row).addr()));
         let row = nodes.get(last);
-        let end = (&raw const *row).addr() + size_of::<Node<'static>>();
+        let end = (&raw const *row).addr() + size_of::<Node>();
         assert!(nodes.holds_address(end - 1));
         assert!(!nodes.holds_address(end));
         let copy = *nodes.get(last);
@@ -2810,7 +2747,7 @@ mod tests {
             scratch.flush_copy(mark, &mut nodes);
         }
 
-        fn two_row_store() -> (Store<Node<'static>>, Id<Alpha>) {
+        fn two_row_store() -> (Store<Node>, Id<Node>) {
             let mut nodes = store();
             nodes.push(Node("a"));
             let id = nodes.push(Node("b"));
@@ -2835,7 +2772,7 @@ mod tests {
             other.get(id);
         }
 
-        fn run_of_two() -> (Store<Node<'static>>, Run<Alpha>) {
+        fn run_of_two() -> (Store<Node>, Run<Node>) {
             let mut nodes = store();
             let mut scratch = ListBuf::new();
             let mark = scratch.mark();

@@ -65,13 +65,13 @@ tsv_lang::value_runs! {
     /// An attribute's or a style directive's value parts: [`AttributeValue`] rows.
     attribute_values, attribute_value_scratch: AttributeValue => attribute_values;
     /// The spans of a directive's modifiers: [`Span`] rows.
-    modifiers, modifier_scratch: Span as Row => modifiers;
+    modifiers, modifier_scratch: Span => modifiers;
     /// The wire's parameter lists of the `{#snippet}` heads that hold a grouping pair:
     /// [`SnippetWireParameters`] rows.
     wire_params, wire_param_scratch: SnippetWireParameters => wire_params;
 }
 
-// Every list is a `Run<F>`, which lays out alike for every family `F`, and an absent list folds
+// Every list is a `Run<T>`, which lays out alike for every row type `T`, and an absent list folds
 // into the run's start.
 #[cfg(test)]
 const _: () = {

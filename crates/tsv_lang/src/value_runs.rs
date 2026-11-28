@@ -11,7 +11,7 @@
 //! one entry per element type, so the crates that hold such lists declare them alike and none
 //! copies the plumbing.
 
-use crate::store::{ListBuf, Row, Store, TextPool};
+use crate::store::{ListBuf, Store, TextPool};
 
 /// Declares a language crate's value-run stores: a struct holding one [`Store`] and one
 /// scratch stack ([`ListBuf`]) per element type, a struct of the scratch stacks' marks, and
@@ -28,7 +28,7 @@ use crate::store::{ListBuf, Row, Store, TextPool};
 ///     /// Declarators, the `a = 1` of `let a = 1`.
 ///     declarators, declarator_scratch: VariableDeclarator => declarators;
 ///     /// The spans of a selector's parts.
-///     part_spans, part_span_scratch: Span as Row => part_spans;
+///     part_spans, part_span_scratch: Span => part_spans;
 ///     /// Tokens no reader asks for.
 ///     tokens, token_scratch: Token;
 /// }
@@ -50,8 +50,8 @@ use crate::store::{ListBuf, Row, Store, TextPool};
 ///   `, mint AstStores.runs => sealed::ListStore, sealed::Seal`: the caller's stores type that
 ///   holds the generated struct and the field holding it, then a trait of the caller's and the
 ///   type of its seal argument. Per entry the macro writes
-///   `impl ListStore for Row` with the trait's one method, `split(stores: &mut AstStores, _:
-///   Seal) -> (&mut Store<Row>, &mut ListBuf<Row>)`, the entry's store and scratch stack
+///   `impl ListStore for T` with the trait's one method, `split(stores: &mut AstStores, _:
+///   Seal) -> (&mut Store<T>, &mut ListBuf<T>)`, the entry's store and scratch stack
 ///   borrowed apart — so a write surface the caller seals behind that trait reaches every
 ///   entry, one added later included, without a line of its own. A caller with no such
 ///   surface leaves the clause out.
@@ -59,15 +59,10 @@ use crate::store::{ListBuf, Row, Store, TextPool};
 /// Each entry names a store field, its scratch stack's field and the element type; its doc
 /// comment documents the store field. An element type has one entry: a second store of the
 /// same type would mint runs the first one's accessor also takes. An attribute on an entry
-/// goes on the store field alone, so an entry cannot be `cfg`-gated. Two parts of an entry
-/// are optional:
-///
-/// - `as Row` after the type says the type states its family itself, so the macro writes no
-///   [`Row`] impl for it: a type another crate owns (a span, an id, a pool handle), or one
-///   that is a row of another store too. Without it the macro makes the type its own family
-///   (`impl Row for T { type Family = Self; }`), so its lists are `Run<T>`;
-/// - `=> name` declares the view accessor `name`, which reads one list as a slice. Without it
-///   no reader reaches the store through the view.
+/// goes on the store field alone, so an entry cannot be `cfg`-gated. An entry's lists are
+/// `Run<T>` of its element type `T`, whichever crate owns the type (a span, an id, a pool
+/// handle). Its optional `=> name` declares the view accessor `name`, which reads one list as
+/// a slice; without it no reader reaches the store through the view.
 ///
 /// The stores struct gets `new` (allocating nothing), `reset` (every store and scratch stack
 /// rewound in place, capacity kept), `capacity_bytes` (the bytes every store's and scratch
@@ -76,7 +71,7 @@ use crate::store::{ListBuf, Row, Store, TextPool};
 /// address lies in the rows of one of the stores, the store-range guard's read), and, in a
 /// build with debug assertions, `scratch_is_empty`. A test build of the caller also gets `shapes`, every
 /// field's [`FieldShape`] in declaration order, and `FIELDS`, the store fields' names. The
-/// macro places no bound on an element type beyond [`Row`]: which flush a list takes
+/// macro places no bound on an element type: which flush a list takes
 /// (`ListBuf::flush_copy` or `flush_copy_short`) is the choice of the code that builds it.
 ///
 /// A scratch stack with no store (a buffer framed and truncated, never flushed) is not a value
@@ -102,13 +97,9 @@ macro_rules! value_runs {
             $(, mint $Outer:ident . $outer_field:ident => $Mint:path, $Seal:ty)?;
         $(
             $(#[$m:meta])*
-            $field:ident, $scratch:ident : $Row:ty $(as $stated:ident)? $(=> $acc:ident)?;
+            $field:ident, $scratch:ident : $Row:ty $(=> $acc:ident)?;
         )*
     ) => {
-        $(
-            $crate::__value_runs_family!($Row $(, $stated)?);
-        )*
-
         $crate::__value_runs_mint! {
             $($Outer . $outer_field => $Mint, $Seal)?;
             $($field, $scratch : $Row;)*
@@ -127,7 +118,7 @@ macro_rules! value_runs {
         $(#[$marks_meta])*
         #[derive(Clone, Copy)]
         $marks_vis struct $Marks {
-            $($field: $crate::store::ListMark<<$Row as $crate::store::Row>::Family>,)*
+            $($field: $crate::store::ListMark<$Row>,)*
         }
 
         impl $Stores {
@@ -220,7 +211,7 @@ macro_rules! value_runs {
                 #[inline]
                 $acc_vis fn $acc(
                     self,
-                    run: $crate::store::Run<<$Row as $crate::store::Row>::Family>,
+                    run: $crate::store::Run<$Row>,
                 ) -> &'a [$Row] {
                     self.$reach().$field.slice(run)
                 }
@@ -254,19 +245,6 @@ macro_rules! __value_runs_mint {
     };
 }
 
-/// [`value_runs!`](crate::value_runs!)'s statement of one element type's family: the type as
-/// its own family, or nothing for a type an entry marks `as Row`, which states it elsewhere.
-#[doc(hidden)]
-#[macro_export]
-macro_rules! __value_runs_family {
-    ($Row:ty) => {
-        impl $crate::store::Row for $Row {
-            type Family = Self;
-        }
-    };
-    ($Row:ty, Row) => {};
-}
-
 /// What a test reads of one store, scratch stack or pool: its length and its capacity.
 ///
 /// A store set lists one per field (the `shapes` a [`value_runs!`](crate::value_runs!) struct
@@ -297,7 +275,7 @@ pub enum FieldKind {
 
 impl FieldShape {
     /// The shape of `store`, the field `name`.
-    pub fn store<T: Row>(name: &'static str, store: &Store<T>) -> Self {
+    pub fn store<T>(name: &'static str, store: &Store<T>) -> Self {
         Self {
             name,
             kind: FieldKind::Store,
@@ -420,7 +398,7 @@ pub fn assert_rejected_under_the_store_check(read: impl FnOnce()) {
 mod tests {
     use super::{FieldKind, FieldShape, assert_every_field_written, assert_rewound};
     use crate::Span;
-    use crate::store::{ListBuf, MarkGroup, PoolText, Row, Run, Store, TextPool};
+    use crate::store::{ListBuf, MarkGroup, PoolText, Run, Store, TextPool};
 
     /// The family of the toy pool.
     enum Words {}
@@ -475,10 +453,10 @@ mod tests {
         branches, branch_scratch: Branch => branches;
         /// Rows with no accessor.
         tokens, token_scratch: Token;
-        /// Rows whose type states its family itself.
-        spans, span_scratch: Span as Row => spans;
-        /// Rows that are handles of the pool, a generic type whose family is stated beside it.
-        names, name_scratch: PoolText<Words> as Row => names;
+        /// Rows of a type another crate owns.
+        spans, span_scratch: Span => spans;
+        /// Rows that are handles of the pool, a generic type.
+        names, name_scratch: PoolText<Words> => names;
     }
 
     /// The seal argument of [`ToySplit`], standing in for a language crate's unconstructible
@@ -492,7 +470,7 @@ mod tests {
 
     /// `items` as one run of `T`'s store, through the store and scratch stack the `mint` clause
     /// hands out.
-    fn push_list<T: ToySplit + Row + Copy>(stores: &mut ToyStores, items: &[T]) -> Run<T::Family> {
+    fn push_list<T: ToySplit + Copy>(stores: &mut ToyStores, items: &[T]) -> Run<T> {
         let (store, scratch) = T::split(stores, ToySeal);
         let mark = scratch.mark();
         scratch.extend_from_slice(items);

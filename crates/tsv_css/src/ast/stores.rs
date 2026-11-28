@@ -65,7 +65,7 @@ tsv_lang::value_runs! {
     /// A relative selector's compound, its simple selectors: [`SimpleSelector`] rows.
     simple_selectors, simple_selector_scratch: SimpleSelector => simple_selectors;
     /// The spans of a `::part()` argument's names: [`Span`] rows.
-    part_spans, part_span_scratch: Span as Row => part_spans;
+    part_spans, part_span_scratch: Span => part_spans;
     /// A condition query's parts: [`ConditionPart`] rows.
     condition_parts, condition_part_scratch: ConditionPart => condition_parts;
     /// A condition part's segments: [`ConditionSegment`] rows.
@@ -75,7 +75,7 @@ tsv_lang::value_runs! {
     values, value_scratch: CssValue => values;
 }
 
-// Every list is a `Run<F>`, which lays out alike for every family `F`, and an absent list folds
+// Every list is a `Run<T>`, which lays out alike for every row type `T`, and an absent list folds
 // into the run's start.
 #[cfg(test)]
 const _: () = {

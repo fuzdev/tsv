@@ -36,7 +36,7 @@ use tsv_lang::store::{Id, ListBuf, ListMark, PoolText, Run, Store};
 use super::{AstStores, Comment, ExprId, Expression, Statement, StmtId, Text};
 
 pub(super) mod sealed {
-    use tsv_lang::store::{ListBuf, Row, Store};
+    use tsv_lang::store::{ListBuf, Store};
 
     use super::super::AstStores;
 
@@ -50,14 +50,13 @@ pub(super) mod sealed {
     }
 
     /// A row pushed one at a time: its store.
-    pub trait RowStore: Copy + Row<Family = Self> {
+    pub trait RowStore: Copy {
         /// The store this row type is pushed into.
         fn store(stores: &mut AstStores, seal: Seal) -> &mut Store<Self>;
     }
 
-    /// A list element, its own family as every list element type is: its store and the
-    /// scratch stack that builds its runs, borrowed apart.
-    pub trait ListStore: Copy + Row<Family = Self> {
+    /// A list element: its store and the scratch stack that builds its runs, borrowed apart.
+    pub trait ListStore: Copy {
         /// The store this element type's runs live in and the scratch stack that builds them.
         fn split(stores: &mut AstStores, seal: Seal) -> (&mut Store<Self>, &mut ListBuf<Self>);
     }
@@ -285,10 +284,10 @@ mod tests {
         assert_eq!(stores.view().text(empty), "");
     }
 
-    /// `push_list` builds a run of every list family, read back in order, and an empty slice
-    /// is the empty run.
+    /// `push_list` builds a run of every list element type, read back in order, and an empty
+    /// slice is the empty run.
     #[test]
-    fn push_list_builds_a_run_of_every_family() {
+    fn push_list_builds_a_run_of_every_element_type() {
         let mut stores = AstStores::new();
         let source = "// c\nf(a, b); let x = 1, y = 2; [p, , q]; (m, n) => m;";
         let program = parse(source, &mut stores);
@@ -349,8 +348,8 @@ mod tests {
 
     /// The lazy-prefix rebuild a rewriter runs over a value run: the first changed element
     /// opens the frame and copies the unchanged prefix in one block, later elements are pushed
-    /// as they come, a nested frame of the same family opened and flushed inside the rebuild
-    /// leaves the outer frame intact, and the rebuilt list prints as its source would.
+    /// as they come, a nested frame of the same element type opened and flushed inside the
+    /// rebuild leaves the outer frame intact, and the rebuilt list prints as its source would.
     #[test]
     fn a_lazy_prefix_rebuild_of_a_value_run_keeps_the_prefix_and_suffix() {
         let mut stores = AstStores::new();
@@ -366,7 +365,7 @@ mod tests {
         for i in 0..run.len() {
             let item = stores.view().declarators(run)[i];
             if i == 1 {
-                // the element's own rewrite builds a list of the same family, opened and
+                // the element's own rewrite builds a list of the same element type, opened and
                 // flushed before the outer frame exists
                 let mark = open::<VariableDeclarator>(&mut stores);
                 push_item(&mut stores, item);

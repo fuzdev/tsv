@@ -1082,10 +1082,10 @@ self-referential ownership — `unsafe_code = "forbid"`). Identifier and element
 names are **span-identity** — recovered from `source[span]` at each consumer, with the rare
 escaped name carried as pool text — so no name-table lifetime lands on the AST or the parser.
 
-**A handle is checked for its family and its bounds, and for nothing else.** An id, a run or a
+**A handle is checked for its type and its bounds, and for nothing else.** An id, a run or a
 pool handle means something only to the stores that minted it, and only until they reset (a
-park resets them). The type system refuses a handle of the wrong family, and a read past the
-store's end fails; a same-family id kept past a reset, or minted by another document's stores,
+park resets them). The type system refuses a handle of the wrong row type (or pool family),
+and a read past the store's end fails; a same-type id kept past a reset, or minted by another document's stores,
 that lands in bounds reads some other row, silently, in every ordinary build. Only the `_internal_store_check` feature (in the `_internal_audits`
 umbrella; `tsv_lang::store::STORE_CHECK` says whether a build carries it) catches either, by
 stamping an instance and a generation on every store, pool and handle and comparing them on

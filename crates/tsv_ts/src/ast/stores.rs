@@ -42,7 +42,7 @@ use std::fmt;
 use std::ops::Deref;
 
 use tsv_lang::store::park::{self, Parkable, Warm};
-use tsv_lang::store::{Id, ListBuf, ListMark, MarkGroup, PoolText, Row, Run, Store, TextPool};
+use tsv_lang::store::{Id, ListBuf, ListMark, MarkGroup, PoolText, Run, Store, TextPool};
 #[cfg(test)]
 use tsv_lang::value_runs::{FieldKind, FieldShape};
 
@@ -60,10 +60,6 @@ use super::{
     TryStatement, VariableDeclarator,
 };
 
-impl Row for Expression {
-    type Family = Self;
-}
-
 /// A handle to one [`Expression`] row.
 pub type ExprId = Id<Expression>;
 
@@ -75,10 +71,6 @@ const _: () = {
     assert!(STORE_CHECK || size_of::<Run<ExprId>>() == 8);
 };
 
-impl Row for Statement {
-    type Family = Self;
-}
-
 /// A handle to one [`Statement`] row.
 pub type StmtId = Id<Statement>;
 
@@ -89,10 +81,6 @@ const _: () = {
     assert!(STORE_CHECK || size_of::<Option<StmtId>>() == 4);
     assert!(STORE_CHECK || size_of::<Run<StmtId>>() == 8);
 };
-
-impl Row for TSType {
-    type Family = Self;
-}
 
 /// A handle to one [`TSType`] row.
 pub type TyId = Id<TSType>;
@@ -119,9 +107,9 @@ const _: () = {
     assert!(STORE_CHECK || size_of::<Option<Run<Comment>>>() == 8);
 };
 
-/// Declares the payload stores. Per entry: the row type as its own family and the id the tree
-/// holds, a [`PayloadStores`] field, that field's lines in `new` and `reset`, and the
-/// [`AstView`] accessor that resolves one id. The entry's doc comment documents the field.
+/// Declares the payload stores. Per entry: the id the tree holds, a [`PayloadStores`] field,
+/// that field's lines in `new` and `reset`, and the [`AstView`] accessor that resolves one id.
+/// The entry's doc comment documents the field.
 macro_rules! payload_stores {
     (
         $(
@@ -130,10 +118,6 @@ macro_rules! payload_stores {
         )*
     ) => {
         $(
-            impl Row for $Row {
-                type Family = Self;
-            }
-
             impl super::mint::sealed::RowStore for $Row {
                 #[inline]
                 fn store(
@@ -326,7 +310,7 @@ tsv_lang::value_runs! {
     decorators, decorator_scratch: Decorator => decorators;
 }
 
-// Every value run is a `Run<F>`, which lays out alike for every family `F`, and an absent
+// Every value run is a `Run<T>`, which lays out alike for every row type `T`, and an absent
 // list (the decorators', an import's attributes) folds into the run's start.
 #[cfg(test)]
 const _: () = {
@@ -335,7 +319,7 @@ const _: () = {
     assert!(STORE_CHECK || size_of::<Option<Run<Decorator>>>() == 8);
 };
 
-// Every payload id is an `Id<F>`, which lays out alike for every family `F`.
+// Every payload id is an `Id<T>`, which lays out alike for every row type `T`.
 #[cfg(test)]
 const _: () = {
     use tsv_lang::store::STORE_CHECK;
