@@ -2145,8 +2145,8 @@ compare, so legit reformatting doesn't read as corruption.
 - read_error, format_error, canonical_rejects_input and canonical_diverges_on_input — skips
   that carry no verdict.
 
-The gate buckets read zero on real formatted code; the divergent bucket there holds a handful
-of template files where a whitespace Text node appears or vanishes beside a BLOCK element —
+The gate buckets read zero on real formatted code; the divergent bucket there holds only
+template files where a whitespace Text node appears or vanishes beside a BLOCK element —
 real document drift for this audit's deliberately narrower question (see `render_browser`'s
 module doc), render-free for the compiler (`render:audit` grades the same files equivalent) —
 so point it at the delimiter-dense prettier suites for the work-list.
@@ -2204,12 +2204,11 @@ Corrections, the `:nth-child(… of …)` selectors and the consecutive combinat
 Corrections, the entity decodings under §Entity Decoding Corrections — and in every one of
 them tsc, prettier, or the spec grades tsv right and the canonical parser wrong.
 
-It stays **tight**, which is the property that makes it safe: a handful of `tests/fixtures`
-files, a couple of the files the pinned prettier suites walk (and of all of
-`../prettier/tests/format`), and **none** in the `../corpora` snapshot. All but two of the
-fixture hits sit in fixture directories whose own `_svelte_divergence` /
-`_svelte_prettier_divergence` suffix already declares the parse divergence, so the census
-rediscovers the declared set from the other side. The two that do not are
+It stays **tight**, which is the property that makes it safe: its fixture hits sit in
+fixture directories whose own `_svelte_divergence` / `_svelte_prettier_divergence` suffix
+already declares the parse divergence, save the two variant-only cases below, so the census
+rediscovers the declared set from the other side; the pinned prettier suites reach it only
+rarely. The two variant-only cases are
 [class/abstract/export_default_line_break](../tests/fixtures/typescript/declarations/class/abstract/export_default_line_break/)
 and [class/modifier_line_break](../tests/fixtures/typescript/declarations/class/modifier_line_break/),
 where the divergence is reachable only from an `unformatted_*` **variant** — and a variant

@@ -132,7 +132,7 @@ pub(crate) fn document_ts_flag(
 }
 
 /// The oracle's parse-time `<script>` attribute rules, all raised in one
-/// source-order loop (`1-parse/read/script.js:48-79`, first error wins):
+/// source-order loop (`read_script` in `1-parse/read/script.js`, first error wins):
 ///
 /// - **`script_reserved_attribute`** — the FIRST check: a `<script>` attribute
 ///   named `server`, `client`, `worker`, `test`, or `default` (the oracle's

@@ -316,7 +316,7 @@ const RUNE_KEYPATHS: &[&str] = &[
 ];
 
 /// The rune keypath of a call the oracle's `rune_invalid_spread`
-/// (`2-analyze/visitors/CallExpression.js:24`) rejects: a rune call — any rune but
+/// (`2-analyze/visitors/CallExpression.js`) rejects: a rune call — any rune but
 /// `$inspect` — carrying a `SpreadElement` argument. `None` otherwise. The oracle
 /// runs this on EVERY call before its rune dispatch, so the caller must walk the
 /// whole component (script + template), not just recognized rune positions.

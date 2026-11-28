@@ -385,7 +385,7 @@ fn collect_nested_declared(view: AstView<'_>, pattern: &Expression, ctx: &mut Wa
 }
 
 /// Refuse a `$`-prefixed **binding name** — the oracle's `dollar_prefix_invalid`
-/// (`phases/2-analyze/visitors/shared/utils.js:278`, literally
+/// (`validate_identifier_name` in `phases/scope.js`, literally
 /// `node.name.startsWith('$')` on a `Binding`).
 ///
 /// This is the rule that separates the two `$$slots` positions, and it is the
@@ -395,25 +395,25 @@ fn collect_nested_declared(view: AstView<'_>, pattern: &Expression, ctx: &mut Wa
 /// compile error. The rule is Svelte-domain, not a JS early error — `let $$slots
 /// = 1` is valid JS.
 ///
-/// **The oracle reaches `validate_identifier_name` from FOUR sites, and only two
-/// of them pass `function_depth`** — so "oracle-rejected" is not one answer for
-/// the six guarded positions. Checked against every call path:
+/// **The oracle reaches `validate_identifier_name` from FOUR sites, and only one
+/// of them (`declare` in `scope.js`) passes `function_depth`** — so
+/// "oracle-rejected" is not one answer for the six guarded positions. Checked against every call path:
 ///
 /// | call path | passes `function_depth`? | positions |
 /// | --- | --- | --- |
-/// | `VariableDeclarator.js:25`, `FunctionDeclaration.js:12`, `ClassDeclaration.js:12` | **no** — so `!function_depth` short-circuits and the gate never applies | a declarator's binding leaves (any depth, any declaration kind, destructured or not), a function-declaration id, a class-declaration id |
-/// | `scope.js:695` (`Scope::declare`) | **yes** — the `function_depth <= 1` gate DOES apply | a function-expression id, a catch-clause parameter, an import specifier's local |
+/// | `VariableDeclarator.js`, `FunctionDeclaration.js`, `ClassDeclaration.js` | **no** — so `!function_depth` short-circuits and the gate never applies | a declarator's binding leaves (any depth, any declaration kind, destructured or not), a function-declaration id, a class-declaration id |
+/// | `scope.js` (`Scope::declare`) | **yes** — the `function_depth <= 1` gate DOES apply | a function-expression id, a catch-clause parameter, an import specifier's local |
 ///
 /// **Unconditionally oracle-rejected** (probe-verified against the pinned
 /// compiler): the three no-depth positions above, plus an **import specifier's
 /// local** — which goes through the depth-passing path but is safe by a
-/// different mechanism, `scope.js:680` re-delegating `declaration_kind ===
+/// different mechanism, `declare` in `scope.js` re-delegating `declaration_kind ===
 /// 'import'` to the parent scope, so an import binding always lands at
 /// `function_depth` 0 however deeply it is written.
 ///
 /// ⚠️ **Two positions are oracle-rejected only at the top level, and tsv refuses
 /// them unconditionally — a deliberate over-refusal.** A **function-expression
-/// id** and a **catch-clause parameter** both declare through `scope.js:695`,
+/// id** and a **catch-clause parameter** both declare through `declare` in `scope.js`,
 /// and the instance script's top-level scope sits at `function_depth` 1, so the
 /// oracle rejects them there and *accepts* them inside any function body
 /// (probe-verified both directions: `const g = function $$slots() {}` and `catch
@@ -423,7 +423,7 @@ fn collect_nested_declared(view: AstView<'_>, pattern: &Expression, ctx: &mut Wa
 /// Narrowing them would need the oracle's depth, which tsv does not have:
 /// [`WalkCtx::fn_depth`] counts function *nodes*, while the oracle's
 /// non-porous increment happens at a function's **`BlockStatement`**
-/// (`scope.js:1174-1188`) — a `FunctionExpression` / `ArrowFunctionExpression`
+/// (`scope.js`) — a `FunctionExpression` / `ArrowFunctionExpression`
 /// scope is itself `child(true)`, porous. So an expression-bodied arrow does not
 /// increment the oracle's depth and does increment tsv's: `const h = () =>
 /// function $$slots() {}` is oracle-**rejected**, and a `fn_depth == 0` gate here
@@ -580,21 +580,21 @@ pub(crate) fn refuse_dollar_binding_name(
 ///
 /// An import's local IS a binding (`declaration_kind: 'import'`), and the
 /// oracle's message names it too ("cannot be used for variables and imports").
-/// Unlike the other `scope.js:695` positions it is depth-INDEPENDENT:
-/// `scope.js:680` re-delegates an `import` declaration to the parent scope, so
+/// Unlike the other `declare` in `scope.js` positions it is depth-INDEPENDENT:
+/// `declare` in `scope.js` re-delegates an `import` declaration to the parent scope, so
 /// the binding always lands at `function_depth` 0 and the `function_depth <= 1`
 /// gate always passes.
 ///
-/// ⚠️ The oracle EXEMPTS a type-only import from the rule (`utils.js:270-276`:
-/// an `importKind === 'type'` binding is skipped), and this does not — it
-/// refuses every local unconditionally. tsv still reaches parity on
-/// `import type { $T }` and `import { type $T }` (probe-verified) for a reason
-/// this rule does not state: TYPE ERASURE runs first and strips both forms
-/// before any import arrives here, so the exempt case is unreachable rather than
-/// handled. That is a pass-ordering fact, not a property of this check — if
-/// erasure ever stopped removing a type-only import (or a non-`lang="ts"` path
-/// grew one), this would over-refuse it and the exemption would have to be
-/// implemented for real.
+/// ⚠️ The oracle EXEMPTS a type-only import from the rule
+/// (`validate_identifier_name` in `scope.js`: an `importKind === 'type'` binding
+/// is skipped), and this does not — it refuses every local unconditionally. tsv
+/// still reaches parity on `import type { $T }` and `import { type $T }`
+/// (probe-verified) for a reason this rule does not state: TYPE ERASURE runs
+/// first and strips both forms before any import arrives here, so the exempt
+/// case is unreachable rather than handled. That is a pass-ordering fact, not a
+/// property of this check — if erasure ever stopped removing a type-only import
+/// (or a non-`lang="ts"` path grew one), this would over-refuse it and the
+/// exemption would have to be implemented for real.
 ///
 /// Two callers, because imports are validated on two paths: [`walk_statement`]
 /// here, and `script_bindings::refuse_runes_invalid_import`, for the imports the

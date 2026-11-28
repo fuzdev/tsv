@@ -1200,13 +1200,13 @@ themselves; asking that question of the *document's word* (`swar::next_byte_belo
 the host-range form: the region's bytes and a lane past its end ignored) ahead of the
 call read a further **−0.45%**. And the CSS wire writer's three JS-`\s` trims a
 declaration — the space after the colon the one byte trimmed among them — took the byte
-bodies the comment seams had landed the session before: **−0.59% of the wire pass**, `+0`
+bodies the comment seams had already landed: **−0.59% of the wire pass**, `+0`
 on the format path. The rung that did NOT pay was the one that measured a pooled text's
 width on the host's word: `text_pooled_in(span, source)` at the three sites that own a
 source slice read **+0.13%** against the tree beneath it — the width was never the price
 of those pooled texts.
 
-The next session took the row that board had left on top, `text_pooled` at 2% of the
+The following rung took the row that board had left on top, `text_pooled` at 2% of the
 cell, and read it as what it is — a copy and an allocation, not a measure. Three of the
 CSS printer's pooled texts are slices of the document itself (the simple-selector leaf,
 the pseudo name, the function name), and a `source_span` node renders them identically

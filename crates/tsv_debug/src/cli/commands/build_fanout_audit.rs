@@ -871,7 +871,7 @@ const CONSTRUCTS: &[Construct] = &[
         name: "ts_call_chain",
         parser: ParserType::TypeScript,
         generate: gen_ts_chain,
-        depths: &[2, 4, 6],
+        depths: &[4, 8, 12],
     },
     Construct {
         name: "ts_ternary_nested",

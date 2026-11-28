@@ -61,11 +61,11 @@ enum StemInit {
 /// lines later, so the collision can flip the whole component out of runes mode.
 ///
 /// ⚠️ **`instance.scope.get` walks UP the scope chain**
-/// (`phases/scope.js:748` — `this.declarations.get(name) ?? this.parent?.get(name)
+/// (`phases/scope.js` — `this.declarations.get(name) ?? this.parent?.get(name)
 /// ?? null`), and the instance scope's parent is the MODULE scope
-/// (`2-analyze/index.js:337` — `js(root.instance, scope_root, true, module.scope)`).
-/// So a `<script module>` binding of the stem reclassifies an instance-script
-/// `$stem` too, and both bodies are searched here, instance first.
+/// (`analyze_component` in `2-analyze/index.js` — `js(root.instance, scope_root,
+/// true, module.scope)`). So a `<script module>` binding of the stem reclassifies an
+/// instance-script `$stem` too, and both bodies are searched here, instance first.
 ///
 /// It walks up only. **Downward** — a function parameter named `state`, a
 /// block-scoped `let state`, a name bound in a nested FUNCTION body — is a CHILD
@@ -75,7 +75,7 @@ enum StemInit {
 /// - a **`var`** anywhere below the top level except inside a function: it is
 ///   function-scoped, so a `var state` in any block, for-head, switch, or
 ///   try/catch of the script lands in `instance.scope`. But it arrives
-///   **stripped of its initializer** — `scope.js:673-681` re-declares it on the
+///   **stripped of its initializer** — `declare` in `scope.js` re-declares it on the
 ///   parent with the 4-argument `initial` left at its `null` default — so the
 ///   rune exemption below can never apply to one, whatever it was written with;
 /// - a statement in a **class STATIC BLOCK**, which is not a scope at all:

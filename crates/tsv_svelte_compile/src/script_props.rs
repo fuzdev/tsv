@@ -171,7 +171,7 @@ pub(crate) fn rewrite_props_pattern(
             // The properties, copied out: the rewrite below pushes as it walks them.
             let props = view.pat_props(obj.properties).to_vec();
             // The oracle's per-property validation of a `$props()` destructure
-            // (`2-analyze/visitors/VariableDeclarator.js:97-110`): three checks in
+            // (`2-analyze/visitors/VariableDeclarator.js`): three checks in
             // source order, first-wins (the oracle's `e.*` throws). Runs BEFORE the
             // rest/bindable short-circuit below so a plain destructure with neither
             // (`{ [x]: a }`, `{ $$slots: a }`, `{ a: { b } }`) still reaches it. A

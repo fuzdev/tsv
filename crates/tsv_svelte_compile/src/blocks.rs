@@ -658,7 +658,7 @@ pub(crate) fn emit_if_block(
 
 /// The one element position a single `animate:` directive is legal: the sole
 /// non-trivial child of a keyed `{#each}` body. Mirrors the oracle's phase-2
-/// placement check (`2-analyze/visitors/shared/element.js:93-108`): a keyed each
+/// placement check (`validate_element` in `2-analyze/visitors/shared/element.js`): a keyed each
 /// whose body has at most one child once `Comment`/`ConstTag`/`DeclarationTag`/
 /// whitespace-only `Text` are filtered out, and that child is a regular element.
 /// Returns that element (whose span the emitter matches) or `None`.

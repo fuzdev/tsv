@@ -171,8 +171,9 @@ fn compile_rejects_rune_inside_block() {
 #[test]
 fn compile_rejects_a_duplicate_snippet_name_in_a_nested_fragment() {
     // The oracle's snippet-name scope is the enclosing FRAGMENT
-    // (`phases/scope.js:1335` declares into `state.scope`), not the component, so
-    // the rule reaches every fragment — not just the root.
+    // (the `SnippetBlock` visitor in `phases/scope.js` declares into
+    // `state.scope`), not the component, so the rule reaches every fragment — not
+    // just the root.
     assert_unsupported(
         "<div>{#snippet a()}x{/snippet}{#snippet a()}y{/snippet}</div>",
         "duplicate {#snippet} a",
@@ -284,7 +285,7 @@ fn compile_places_a_nested_snippet_named_after_a_top_level_snippet() {
 
 #[test]
 fn compile_rejects_a_top_level_snippet_shadowing_a_script_declaration() {
-    // `declaration_duplicate` at `2-analyze/visitors/SnippetBlock.js:34` — the
+    // `declaration_duplicate` at `2-analyze/visitors/SnippetBlock.js` — the
     // OTHER call site of that oracle error code, snippet-vs-script.
     assert_unsupported(
         "<script>let foo = 'bar';</script>{#snippet foo()}baz{/snippet}",
@@ -295,7 +296,7 @@ fn compile_rejects_a_top_level_snippet_shadowing_a_script_declaration() {
 #[test]
 fn compile_accepts_a_top_level_snippet_named_after_an_import() {
     // The must-not-over-refuse companion: `Scope.declare` forwards an `import` to
-    // the PARENT scope (`phases/scope.js:679-681`), so an instance-script import
+    // the PARENT scope (`phases/scope.js`), so an instance-script import
     // lands in `module.scope.declarations` and is never in the
     // `instance.scope.declarations` `declaration_duplicate` tests. All four import
     // forms, live-probed — the oracle compiles each and emits the import.
@@ -349,7 +350,7 @@ fn snippet_script_duplicate_precedes_module_refusals() {
 
 #[test]
 fn compile_rejects_a_snippet_shadowing_a_component_prop() {
-    // `snippet_shadowing_prop` (`SnippetBlock.js:59`) — a plain attribute, and the
+    // `snippet_shadowing_prop` (`SnippetBlock.js`) — a plain attribute, and the
     // `BindDirective` arm beside it.
     assert_unsupported(
         "<C title=\"\">{#snippet title()}t{/snippet}</C>",
@@ -372,7 +373,7 @@ fn compile_accepts_the_shadowing_prop_rule_s_exemptions() {
 
 #[test]
 fn compile_rejects_a_children_snippet_beside_other_content() {
-    // `snippet_conflict` (`SnippetBlock.js:77`).
+    // `snippet_conflict` (`SnippetBlock.js`).
     assert_unsupported(
         "<Foo>hello{#snippet children()}hi{/snippet}</Foo>",
         "{#snippet children()} alongside other default content",
@@ -397,7 +398,7 @@ fn compile_non_hoistable_snippets_emit_in_recursive_direct_first_order() {
     // recursive-direct-first order, NOT document pre-order: a fragment's own
     // direct-child snippets (source order) precede its descendant elements'
     // snippets. Mirrors the oracle's push-order timing
-    // (Fragment.js:35-44 + RegularElement.js:229-231).
+    // (`Fragment.js` + `RegularElement.js`).
     //
     // `a` is a root snippet reading instance state `v` (not module-hoistable →
     // component body); `b` is nested in a `<div>` (never hoistable → bubbles to

@@ -8,7 +8,7 @@ const SLOT_IMPORT: &str = "<script>import N from './N.svelte';</script>";
 
 #[test]
 fn compile_duplicate_attribute_refuses() {
-    // The oracle's parse-time `attribute_duplicate` (`1-parse/state/element.js:250`)
+    // The oracle's parse-time `attribute_duplicate` (`1-parse/state/element.js`)
     // — a rule tsv did not enforce, so these all compiled. Each of the three
     // participating attribute kinds keys separately.
     assert_unsupported("<div id=\"a\" id=\"b\"></div>", "duplicate");
@@ -80,7 +80,7 @@ fn compile_root_only_meta_tag_placement_is_parse_rejected() {
 
 #[test]
 fn compile_unknown_svelte_meta_tag_is_parse_rejected() {
-    // The oracle's `svelte_meta_invalid_tag` (`element.js:142`): a `svelte:`-prefixed
+    // The oracle's `svelte_meta_invalid_tag` (`element.js`): a `svelte:`-prefixed
     // element whose name is not a known meta tag. It is raised at PARSE on both sides —
     // `meta_tags.has(name)` *is* the node-type decision, so accepting the tag would force
     // a fabricated `RegularElement` — which is why this crate carries no refusal for it:
@@ -215,9 +215,9 @@ fn compile_invalid_node_placement_gates_the_custom_element_reset_on_reset_by() {
 #[test]
 fn compile_refuses_an_invalid_attribute_name() {
     // The oracle's `attribute_invalid_name`
-    // (`2-analyze/visitors/shared/element.js:59`), whose regex has TWO alternatives:
-    // an illegal LEADING character, and an illegal character anywhere.
-    // Each shape below is live-verified oracle-REJECTED.
+    // (`validate_element` in `2-analyze/visitors/shared/element.js`), whose regex
+    // has TWO alternatives: an illegal LEADING character, and an illegal character
+    // anywhere. Each shape below is live-verified oracle-REJECTED.
 
     // Leading alternative — `^[0-9-.]`.
     assert_unsupported("<p 3aa=\"abc\">x</p>", "attribute name");
@@ -263,9 +263,9 @@ fn compile_does_not_apply_the_attribute_name_rule_to_components() {
 #[test]
 fn compile_refuses_an_event_handler_without_an_expression_value() {
     // The oracle's `attribute_invalid_event_handler`
-    // (`2-analyze/visitors/shared/element.js:64`): an `on…` attribute is legal only
-    // with a SINGLE-expression value. Each shape below is live-verified
-    // oracle-REJECTED.
+    // (`validate_element` in `2-analyze/visitors/shared/element.js`): an `on…`
+    // attribute is legal only with a SINGLE-expression value. Each shape below is
+    // live-verified oracle-REJECTED.
 
     // A text value — the sample the ratchet pinned.
     assert_unsupported("<button onclick=\"foo\">x</button>", "event handler");
@@ -300,7 +300,7 @@ fn compile_accepts_event_handlers_the_oracle_allows() {
 #[test]
 fn compile_refuses_an_unquoted_multichunk_attribute_value() {
     // The oracle's `attribute_unquoted_sequence` — the error half of
-    // `validate_attribute` (`2-analyze/visitors/shared/attribute.js:41-48`): an
+    // `validate_attribute` (`2-analyze/visitors/shared/attribute.js`): an
     // UNQUOTED value of two or more chunks must be quoted. Every shape below is
     // live-verified oracle-REJECTED (compile_corpus_compare over a probe dir
     // reported all as `attribute_unquoted_sequence` over-acceptances pre-fix).
@@ -322,7 +322,7 @@ fn compile_refuses_an_unquoted_multichunk_attribute_value() {
     );
     // ⚠️ Unlike the name/event-handler rules this is NOT element-only:
     // `validate_attribute` is called from the component visitor too
-    // (`shared/component.js:93`).
+    // (`visit_component` in `shared/component.js`).
     assert_unsupported(
         "<script>import F from './F.svelte';\n\tlet b = $state('y');</script><F x=a{b} />",
         "must be quoted",
@@ -369,9 +369,10 @@ fn compile_orders_attribute_rules_per_attribute_like_the_oracle() {
 #[test]
 fn compile_refuses_an_unparenthesized_sequence_expression_attribute() {
     // The oracle's `attribute_invalid_sequence_expression`
-    // (`2-analyze/visitors/shared/element.js:52`, `shared/component.js:174`). It
-    // scans the source BACKWARD from the sequence's start: `{` first means bare,
-    // `(` first means parenthesized. Every shape live-verified oracle-REJECTED.
+    // (`validate_element` in `2-analyze/visitors/shared/element.js`,
+    // `disallow_unparenthesized_sequences` in `shared/component.js`). It scans
+    // the source BACKWARD from the sequence's start: `{` first means bare, `(`
+    // first means parenthesized. Every shape live-verified oracle-REJECTED.
 
     assert_unsupported("<span foo={x, y, z} />", "sequence expression");
     // Whitespace between the delimiter and the sequence does not rescue it.
@@ -417,7 +418,7 @@ fn compile_accepts_parenthesized_sequence_expressions() {
 #[test]
 fn compile_refuses_a_misplaced_slot_attribute() {
     // The oracle's `slot_attribute_invalid_placement`
-    // (`2-analyze/visitors/shared/attribute.js:90,123`). Its `owner` is the
+    // (`validate_slot_attribute` in `2-analyze/visitors/shared/attribute.js`). Its `owner` is the
     // INNERMOST ancestor that is a component / `<svelte:element>` / custom element,
     // and a slot attribute is legal only when that owner is the element's DIRECT
     // parent. Every shape below is live-verified oracle-REJECTED.
@@ -488,7 +489,7 @@ fn compile_keeps_the_direct_child_named_slot_a_fence_not_a_placement_refusal() {
 
 #[test]
 fn compile_arguments_outside_a_function_refuses() {
-    // The oracle's `invalid_arguments_usage` (`Identifier.js:27-32`): a REFERENCE
+    // The oracle's `invalid_arguments_usage` (`Identifier.js`): a REFERENCE
     // to `arguments` with no FunctionDeclaration/FunctionExpression ancestor. An
     // arrow, a `{#snippet}` body, a class field initializer, and a static block do
     // NOT count as such an ancestor. Rides the whole-component `needs_context` walk,

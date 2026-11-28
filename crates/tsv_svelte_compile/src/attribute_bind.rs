@@ -159,12 +159,13 @@ fn is_get_set_pair(env: &EmitEnv<'_>, expr: ExprId) -> bool {
 /// rejects with `constant_binding`.
 ///
 /// The oracle keys that rejection on the DECLARATION KEYWORD, not on inferred
-/// reassignability (`phases/2-analyze/visitors/shared/utils.js:82-105`): an
-/// `import` local, or a `const` binding whose kind is not `each`. So a
-/// `const c = $state(0)` is refused as a bind target even though it is reactive —
-/// which is exactly why `env.unassignable_names` is its own set rather than a
-/// filter on `state_names` (that set also drives component-dynamic classification,
-/// where the same binding IS dynamic).
+/// reassignability (`validate_no_const_assignment` in
+/// `phases/2-analyze/visitors/shared/utils.js`): an `import` local, or a `const`
+/// binding whose kind is not `each`. So a `const c = $state(0)` is refused as a
+/// bind target even though it is reactive — which is exactly why
+/// `env.unassignable_names` is its own set rather than a filter on `state_names`
+/// (that set also drives component-dynamic classification, where the same binding
+/// IS dynamic).
 ///
 /// This is the single seam every `bind:` target check shares — the `$state`-gated
 /// ones ([`emitted_bind_target`], [`validate_inert_bind_target`]) and the
@@ -175,12 +176,12 @@ fn is_get_set_pair(env: &EmitEnv<'_>, expr: ExprId) -> bool {
 /// is keyed on **top-level script statements only**, so this seam enforces the
 /// oracle's `constant_binding` for a top-level `const`/import and is BLIND to a
 /// TEMPLATE-scoped one — a `{@const}` name, a `{:then}`/`{:catch}` value
-/// (`scope.js:1310`/`:1324`), an `{#each}` index (`:1273`), each equally
-/// `declaration_kind: 'const'` (kind `'template'`/`'static'`, not `'each'`).
+/// (the `AwaitBlock` visitor in `scope.js`), an `{#each}` index (its `EachBlock` visitor),
+/// each equally `declaration_kind: 'const'` (kind `'template'`/`'static'`, not `'each'`).
 ///
 /// That blindness is no longer a gap, because this is not the only enforcement
 /// point: `needs_context`'s whole-component walk reaches every `bind:` too
-/// (`BindDirective.js:181` is the oracle's own third caller of the same validator)
+/// (`BindDirective.js` is the oracle's own third caller of the same validator)
 /// and applies the rule from its scoped `template_consts` set. So a bind to a
 /// template-scoped const refuses THERE, not here. Keep the two straight when
 /// changing either — a shape this seam accepts is not thereby accepted by tsv.

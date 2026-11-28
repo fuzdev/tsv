@@ -80,7 +80,7 @@ fn compile_each_block() {
 
 #[test]
 fn compile_refuses_each_key_without_as() {
-    // The oracle's `each_key_without_as` (`EachBlock.js:26-34`): a `(key)` with no
+    // The oracle's `each_key_without_as` (`EachBlock.js`): a `(key)` with no
     // `as` clause, when keyed. The comma-index form `{#each x, i (key)}` is what
     // reaches here — a bare `{#each x (k)}` parses as a call `x(k)`, no key.
     // A member/expression key is always keyed.

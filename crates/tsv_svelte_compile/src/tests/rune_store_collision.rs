@@ -35,8 +35,8 @@ fn compile_refuses_rune_name_bound_as_store() {
 
 #[test]
 fn compile_refuses_rune_name_bound_in_module_scope() {
-    // `instance.scope.get(stem)` walks UP (`phases/scope.js:748`) and the instance
-    // scope's parent IS the module scope (`2-analyze/index.js:337`), so a MODULE
+    // `instance.scope.get(stem)` walks UP (`phases/scope.js`) and the instance
+    // scope's parent IS the module scope (`analyze_component` in `2-analyze/index.js`), so a MODULE
     // binding reclassifies an INSTANCE `$state` too. Oracle (verified):
     // `const x = $.store_get($$store_subs ??= {}, '$state', state)(1)`.
     assert_unsupported(
@@ -102,7 +102,7 @@ fn compile_refuses_rune_name_bound_in_class_static_block() {
 #[test]
 fn compile_refuses_rune_name_bound_by_porous_hoisted_var_with_rune_init() {
     // ⚠️ A `var` hoisting through a POROUS scope arrives with NO initializer:
-    // `phases/scope.js:673-681` re-declares it on the parent via the 3-argument
+    // `declare` in `phases/scope.js` re-declares it on the parent via the 3-argument
     // call, leaving `initial` at its `null` default. So `get_rune(binding.initial)`
     // is null and the rune EXEMPTION does not apply, even though the declarator
     // was written with a rune init. Oracle (verified): emits
@@ -132,7 +132,8 @@ fn compile_refuses_every_class_expression_position_holding_a_static_block() {
     // class-DECLARATION member position (a property initializer is NOT a function
     // scope — `phases/scope.js` has no `PropertyDefinition` visitor — and neither
     // is a computed key or a `super_class`), and a function PARAMETER DEFAULT (the
-    // oracle gives a function's parameters a POROUS scope, `scope.js:1143/1155/1163`).
+    // oracle gives a function's parameters a POROUS scope — the `FunctionExpression`,
+    // `FunctionDeclaration` and `ArrowFunctionExpression` visitors in `scope.js`).
     for source in [
         // for-head init expression
         "<script>\n\tvar y;\n\tfor (y = class { static { var state = 5 } }; false; ) {}\n\tlet count = $state(0);\n</script>\n<p>{count}</p>",

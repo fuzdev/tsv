@@ -320,7 +320,7 @@ fn compile_optional_chain_bind_target_refuses() {
 #[test]
 fn compile_template_scoped_const_bind_target_refuses() {
     // A `bind:` reaches the SAME validator as an assignment
-    // (`BindDirective.js:181`), so the template-scoped consts obey the rule there
+    // (`BindDirective.js`), so the template-scoped consts obey the rule there
     // too — the oracle raises `constant_binding` on each of these (live-verified:
     // "Cannot bind to constant"). This was a TRACKED over-acceptance until the
     // template scopes were modeled; it is the bind half of

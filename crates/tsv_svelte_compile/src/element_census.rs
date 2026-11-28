@@ -30,10 +30,10 @@
 //! (tsv drops the branch, as the oracle's SSR `$.await` has no catch arm) and the
 //! `<svelte:boundary>` children a `pending` snippet discards. The census follows
 //! the oracle's CSS pass rather than emission because pruning is decided BEFORE
-//! emission is: `css-prune.js:1110-1111` pushes `pending`/`then`/`catch` alike, so
-//! a selector matching only dropped content is still KEPT and still scoped.
-//! Narrowing the census to the emitted set instead made such a selector match
-//! nothing, and tsv over-refused it.
+//! emission is: `get_possible_nested_siblings` in `css-prune.js` pushes
+//! `pending`/`then`/`catch` alike, so a selector matching only dropped content is
+//! still KEPT and still scoped. Narrowing the census to the emitted set instead
+//! made such a selector match nothing, and tsv over-refused it.
 //!
 //! Marking an element emission never reaches is safe: `element_scope` is a span
 //! lookup performed at emission, so an unemitted element is never queried and
@@ -72,9 +72,10 @@ pub(crate) struct CensusElement<'a> {
 /// A CSS scoping candidate — the oracle's element list holds `RegularElement` and
 /// `SvelteElement`, so the census does too. Both project onto one leaf test (span,
 /// attributes, type name); a `<svelte:element>` differs only in that a type selector
-/// matches it **unconditionally** (its runtime tag is unknown, `css-prune.js:637-647`)
-/// and, as a possible sibling, it only PROBABLY exists (its tag may resolve to
-/// nothing). `Copy` — both variants are a single reference.
+/// matches it **unconditionally** (its runtime tag is unknown,
+/// `relative_selector_might_apply_to_node` in `css-prune.js`) and, as a possible
+/// sibling, it only PROBABLY exists (its tag may resolve to nothing). `Copy` — both
+/// variants are a single reference.
 #[derive(Clone, Copy)]
 pub(crate) enum CensusNode<'a> {
     /// A regular HTML element. A type selector matches it by tag name.
@@ -116,7 +117,8 @@ impl<'a> CensusNode<'a> {
     }
 
     /// Whether this is a `<svelte:element>` — a type selector matches it
-    /// unconditionally, for any type name (`css-prune.js:637-647`).
+    /// unconditionally, for any type name
+    /// (`relative_selector_might_apply_to_node` in `css-prune.js`).
     pub(crate) fn is_dynamic(self) -> bool {
         matches!(self, CensusNode::Dynamic(_))
     }
@@ -151,7 +153,7 @@ enum Owner<'a> {
     /// A regular HTML element or a `<svelte:element>` (an ancestor element, and a
     /// sibling-walk boundary — the oracle's `get_ancestor_elements` and
     /// `get_element_parent` treat both `RegularElement` and `SvelteElement` as
-    /// element parents, `css-prune.js:859`/`981`).
+    /// element parents, in `css-prune.js`).
     Element(CensusNode<'a>),
     /// A component — transparent for ancestor purposes (not an ancestor element),
     /// and its slot content flows into the parent for siblings.
@@ -162,7 +164,7 @@ enum Owner<'a> {
     /// `<svelte:head>` content — an element-like boundary (not a block).
     Head,
     /// `<svelte:boundary>` content. Like [`Owner::Head`] on both axes, and for the
-    /// same reason: the oracle's `is_block` set (`css-prune.js:1240-1246`) holds
+    /// same reason: the oracle's `is_block` set (`css-prune.js`) holds
     /// neither, so the upward SIBLING walk stops here (`if (!is_block(current))
     /// break`), while `get_ancestor_elements` counts only
     /// `RegularElement`/`SvelteElement` and so climbs straight THROUGH it. Net: a
@@ -308,13 +310,13 @@ fn walk_fragment<'a>(
                 // All THREE arms are descended, `{:catch}` included — even though
                 // the catch arm never reaches SSR output. The oracle's CSS pass
                 // pushes `pending`, `then` and `catch` alike
-                // (`css-prune.js:1110-1111`), so a selector matching only catch
-                // content is still KEPT and still scoped; excluding it here made
-                // such a selector match nothing and over-refuse. Unlike
-                // `<svelte:boundary>`, no distinct owner is needed: `is_block`
-                // holds `AwaitBlock` (`css-prune.js:1240-1246`), so the upward
-                // sibling walk continues through it exactly as `Owner::Await`
-                // already models.
+                // (`get_possible_nested_siblings` in `css-prune.js`), so a
+                // selector matching only catch content is still KEPT and still
+                // scoped; excluding it here made such a selector match nothing
+                // and over-refuse. Unlike `<svelte:boundary>`, no distinct owner
+                // is needed: `is_block` holds `AwaitBlock` (`css-prune.js`), so
+                // the upward sibling walk continues through it exactly as
+                // `Owner::Await` already models.
                 //
                 // Safe for the same reason the boundary descent is: `element_scope`
                 // is a span lookup at emission, so an element the census marks but
@@ -593,7 +595,7 @@ fn scan_sibling<'a>(
         // A `<svelte:element>` sibling only PROBABLY exists (its runtime tag may
         // resolve to nothing), so — unlike a regular element — it never triggers the
         // `adjacent_only` (`+`) early stop and carries no slot check
-        // (`css-prune.js:1041`).
+        // (`get_possible_element_siblings` in `css-prune.js`).
         FragmentNode::SpecialElement(special) if is_svelte_element(special) => {
             add_one(result, CensusNode::Dynamic(special), Existence::Probably);
         }
@@ -730,7 +732,7 @@ fn loop_child<'a>(
             }
             // A `<svelte:element>` last child only PROBABLY exists — added as a
             // possible sibling but never breaking the `adjacent_only` scan
-            // (`css-prune.js:1215`).
+            // (`loop_child` in `css-prune.js`).
             FragmentNode::SpecialElement(special) if is_svelte_element(special) => {
                 add_one(result, CensusNode::Dynamic(special), Existence::Probably);
             }
@@ -781,10 +783,11 @@ fn add_all<'a>(
 /// elements when scanning for flow siblings).
 ///
 /// Case-**insensitive**, mirroring its oracle site: CSS pruning matches
-/// `attr.name.toLowerCase() === 'slot'` (`css-prune.js:1015`). ⚠️ Do NOT unify this
-/// with `component.rs`'s `child_slot_attribute` / `special_element_slot_attribute`,
-/// which are case-**sensitive** because *their* oracle sites are
-/// (`server/visitors/shared/component.js:50`). The oracle is itself split, so each
+/// `attr.name.toLowerCase() === 'slot'` (`get_possible_element_siblings` in
+/// `css-prune.js`). ⚠️ Do NOT unify this with `component.rs`'s
+/// `child_slot_attribute` / `special_element_slot_attribute`, which are
+/// case-**sensitive** because *their* oracle sites are (`build_inline_component` in
+/// `server/visitors/shared/component.js`). The oracle is itself split, so each
 /// predicate faithfully mirrors its own site; deduplicating the three into one
 /// would silently break CSS-prune parity.
 fn has_slot_attribute(sv: SvelteView<'_>, element: &Element, source: &str) -> bool {

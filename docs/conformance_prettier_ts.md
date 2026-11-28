@@ -974,9 +974,10 @@ Fixtures: [field_key_quoted_accessor_abstract](../tests/fixtures/typescript/decl
 
 The **source-phase imports** and **import defer** proposals (`import source x
 from 'mod'` / `import.source('mod')`, `import defer * as ns from 'mod'` /
-`import.defer('mod')`) are a tsv-native parser divergence — acorn rejects them, so
-they are **not** in the "Prettier rejects valid input" set below (that set is keyed
-on acorn *accepting* the input). Prettier diverges on the `source` phase, both spellings:
+`import.defer('mod')`) are a tsv-native parser divergence — acorn rejects them. They
+are cataloged here as one family rather than in the "Prettier rejects valid input" set
+below, because prettier parts on only one of the two phases and the family is kept
+whole. Prettier diverges on the `source` phase, both spellings:
 
 - **`import source` — printer throws.** Prettier's `typescript` parser reads
   `source` as a binding name and throws (`'=' expected`). tsv parses and keeps the
@@ -1008,7 +1009,7 @@ and [conformance_test262.md](./conformance_test262.md).
 
 ## Prettier rejects valid input
 
-This input is **valid** by tsv's parse oracle (Svelte / acorn-typescript / `parseCss`) and our formatter keeps it stable, but prettier's parser/printer **throws** on it (the `typescript` parser for the TS/Svelte cases, postcss for the CSS ones) — so there is no `output_prettier.*` oracle. The fixture carries a `prettier_rejects.txt` marker pinning the exact error; rule F6 live-verifies that prettier still rejects the input (failing loudly if the bug is fixed upstream or the error morphs). It reproduces in plain prettier (`parser: 'typescript'`, zero Svelte) and is fine under `babel-ts`; prettier-plugin-svelte routes `lang="ts"` formatting through the real `typescript` parser rather than `babel-ts`, so it surfaces there too.
+tsv accepts these inputs and our formatter keeps them stable, but prettier's parser/printer **throws** on them (the `typescript` parser for the TS/Svelte cases, postcss for the CSS ones) — so there is no `output_prettier.*` oracle. Members acorn-typescript also rejects are cross-cataloged as Svelte divergences ([conformance_svelte.md §TypeScript Corrections](./conformance_svelte.md#typescript-corrections)). Each fixture carries a `prettier_rejects.txt` marker pinning the exact error; rule F6 live-verifies that prettier still rejects the input (failing loudly if the bug is fixed upstream or the error morphs). It reproduces in plain prettier (`parser: 'typescript'`, zero Svelte) and is fine under `babel-ts`; prettier-plugin-svelte routes `lang="ts"` formatting through the real `typescript` parser rather than `babel-ts`, so it surfaces there too.
 
 - Optional chain to private field (`x?.#a`) — `An optional chain cannot contain private identifiers.` — [private_fields_optional_chain](../tests/fixtures/typescript/declarations/class/private_fields_optional_chain_prettier_divergence/)
 - Operator keyword heading a member access after `<` (`p < keyof.a > (t, u)`) — `Type expected.` (acorn reads a comparison on the value `keyof.a` — an operator keyword cannot head a qualified type name, unlike an atom's `p < string.length > (t, u)`; tsc commits to type arguments at the keyword and has no type after the `.`) — [less_than_keyword_member](../tests/fixtures/typescript/syntax/disambiguation/less_than_keyword_member_prettier_divergence/)

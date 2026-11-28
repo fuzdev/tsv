@@ -311,7 +311,6 @@ tsv declines to reproduce any of it — its format→re-parse invariant outranks
 >
 > - CSS: `comma_space_separated_long`, `comma_separated_greedy_fill`
 > - Svelte: `inline_element_fill_long`, `inline_component_fill_long`, `fill_after_inline`, `block_multiline_attrs_content_hug`, `multiline_value_inline_long`, `fill_expr_travel_boundary_long`
-> - TypeScript: `long` (template literals)
 
 ## CSS: Comments
 

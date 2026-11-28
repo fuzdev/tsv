@@ -678,7 +678,8 @@ production's grouping `(` (`return` / `throw` / `yield`), and a Svelte
 span, so the delimiter that closes it (the header's `;`, the `in`/`of` keyword, the condition's
 `)`, the grouping `)`, the closing `}`)
 stays parent-owned, and a sibling clause or attribute the freeze does not reach still
-normalizes. Prettier agrees at every one of those positions, so the ordinary fixtures
+normalizes. Prettier agrees at these positions save the divergences listed below, so the
+ordinary fixtures
 `for/clauses_prettier_ignore_head`, `statements/condition_prettier_ignore_head`,
 `return_throw/operand_prettier_ignore_head` and
 `bind/value_prettier_ignore_head` **match**.
@@ -1000,7 +1001,8 @@ value (a
 parameter default, a destructuring default, an array-pattern default). The slice is the value's
 own node span, so the binding, the operator and the enclosing list stay parent-owned and a
 sibling declarator, member or property the freeze does not reach still normalizes. Prettier
-agrees at every unprefixed host, so the ordinary fixtures
+agrees at the hosts the ordinary fixtures below pin; the hosts where it parts are listed after
+them. The ordinary fixtures
 `statements/variable/init_prettier_ignore_head`, `expressions/assignment/rhs_prettier_ignore_head`,
 `statements/for/init_declarator_prettier_ignore_head`,
 `expressions/arrow/body_prettier_ignore_head`

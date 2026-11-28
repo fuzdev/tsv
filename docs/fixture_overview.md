@@ -1069,7 +1069,7 @@ Every pattern's validations are the rules in
 ### Fixture Generation Commands
 
 - **`fixtures_update_parsed`** - Updates parser expectations
-  - Generates `expected.json` from the input type's canonical parser — Svelte's parser, acorn-typescript at the fixture's goal, or `parseCss` (default) — with every `loc` / `name_loc` stripped (the span-only wire)
+  - Generates `expected.json` from the input type's canonical parser — Svelte's parser, acorn-typescript at the fixture's goal, or `parseCss` — with every `loc` / `name_loc` stripped (the span-only wire)
   - Generates `expected_ours.json` + `expected_svelte.json` when divergence exists (`expected_svelte.json` takes the error marker only when the canonical parser rejects; a sidecar failure fails the fixture and writes nothing)
   - Regenerates every variant parse pin (`expected_<stem>.json`, P4) a fixture holds
   - Generates `expected_svelte.json` alone for a `tsv_rejects.txt` fixture (canonical parser only — tsv emits no AST; fails loudly if the canonical parser rejects, i.e. the divergence is dead)

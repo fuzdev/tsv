@@ -107,7 +107,7 @@ A never-updated `$state`/plain binding is statically known and its template read
 
 - **Comments carry alongside a `$$slots` reference**: the injected `const $$slots = $.sanitize_slots($$props)` is zero-width at the component body's start (`transform_server.rs::build_sanitize_slots_decl`), so it opens no comment window over the script.
 
-**`$`-prefixed bindings — Refused.** The oracle's `dollar_prefix_invalid` (`validate_identifier_name` in `phases/2-analyze/visitors/shared/utils.js`, literally `node.name.startsWith('$')` on a `Binding`) is a Svelte reserved-prefix rule on a **binding**, not on a reference — which is exactly what makes the `$$slots` reference carve-out above sound, and what the carve-out must not swallow. The oracle reaches `validate_identifier_name` from **four** sites, and only two pass `function_depth` — so "oracle-rejected" is not one answer across the guarded positions. Checked against every call path, and probe-verified against the pinned compiler:
+**`$`-prefixed bindings — Refused.** The oracle's `dollar_prefix_invalid` (`validate_identifier_name` in `phases/scope.js`, literally `node.name.startsWith('$')` on a `Binding`) is a Svelte reserved-prefix rule on a **binding**, not on a reference — which is exactly what makes the `$$slots` reference carve-out above sound, and what the carve-out must not swallow. The oracle reaches `validate_identifier_name` from **four** sites, and only one of them (`declare` in `scope.js`) passes `function_depth` — so "oracle-rejected" is not one answer across the guarded positions. Checked against every call path, and probe-verified against the pinned compiler:
 
 | call path | passes `function_depth`? | verdict |
 | --- | --- | --- |
@@ -920,12 +920,12 @@ exists: the mutant is `.z\u{0085} + .z` grown out of an ordinary scoping fixture
 and no gate, no fixture, and no corpus file reached it. The fix is in `tsv_css`'s
 lexer, so it lands on the parser side rather than in this crate.
 
-### Owed to main
+### Frontend-rooted over-acceptances
 
 Over-acceptances whose root cause is in a **frontend** crate (`tsv_ts`, `tsv_css`,
 `tsv_svelte`), not in `tsv_svelte_compile`. Nothing in this crate can close them —
 the dependency runs compiler → frontend, never back — so each is recorded here and
-fixed on **main**, graded by a parser-conformance fixture. The `U+0085` CSS entry
+fixed in the frontend crate, graded by a parser-conformance fixture. The `U+0085` CSS entry
 above belongs to this family too.
 
 #### `using` / `await using` declarations

@@ -513,7 +513,7 @@ fn analyze(
     // instance-scope declaration) and the snippet hoist analysis (an import does
     // not disqualify hoisting). Both distinctions come from the same oracle rule,
     // `Scope.declare` forwarding an `import` to the parent scope
-    // (`phases/scope.js:679-681`), so they share one set rather than each keeping
+    // (`phases/scope.js`), so they share one set rather than each keeping
     // its own.
     let import_names: NameSet = view
         .stmt_list(instance_body)
@@ -536,7 +536,7 @@ fn analyze(
         .collect();
 
     // `declaration_duplicate` for a TOP-LEVEL `{#snippet}` whose name the instance
-    // script also declares (`2-analyze/visitors/SnippetBlock.js:34`). It reads the
+    // script also declares (`2-analyze/visitors/SnippetBlock.js`). It reads the
     // instance scope's declarations, so it runs here rather than in
     // `validate_document`'s structural walk — which places it BEFORE the
     // module↔instance collision check below. That is what a component tripping
@@ -608,7 +608,7 @@ fn analyze(
     )?;
 
     // `snippet_invalid_export` / `export_undefined` for the module script's
-    // `export { … }` specifiers (`2-analyze/index.js:823-836`). It reads the
+    // `export { … }` specifiers (`analyze_component` in `2-analyze/index.js`). It reads the
     // hoist decision (a hoistable snippet's binding lands in module scope), so it
     // runs after `analyze_snippets`.
     crate::validate::validate_module_exports(view, module_body, source, &snippets)?;
@@ -648,7 +648,7 @@ fn analyze(
     // refuses upstream: `analyze_module_script` runs its guard walk before this
     // point, so no module `$state` can reach here. It is NOT a rule about module
     // scope — the oracle keys component-dynamism on `binding.kind !== 'normal'`
-    // (`2-analyze/visitors/Component.js:14`), and a module `$state` gets kind
+    // (`2-analyze/visitors/Component.js`), and a module `$state` gets kind
     // `state` exactly like an instance one, so `<script module>let Thing =
     // $state(null)</script><Thing />` compiles to the DYNAMIC form. Whoever lifts
     // the module-rune refusal must widen this scan to `module_body` too, or the
@@ -1158,8 +1158,8 @@ pub(crate) fn compile_server(
     };
 
     // The oracle unshifts `const $$slots = $.sanitize_slots($$props)` to the top
-    // of the component function body — before the wrapper (`transform-server.js`
-    // `:300`). Prepend it here so it sits outside any `$$renderer.component`
+    // of the component function body — before the wrapper (`server_component` in
+    // `transform-server.js`). Prepend it here so it sits outside any `$$renderer.component`
     // wrapper, matching the oracle's placement.
     let body = if component.uses_slots {
         let slots_decl = build_sanitize_slots_decl(&mut env.b, block_start);

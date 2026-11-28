@@ -236,7 +236,7 @@ pub(crate) fn expand_destructured_derived(
 
 /// Lower a destructured `$state` / `$state.raw` / `$state.snapshot` declarator into
 /// N declarators via the oracle's `create_state_declarators`
-/// (`VariableDeclaration.js:229-247`), pushed onto `declarations` (`tmp` first, then
+/// (`VariableDeclaration.js`), pushed onto `declarations` (`tmp` first, then
 /// inserts, then paths — the oracle's order).
 ///
 /// Unlike the derived branch this ALWAYS mints a `tmp` holding the value
@@ -606,7 +606,7 @@ impl<'b, 'a> Extractor<'b, 'a> {
         self.b.push(call)
     }
 
-    /// The port of the oracle's `build_fallback` (`utils/ast.js:585`) for the sync
+    /// The port of the oracle's `build_fallback` (`utils/ast.js`) for the sync
     /// subset. A simple default → `$.fallback(expr, default)`; a non-simple one →
     /// `$.fallback(expr, () => default, true)` (with the `b.thunk` unthunk collapse
     /// — `f()` → `f`). An async default is unreachable: the pattern guard walk
@@ -632,7 +632,7 @@ impl<'b, 'a> Extractor<'b, 'a> {
     }
 }
 
-/// The oracle's `is_simple_expression` (`utils/ast.js:442`): an identifier /
+/// The oracle's `is_simple_expression` (`utils/ast.js`): an identifier /
 /// literal / function / arrow, or a conditional/binary/logical whose operands are
 /// all simple. tsv folds logical into [`ExpressionKind::BinaryExpression`].
 fn is_simple_expression(view: AstView<'_>, node: ExprId) -> bool {
@@ -647,9 +647,10 @@ fn is_simple_expression(view: AstView<'_>, node: ExprId) -> bool {
                 && is_simple_expression(view, c.alternate)
         }
         ExpressionKind::BinaryExpression(b) => {
-            // TODO: the oracle (`utils/ast.js:461`) also guards `left.type !==
-            // 'PrivateIdentifier'` on this arm; omitted as unreachable — a
-            // `#x in obj` default is parse-rejected at module scope.
+            // TODO: the oracle (`is_simple_expression` in `utils/ast.js`) also
+            // guards `left.type !== 'PrivateIdentifier'` on this arm; omitted
+            // as unreachable — a `#x in obj` default is parse-rejected at
+            // module scope.
             is_simple_expression(view, b.left) && is_simple_expression(view, b.right)
         }
         _ => false,

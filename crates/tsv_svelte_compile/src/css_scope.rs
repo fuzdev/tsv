@@ -17,20 +17,20 @@
 //! (`div :global.x` → `div.x`); a non-`@keyframes` **group at-rule**
 //! (`@media`/`@supports`/`@container`/`@layer`/`@scope`/…), which recurses into its
 //! block and scopes the inner rules the ordinary way (the oracle's generic `next()`
-//! recursion — `phases/3-transform/css/index.js:82-99`; the at-rule prelude is never
-//! scoped); and **`@keyframes`** — name-prefixed (`@keyframes foo` → `@keyframes
-//! svelte-tsvhash-foo`, a `-global-` prefix stripped and un-scoped instead) with every
-//! `animation` / `animation-name` value referencing a collected name rewritten to the
-//! prefixed spelling (the oracle's `is_keyframes_node` collect + `Atrule`/`Declaration`
-//! transform, `css-analyze.js:52-63` / `css/index.js:82-124`). The transform never
-//! descends into a keyframes block, but the oracle's phase-2 PRUNE walk does: it matches
-//! each step rule's selectors against every element the ordinary backward way, so a step
-//! selector can scope elements (a `from` step matches `<from>`, `.c` matches
+//! recursion — the `Atrule` visitor in `phases/3-transform/css/index.js`; the at-rule
+//! prelude is never scoped); and **`@keyframes`** — name-prefixed (`@keyframes foo` →
+//! `@keyframes svelte-tsvhash-foo`, a `-global-` prefix stripped and un-scoped instead)
+//! with every `animation` / `animation-name` value referencing a collected name
+//! rewritten to the prefixed spelling (the oracle's `is_keyframes_node` collect +
+//! `Atrule`/`Declaration` transform, `css-analyze.js` / `css/index.js`). The transform
+//! never descends into a keyframes block, but the oracle's phase-2 PRUNE walk does: it
+//! matches each step rule's selectors against every element the ordinary backward way,
+//! so a step selector can scope elements (a `from` step matches `<from>`, `.c` matches
 //! `class="c"`). A `Percentage` / `Nth` simple selector is skipped within its compound
-//! (`css-prune.js:509`), so a percentage-only compound matches ANY element (the
-//! fallthrough) while `0%.c` still narrows to `class="c"`. Step matching feeds ONLY the
-//! scoped-element set — step selectors are never spliced, pruned, or refused for no
-//! match. Everything else refuses:
+//! (`relative_selector_might_apply_to_node` in `css-prune.js`), so a percentage-only
+//! compound matches ANY element (the fallthrough) while `0%.c` still narrows to
+//! `class="c"`. Step matching feeds ONLY the scoped-element set — step selectors are
+//! never spliced, pruned, or refused for no match. Everything else refuses:
 //! the `||` column combinator, `:global{}` blocks, `:is`/`:where`/`:has`/`:not`,
 //! `:root`/`:host`, nesting, namespaced/escaped names, a snippet/render-crossing
 //! combinator path, and a compound matching no element (`CssSelectorNoMatch`; the
@@ -65,11 +65,12 @@ pub(crate) const SCOPE_HASH_CLASS: &str = "svelte-tsvhash";
 
 /// The `@keyframes` name-prefix (`<hash>-`) — the oracle's `${state.hash}-`, inserted
 /// before a keyframes name and before each `animation`-value token that references a
-/// collected name (`css/index.js:92`/`:111`). NOT a class (no leading `.`).
+/// collected name (the `Atrule` and `Declaration` visitors in `css/index.js`). NOT a class
+/// (no leading `.`).
 const SCOPE_HASH_PREFIX: &str = "svelte-tsvhash-";
 
 /// HTML attributes whose enumerated values are case-insensitive per the HTML
-/// spec (the oracle's `case_insensitive_attributes`, `css-prune.js:30-67`).
+/// spec (the oracle's `case_insensitive_attributes`, `css-prune.js`).
 const HTML_CASE_INSENSITIVE_ATTRIBUTES: &[&str] = &[
     "accept-charset",
     "autocapitalize",
@@ -325,11 +326,11 @@ pub(crate) fn analyze_style(
 // ── @keyframes collection + transform (the oracle's is_keyframes_node handling) ─
 
 /// Collect every `@keyframes` prelude the oracle's phase-2 analysis pushes into
-/// `state.keyframes` (`css-analyze.js:52-63`): the trimmed prelude of every keyframes
-/// at-rule at any nesting depth whose prelude does not start with `-global-`. The walk
-/// descends into every at-rule block (including a keyframes block, so a nested keyframes
-/// collects too), mirroring the analysis walk's unconditional `context.next()`.
-/// Duplicates are harmless — the value rewrite is a membership test.
+/// `state.keyframes` (the `Atrule` visitor in `css-analyze.js`): the trimmed prelude of
+/// every keyframes at-rule at any nesting depth whose prelude does not start with
+/// `-global-`. The walk descends into every at-rule block (including a keyframes block,
+/// so a nested keyframes collects too), mirroring the analysis walk's unconditional
+/// `context.next()`. Duplicates are harmless — the value rewrite is a membership test.
 ///
 /// The name string is the oracle's `node.prelude` exactly, via
 /// [`CssAtrule::public_prelude`] — the wire-parity form (block comments elided, JS-whitespace
@@ -340,11 +341,11 @@ pub(crate) fn analyze_style(
 /// renamed keyframes, un-renamed reference.
 ///
 /// ⚠️ The oracle also gates the push on `!is_in_global_block(context.path)`
-/// (`css-analyze.js:52`), a conjunct tsv drops here (matching [`keyframes_name_edit`]). It
-/// is safe: the only shape it excludes is a keyframes inside a `:global { … }` block, which
-/// sits inside a rule — and a rule containing a nested at-rule refuses [`Refusal::CssNestedRule`]
-/// in [`analyze_rule`] before any name edit is emitted, so a name collected here is discarded
-/// on that over-refusal and never reaches output.
+/// (the `Atrule` visitor in `css-analyze.js`), a conjunct tsv drops here (matching
+/// [`keyframes_name_edit`]). It is safe: the only shape it excludes is a keyframes inside a
+/// `:global { … }` block, which sits inside a rule — and a rule containing a nested at-rule
+/// refuses [`Refusal::CssNestedRule`] in [`analyze_rule`] before any name edit is emitted, so a
+/// name collected here is discarded on that over-refusal and never reaches output.
 fn collect_keyframes(css: CssView<'_>, nodes: &[CssNode], source: &str) -> Vec<String> {
     let mut names = Vec::new();
     for node in nodes {
@@ -435,7 +436,7 @@ fn analyze_rule(
         return Ok(());
     }
     // The oracle's `Declaration` visitor runs on every declaration the transform reaches
-    // (`css/index.js:100`) — including inside a plain rule — rewriting `animation` /
+    // (`css/index.js`) — including inside a plain rule — rewriting `animation` /
     // `animation-name` values that reference a collected keyframes name.
     for child in declarations {
         if let CssBlockChild::Declaration(decl) = child {
@@ -458,7 +459,7 @@ fn analyze_rule(
 }
 
 /// Analyze one at-rule (the oracle's `Atrule` visitor,
-/// `phases/3-transform/css/index.js:82-99`). `@keyframes` (name-discriminated — the
+/// `phases/3-transform/css/index.js`). `@keyframes` (name-discriminated — the
 /// ONLY at-rule family whose inner "rules" are keyframe stops rather than element
 /// selectors) is name-prefixed and its block is LEFT UNTRANSFORMED: the oracle emits the
 /// name edit (`@keyframes foo` → `@keyframes svelte-tsvhash-foo`, or strips a `-global-`
@@ -538,12 +539,13 @@ fn analyze_atrule(
 /// Each step's prelude `ComplexSelector`s are built through the SAME
 /// [`build_selector`] machinery as ordinary rules, with `keyframe_step = true` so a
 /// `Percentage`/`Nth` simple selector is skipped within its compound
-/// (`css-prune.js:509`): `0%` becomes an empty predicate list that matches any element,
-/// `0%.c` narrows to `class="c"`. A build failure on a step (an unsupported pseudo, …)
-/// refuses via the sink (safe over-refusal, corpus-absent). A nested rule/at-rule inside
-/// a step, or an at-rule directly inside the keyframes block, refuses
-/// [`Refusal::CssNestedRule`] (safe over-refusal — the oracle's step preludes are simple
-/// compounds). Declaration/comment children of the block or of a step are ignored.
+/// (`relative_selector_might_apply_to_node` in `css-prune.js`): `0%` becomes an empty
+/// predicate list that matches any element, `0%.c` narrows to `class="c"`. A build
+/// failure on a step (an unsupported pseudo, …) refuses via the sink (safe over-refusal,
+/// corpus-absent). A nested rule/at-rule inside a step, or an at-rule directly inside
+/// the keyframes block, refuses [`Refusal::CssNestedRule`] (safe over-refusal — the
+/// oracle's step preludes are simple compounds). Declaration/comment children of the
+/// block or of a step are ignored.
 fn analyze_keyframes_steps(
     css: CssView<'_>,
     atrule: &CssAtrule,
@@ -582,7 +584,7 @@ fn analyze_keyframes_steps(
     Ok(())
 }
 
-/// The `@keyframes` name edit (`css/index.js:82-93`): the insert point is
+/// The `@keyframes` name edit (the `Atrule` visitor in `css/index.js`): the insert point is
 /// `atrule.start + 1 + decoded_name.len()` (the `@` plus the decoded at-keyword — ASCII
 /// by the keyframes discriminator, so byte length == the oracle's `node.name.length`),
 /// advanced over LITERAL SPACE bytes only (not tabs/newlines). A `-global-` prelude
@@ -593,12 +595,13 @@ fn analyze_keyframes_steps(
 /// as the oracle does.
 ///
 /// ⚠️ The oracle gates the INSERT branch on `!is_in_global_block(path)`
-/// (`css/index.js:83`), a conjunct tsv drops (matching [`collect_keyframes_atrule`]). The
-/// `-global-` STRIP branch runs unconditionally on both sides, so only the insert is
-/// affected — and the sole shape it changes is a keyframes inside a `:global { … }` block,
-/// which tsv never reaches: the enclosing rule holds a nested at-rule and refuses
-/// [`Refusal::CssNestedRule`] in [`analyze_rule`] before this edit is emitted (a safe
-/// over-refusal masking the dropped conjunct; the oracle instead compiles it un-prefixed).
+/// (the `Atrule` visitor in `css/index.js`), a conjunct tsv drops (matching
+/// [`collect_keyframes_atrule`]). The `-global-` STRIP branch runs unconditionally on both
+/// sides, so only the insert is affected — and the sole shape it changes is a keyframes
+/// inside a `:global { … }` block, which tsv never reaches: the enclosing rule holds a
+/// nested at-rule and refuses [`Refusal::CssNestedRule`] in [`analyze_rule`] before this
+/// edit is emitted (a safe over-refusal masking the dropped conjunct; the oracle instead
+/// compiles it un-prefixed).
 fn keyframes_name_edit(css: CssView<'_>, atrule: &CssAtrule, source: &str) -> Edit {
     let mut start = atrule.span.start + 1 + css.text(atrule.name).len() as u32;
     let bytes = source.as_bytes();
@@ -621,7 +624,7 @@ fn keyframes_name_edit(css: CssView<'_>, atrule: &CssAtrule, source: &str) -> Ed
 }
 
 /// Rewrite an `animation` / `animation-name` declaration's value tokens that reference a
-/// collected keyframes name (the oracle's `Declaration` visitor, `css/index.js:100-124`).
+/// collected keyframes name (the oracle's `Declaration` visitor, `css/index.js`).
 /// The property compare uses the RAW property source text (so an escaped `\61nimation`
 /// spelling never matches, as the oracle's raw compare doesn't), ASCII-lowercased then
 /// vendor-prefix-stripped. ASCII-lowercase is provably equivalent to JS `.toLowerCase()`
@@ -683,7 +686,7 @@ fn scan_animation_declaration(
 }
 
 /// Whether an at-rule name is `@keyframes` — the oracle's `is_keyframes_node`
-/// (`remove_css_prefix(node.name) === 'keyframes'`, `phases/css.js:14`).
+/// (`remove_css_prefix(node.name) === 'keyframes'`, `phases/css.js`).
 /// **Case-sensitive** on purpose: `@KEYFRAMES` is NOT keyframes to the oracle, so it
 /// recurses as a group at-rule and its `from`/`to` are treated as element selectors
 /// (which match nothing → `CssSelectorNoMatch`). `atrule.name` is escape-decoded by
@@ -693,7 +696,7 @@ fn is_keyframes_atrule(name: &str) -> bool {
 }
 
 /// Strip a leading vendor prefix (`-webkit-`/`-moz-`/`-o-`/`-ms-`) — the oracle's
-/// `remove_css_prefix` (`/^-((webkit)|(moz)|(o)|(ms))-/`, `phases/css.js:2-9`).
+/// `remove_css_prefix` (`/^-((webkit)|(moz)|(o)|(ms))-/`, `phases/css.js`).
 /// Case-sensitive, like the regex (no `i` flag).
 fn remove_css_prefix(name: &str) -> &str {
     for prefix in ["-webkit-", "-moz-", "-o-", "-ms-"] {
@@ -787,8 +790,9 @@ pub(crate) fn match_scope<'a>(
 
 /// Build one `ComplexSelector` into the chain model, or the [`Refusal`] its shape
 /// maps to. `keyframe_step` marks a `@keyframes` step selector: a `Percentage`/`Nth`
-/// simple selector is then skipped within its compound (the oracle's `css-prune.js:509`
-/// `continue`). Ordinary selectors pass `false`, so a top-level `50% {}` keeps refusing.
+/// simple selector is then skipped within its compound (the oracle's `continue` in
+/// `relative_selector_might_apply_to_node`, `css-prune.js`). Ordinary
+/// selectors pass `false`, so a top-level `50% {}` keeps refusing.
 fn build_selector(
     css: CssView<'_>,
     complex: &ComplexSelector,
@@ -809,7 +813,7 @@ fn build_selector(
         relatives.push(classify_relative(css, relative, source, keyframe_step)?);
     }
 
-    // `truncate` (css-prune.js:209-232): drop trailing global relatives from the
+    // `truncate` (`css-prune.js`): drop trailing global relatives from the
     // MATCH chain (they still splice). `match_len` is one past the last non-global.
     let match_len = relatives
         .iter()
@@ -910,8 +914,9 @@ fn classify_relative(
 /// Parse a plain compound into its predicate list and hash-splice anchor. Refuses
 /// combinators (via the caller), the refused pseudos, namespaced/escaped/nesting/nth
 /// selectors, and a bare pseudo-only compound (no anchor). `keyframe_step` skips a
-/// `Percentage`/`Nth` simple selector (the oracle's `css-prune.js:509` `continue`): the
-/// skipped selector contributes no predicate, so a compound of only these has an empty
+/// `Percentage`/`Nth` simple selector (the oracle's `continue` in
+/// `relative_selector_might_apply_to_node`, `css-prune.js`): the skipped
+/// selector contributes no predicate, so a compound of only these has an empty
 /// predicate list and matches ANY element (the oracle's fallthrough `return true`).
 fn parse_plain_compound(
     css: CssView<'_>,
@@ -1259,7 +1264,7 @@ fn refuse(sink: &mut Option<&mut Vec<Refusal>>, reason: Refusal) -> Result<(), C
 // ── Combinator matching (the oracle's apply_selector / apply_combinator) ───────
 
 /// Whether `element` satisfies the whole chain `sel.relatives[from..to]`, matched
-/// BACKWARD from the rightmost relative (`css-prune.js:243-279`). Marks a matched
+/// BACKWARD from the rightmost relative (`apply_selector` in `css-prune.js`). Marks a matched
 /// relative scoped (unless global) and inserts every touched element's span.
 #[expect(
     clippy::too_many_arguments,
@@ -1297,7 +1302,7 @@ fn apply_selector<'a>(
     Ok(matched)
 }
 
-/// Resolve the combinator to the left of `relative` (`css-prune.js:291-359`,
+/// Resolve the combinator to the left of `relative` (`apply_combinator` in `css-prune.js`,
 /// BACKWARD only). A snippet-crossing walk refuses.
 #[expect(
     clippy::too_many_arguments,
@@ -1375,14 +1380,14 @@ fn apply_combinator<'a>(
 }
 
 /// Whether every relative in `sel.relatives[from..to]` is global — the oracle's
-/// `every_is_global` (`css-prune.js:368-373`). A global remainder is satisfied by
+/// `every_is_global` (`css-prune.js`). A global remainder is satisfied by
 /// an out-of-component `:global(...)`, so the leaf matches regardless of ancestors.
 fn every_is_global(sel: &ScopedSelector, from: usize, to: usize) -> bool {
     sel.relatives[from..to].iter().all(|r| r.global)
 }
 
 /// The leaf test — `relative_selector_might_apply_to_node` restricted to this
-/// slice's compounds (`css-prune.js:436-675`).
+/// slice's compounds (`css-prune.js`).
 fn relative_might_apply<'a>(
     sv: SvelteView<'a>,
     view: AstView<'_>,
@@ -1391,7 +1396,8 @@ fn relative_might_apply<'a>(
     source: &str,
 ) -> Result<bool, CompileError> {
     match relative.kind {
-        // A bare `:global` short-circuits to "matches" (`css-prune.js:530`).
+        // A bare `:global` short-circuits to "matches"
+        // (`relative_selector_might_apply_to_node` in `css-prune.js`).
         RelKind::BareGlobal => Ok(true),
         // A plain compound, or a `:global(<compound>)`'s inner compound.
         RelKind::Normal | RelKind::PureGlobal => {
@@ -1420,9 +1426,9 @@ fn predicate_matches<'a>(
         Predicate::Universal => Ok(true),
         Predicate::Type(name) => {
             // A `<svelte:element>`'s runtime tag is unknown, so a type selector
-            // matches it for ANY name (`css-prune.js:637-647`, `element.type !==
-            // 'SvelteElement'`). No name compare — the literal `svelte:element` is
-            // never the runtime tag.
+            // matches it for ANY name (`relative_selector_might_apply_to_node` in
+            // `css-prune.js`, `element.type !== 'SvelteElement'`). No name compare
+            // — the literal `svelte:element` is never the runtime tag.
             if element.is_dynamic() {
                 return Ok(true);
             }
@@ -1477,7 +1483,7 @@ fn predicate_matches<'a>(
     }
 }
 
-/// The oracle's `whitelist_attribute_selector` (`css-prune.js:20-23`): `[open]` on
+/// The oracle's `whitelist_attribute_selector` (`css-prune.js`): `[open]` on
 /// `<details>`/`<dialog>` matches unconditionally.
 fn is_attribute_whitelisted(element_name: &str, attr_name: &str) -> bool {
     let element_lower = element_name.to_ascii_lowercase();
@@ -1485,7 +1491,7 @@ fn is_attribute_whitelisted(element_name: &str, attr_name: &str) -> bool {
         && attr_name.eq_ignore_ascii_case("open")
 }
 
-/// Port of the oracle's `attribute_matches` (`css-prune.js:713-822`), including the
+/// Port of the oracle's `attribute_matches` (`css-prune.js`), including the
 /// `get_possible_values` bounded static-eval and the multi-chunk combination loop: a
 /// dynamic or mixed attribute value (`class={x?'a':'b'}`, `class={['a', c&&'b']}`,
 /// `class="pre-{x}"`, `data-x={0}`) is enumerated and each candidate tested. An
@@ -1549,7 +1555,7 @@ fn attribute_matches<'a>(
                     }
                     return Ok(matches);
                 }
-                // The general chunks path (`css-prune.js:747-818`): a match returns
+                // The general chunks path (`attribute_matches` in `css-prune.js`): a match returns
                 // `true`; NO match falls through to the next attribute (the oracle has
                 // no `return false` here — unlike the text path above).
                 if attribute_chunks_match(
@@ -1570,7 +1576,7 @@ fn attribute_matches<'a>(
     Ok(false)
 }
 
-/// The oracle's multi-chunk combination loop (`css-prune.js:747-818`): enumerate the
+/// The oracle's multi-chunk combination loop (`attribute_matches` in `css-prune.js`): enumerate the
 /// whitespace-delimited candidate values of a dynamic/mixed attribute and test each
 /// against the selector. Returns `Ok(true)` where the oracle `return true`s — an
 /// `UNKNOWN` chunk (`if (!current_possible_values) return true`), the `prev_values >
@@ -1678,7 +1684,7 @@ fn ends_with_js_whitespace(s: &str) -> bool {
     s.chars().next_back().is_some_and(is_js_whitespace)
 }
 
-/// The oracle's `get_possible_values` (`css/utils.js:85-96`): a `Text` chunk yields
+/// The oracle's `get_possible_values` (`css/utils.js`): a `Text` chunk yields
 /// its decoded data; an `{expression}` chunk is gathered. `Ok(None)` = the oracle's
 /// `null` (the set contained `UNKNOWN` → assume match). An un-stringifiable literal
 /// refuses.
@@ -1783,7 +1789,7 @@ fn strip_ts_wrappers<'a>(view: AstView<'a>, mut node: &'a Expression) -> &'a Exp
     }
 }
 
-/// The oracle's `gather_possible_values` (`css/utils.js:11-78`). Adds each concrete
+/// The oracle's `gather_possible_values` (`css/utils.js`). Adds each concrete
 /// value the expression can take to `set`, or marks it `UNKNOWN`. An un-stringifiable
 /// literal (BigInt / regex / non-integer number / escaped object key) refuses.
 fn gather_possible_values(
@@ -2000,7 +2006,7 @@ pub(crate) fn splice_scoped_css(style: &Style, source: &str, scope: &CssScoping)
     for (selector, rel_scoped) in scope.info.selectors.iter().zip(&scope.relative_scoped) {
         // Specificity bump is per `ComplexSelector`, left-to-right: the first scoped
         // compound gets a plain class (+0-1-0), every later one a zero-specificity
-        // `:where(...)` (index.js:283-372).
+        // `:where(...)` (the `ComplexSelector` visitor in `index.js`).
         let mut bumped = false;
         for (relative, &was_scoped) in selector.relatives.iter().zip(rel_scoped) {
             for removal in &relative.global_strip {

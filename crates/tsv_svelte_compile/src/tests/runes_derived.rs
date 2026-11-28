@@ -424,10 +424,11 @@ fn compile_destructured_derived_refuses_in_multi_declarator() {
 fn compile_destructured_derived_leaf_folds_through_scalar_arg() {
     // A destructured-derived LEAF folds through the rune's argument, exactly like an
     // identifier target — the oracle declares every leaf with the whole `$derived(…)`
-    // call as its initial (`scope.js:1204-1213`) and evaluates it through the arg. So
-    // with `d`→5 (a bounded scalar), `{a}` folds to the CONTAINER value `5` (ignoring
-    // the `.a` projection), NOT a dynamic `$.escape(a())`. This was the committed
-    // MISMATCH before the leaf-initial fix (leaves were wrongly `Initial::None`).
+    // call as its initial (the `VariableDeclaration` visitor in `scope.js`) and
+    // evaluates it through the arg. So with `d`→5 (a bounded scalar), `{a}` folds to
+    // the CONTAINER value `5` (ignoring the `.a` projection), NOT a dynamic
+    // `$.escape(a())`. This was the committed MISMATCH before the leaf-initial fix
+    // (leaves were wrongly `Initial::None`).
     let out = compile_checked(
         "<script>\n\tlet d = $derived(5);\n\tlet { a } = $derived(d);\n</script>\n<p>{a}</p>",
     );

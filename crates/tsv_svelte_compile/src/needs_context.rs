@@ -70,7 +70,7 @@ struct Nc<'a> {
     context_roots: &'a NameSet,
     /// The instance script's `$props()` **rest_prop** binding names — the roots
     /// whose `.$$…` member access the oracle rejects
-    /// (`props_illegal_name`, `MemberExpression.js:11-16`). A `$props()`
+    /// (`props_illegal_name`, `MemberExpression.js`). A `$props()`
     /// declarator produces a `rest_prop` in exactly two forms: the whole-object
     /// `let props = $props()` and the REST element of `let { a, ...rest } =
     /// $props()`; the named props are `prop`, not `rest_prop`. See
@@ -95,16 +95,17 @@ struct Nc<'a> {
     snippet_params: NameSet,
     /// TEMPLATE-scoped `const` names currently in scope — a `{@const}` name, a
     /// `{:then}`/`{:catch}` value, and an `{#each}` INDEX. All three are
-    /// `declaration_kind: 'const'` to the oracle (`phases/scope.js:1205` via the
-    /// `ConstTag` parent test, `:1310`/`:1324`, `:1273`), so a write to one is
-    /// `constant_assignment` — unlike the each ITEM beside the index, which is
-    /// `kind: 'each'` and is EXCLUDED from that rule by
-    /// `validate_no_const_assignment` in favor of its own.
+    /// `declaration_kind: 'const'` to the oracle (the `VariableDeclaration`
+    /// visitor in `phases/scope.js` via the `ConstTag` parent test, and its
+    /// `AwaitBlock` and `EachBlock` visitors), so a write to one is `constant_assignment` —
+    /// unlike the each ITEM beside the index, which is `kind: 'each'` and is
+    /// EXCLUDED from that rule by `validate_no_const_assignment` in favor of its
+    /// own.
     ///
     /// Block-scoped like [`Nc::each_items`], at the extent the oracle's own scope
     /// covers: a `{@const}` to its enclosing FRAGMENT (every `Fragment` gets a
     /// child scope, and a fragment holding a declaration tag is never porous —
-    /// `1-parse/index.js:306`), a `{:then}`/`{:catch}` value to that branch's
+    /// the parser's `pop` in `1-parse/index.js`), a `{:then}`/`{:catch}` value to that branch's
     /// fragment, an `{#each}` index to body + fallback.
     ///
     /// Consulted AFTER [`Nc::js_scope`] (a JS scope always nests inside a template
@@ -162,7 +163,7 @@ struct Nc<'a> {
     /// declarations, class methods, static blocks).
     fn_depth: u32,
     /// Current **non-arrow** function nesting depth — the oracle's
-    /// `invalid_arguments_usage` ancestor test (`Identifier.js:29`): the count of
+    /// `invalid_arguments_usage` ancestor test (`Identifier.js`): the count of
     /// `FunctionDeclaration`/`FunctionExpression` ancestors around the walk.
     /// ⚠️ DISTINCT from [`Nc::fn_depth`], which ALSO counts arrows, static blocks,
     /// and `{#snippet}` bodies — none of which suppress the `arguments` rule. A
@@ -383,15 +384,15 @@ fn collect_context_roots(
 
 /// Collect the instance script's `$props()` **rest_prop** binding names — the
 /// roots whose `.$$…` member access the oracle's `props_illegal_name`
-/// rejects (`MemberExpression.js:11-16`).
+/// rejects (`MemberExpression.js`).
 ///
 /// A `$props()` declarator produces a `rest_prop` binding in exactly two forms
 /// (`VariableDeclarator.js`):
 ///
 /// - the whole-object `let props = $props()` — an Identifier `node.id`, whose
-///   binding becomes `rest_prop` (`:87-90`);
+///   binding becomes `rest_prop`;
 /// - the REST element of a destructure `let { a, ...rest } = $props()` —
-///   `path.is_rest` (`:46-47`). The NAMED props (`a`) are `prop`/`bindable_prop`,
+///   `path.is_rest`. The NAMED props (`a`) are `prop`/`bindable_prop`,
 ///   NOT `rest_prop`, so they are deliberately excluded here (unlike
 ///   [`collect_context_roots`], which takes every prop name).
 ///
@@ -443,13 +444,13 @@ fn collect_rest_prop_names(
 
 /// The names an assignment, an update, or a `bind:` may not write to — one set,
 /// because the oracle reaches ONE validator from all three positions
-/// (`validate_assignment`, `phases/2-analyze/visitors/shared/utils.js:18`).
+/// (`validate_assignment`, `phases/2-analyze/visitors/shared/utils.js`).
 ///
 /// It keys `constant_assignment` / `constant_binding` on the DECLARATION KEYWORD,
 /// not on inferred reassignability — an `import` local, or a `const` binding whose
-/// kind is not `each` (`:84-120`) — so a `const c = $state(0)` is in here despite
-/// being reactive. That is why it is its own set and not a filter on
-/// `state_names`.
+/// kind is not `each` (`validate_no_const_assignment`) — so a `const c = $state(0)`
+/// is in here despite being reactive. That is why it is its own set and not a filter
+/// on `state_names`.
 ///
 /// Spans BOTH script bodies: the declaration keyword is what the rule reads, and a
 /// module-script `const`/import is exactly as unrebindable as an instance one.
@@ -509,20 +510,20 @@ pub(crate) fn collect_constant_names(
 
 /// Refuse an assignment / update / `bind:` target the oracle rejects outright —
 /// its `validate_assignment` family
-/// (`phases/2-analyze/visitors/shared/utils.js:18-120`, one function reached from
+/// (`phases/2-analyze/visitors/shared/utils.js`, one function reached from
 /// `AssignmentExpression`, `UpdateExpression` and `BindDirective` alike, which is
 /// why one walk covers all three positions).
 ///
 /// The oracle's shape is reproduced exactly, and the two halves recurse
 /// differently:
 ///
-/// - `validate_no_const_assignment` (`:84`) recurses through **patterns** —
+/// - `validate_no_const_assignment` recurses through **patterns** —
 ///   `ArrayPattern` elements and `ObjectPattern` property *values*, and nothing
 ///   else. A `RestElement` and an `AssignmentPattern` match no branch and fall
 ///   through with **no** error, so `[...rest] = x` and `[c = 1] = x` are accepted
 ///   even for a `const` `rest`/`c`; so is a `MemberExpression` target, which
 ///   mutates through the binding rather than rebinding it.
-/// - the `each` / `snippet` rules (`:21-39`) test `argument.type === 'Identifier'`
+/// - the `each` / `snippet` rules (in `validate_assignment`) test `argument.type === 'Identifier'`
 ///   on the argument **itself** and never recurse — hence the `top` flag.
 ///
 /// TypeScript wrappers are peeled because the oracle analyzes a type-stripped
@@ -758,7 +759,7 @@ fn js_binding<'b>(nc: &'b Nc<'_>, name: &str) -> Option<&'b JsBinding> {
 /// the declaration outright with `js_parse_error`), so this choice is unreachable
 /// there and untested by probe. That parse gap is itself a standing tsv
 /// over-acceptance, owed to the frontend — see
-/// `../../docs/checklist_svelte_compiler.md` §Owed to main.
+/// `../../docs/checklist_svelte_compiler.md` §Frontend-rooted over-acceptances.
 fn declare_js_pattern(pattern: &Expression, nc: &mut Nc<'_>, is_const: bool) {
     declare_pattern(pattern, nc);
     let mut names = Vec::new();
@@ -945,7 +946,7 @@ fn walk_expr(expr: &Expression, nc: &mut Nc<'_>) {
             walk_exprs(new_expr.arguments, nc);
         }
         ExpressionKind::CallExpression(call) => {
-            // The oracle's `rune_invalid_spread` (`CallExpression.js:24`), checked
+            // The oracle's `rune_invalid_spread` (`CallExpression.js`), checked
             // on every rune call BEFORE its dispatch and before recursing — so the
             // outer rune call's spread wins, matching the oracle's visit order. Any
             // rune but `$inspect`; fires wherever the call sits (this walk covers
@@ -961,7 +962,7 @@ fn walk_expr(expr: &Expression, nc: &mut Nc<'_>) {
         }
         ExpressionKind::MemberExpression(member) => {
             // The oracle's `props_illegal_name` REFERENCE-site rule
-            // (`MemberExpression.js:11-16`): a `rest_prop.$$…` access — a plain
+            // (`MemberExpression.js`): a `rest_prop.$$…` access — a plain
             // Identifier object bound to a `$props()` rest_prop, and an
             // Identifier property whose name starts with `$$` (reserved for
             // Svelte internals). One error code, shared with the declare-site
@@ -1026,7 +1027,7 @@ fn walk_expr(expr: &Expression, nc: &mut Nc<'_>) {
         // `uses_slots`) and a `$name` store access (the store-subscription gate),
         // otherwise a leaf.
         ExpressionKind::Identifier(id) => {
-            // The oracle's `invalid_arguments_usage` (`Identifier.js:27-32`): a
+            // The oracle's `invalid_arguments_usage` (`Identifier.js`): a
             // REFERENCE to `arguments` with no
             // `FunctionDeclaration`/`FunctionExpression` ancestor. This arm is
             // reached only for reference-position identifiers (the member-property /
@@ -1504,7 +1505,7 @@ fn walk_special_element(se: &SpecialElement, nc: &mut Nc<'_>) {
                 &mut nc.reassigned,
             );
             // A `bind:` reaches the SAME oracle validator as an assignment
-            // (`BindDirective.js:181`), so its target obeys the same three rules.
+            // (`BindDirective.js`), so its target obeys the same three rules.
             refuse_invalid_assign_target(nc.view.expr(d.expression), nc, true);
         }
     }
@@ -1520,9 +1521,10 @@ fn walk_special_element(se: &SpecialElement, nc: &mut Nc<'_>) {
 /// `needs_context`, and a `new` in a *hoistable* snippet body fires it too).
 fn walk_snippet_block(snippet: &SnippetBlock, nc: &mut Nc<'_>) {
     nc.fn_depth += 1;
-    // Parameters are `kind: 'snippet'` in the oracle (`phases/scope.js:1342`), so
-    // writing to one inside the body is `snippet_parameter_assignment` — and,
-    // unlike the each rule, it is NOT gated on runes mode.
+    // Parameters are `kind: 'snippet'` in the oracle (the `SnippetBlock` visitor
+    // in `phases/scope.js`), so writing to one inside the body is
+    // `snippet_parameter_assignment` — and, unlike the each rule, it is NOT gated
+    // on runes mode.
     let mut names = Vec::new();
     let view = nc.view;
     for param in view.exprs(snippet.parameters) {
@@ -1576,7 +1578,7 @@ fn walk_element(element: &Element, nc: &mut Nc<'_>) {
                 &mut nc.reassigned,
             );
             // A `bind:` reaches the SAME oracle validator as an assignment
-            // (`BindDirective.js:181`), so its target obeys the same three rules.
+            // (`BindDirective.js`), so its target obeys the same three rules.
             refuse_invalid_assign_target(nc.view.expr(d.expression), nc, true);
         }
     }
@@ -1626,13 +1628,14 @@ fn walk_each_block(block: &EachBlock, nc: &mut Nc<'_>) {
     if let Some(key) = &block.key {
         walk_id(key.expression, nc);
     }
-    // The context binding is `kind: 'each'` in the oracle (`phases/scope.js:1244`),
-    // so writing to it inside the block is `each_item_invalid_assignment`. Scoped
-    // to the block's body and fallback — the same extent the oracle's child scope
-    // covers. The INDEX binding is deliberately absent: it is `kind: 'template'` /
-    // `'static'` with `declaration_kind: 'const'` (`:1272`), so the oracle rejects
-    // a write to it as `constant_assignment` — a template-scoped const, part of
-    // the residual this slice leaves open (see the checklist).
+    // The context binding is `kind: 'each'` in the oracle (the `EachBlock` visitor
+    // in `phases/scope.js`), so writing to it inside the block is
+    // `each_item_invalid_assignment`. Scoped to the block's body and fallback — the
+    // same extent the oracle's child scope covers. The INDEX binding is
+    // deliberately absent: it is `kind: 'template'` / `'static'` with
+    // `declaration_kind: 'const'` (the same visitor), so the oracle rejects a write to it as
+    // `constant_assignment` — a template-scoped const, part of the residual this
+    // slice leaves open (see the checklist).
     let mut each_added = Vec::new();
     if let Some(context) = block.context {
         let context = nc.view.expr(context);
@@ -1647,10 +1650,11 @@ fn walk_each_block(block: &EachBlock, nc: &mut Nc<'_>) {
     if let Some(index) = block.index {
         let index = index.extract(nc.source);
         nc.shadowed.insert(index.to_string());
-        // `('template' | 'static', 'const')` at `phases/scope.js:1273` — so unlike
-        // the ITEM beside it (`('each', 'const')`, excluded from the const rule),
-        // a write to the index is `constant_assignment`. Same extent as the item:
-        // the each block's child scope, covering body + fallback.
+        // `('template' | 'static', 'const')` at the `EachBlock` visitor in
+        // `phases/scope.js` — so unlike the ITEM beside it (`('each', 'const')`,
+        // excluded from the const rule), a write to the index is
+        // `constant_assignment`. Same extent as the item: the each block's child
+        // scope, covering body + fallback.
         index_added = enter_block_scope(&mut nc.template_consts, vec![index.to_string()]);
     }
     walk_fragment(block.body, nc);
@@ -1678,8 +1682,9 @@ fn walk_await_block(block: &AwaitBlock, nc: &mut Nc<'_>) {
         walk_fragment(*pending, nc);
     }
     // The `{:then}` value and the `{:catch}` error are each declared `'const'`
-    // into their OWN branch fragment's scope (`phases/scope.js:1310`/`:1324`), so
-    // a write to one is `constant_assignment`, scoped to that branch alone.
+    // into their OWN branch fragment's scope (the `AwaitBlock` visitor in
+    // `phases/scope.js`), so a write to one is `constant_assignment`,
+    // scoped to that branch alone.
     if let Some(then) = &block.then {
         let names = template_const_names(nc.view, block.value, nc.source);
         let added = enter_block_scope(&mut nc.template_consts, names);

@@ -51,9 +51,9 @@ use crate::template_value::wrap_value_expr;
 use crate::transform_server::{EmitEnv, unsupported};
 use crate::{CompileError, Refusal};
 
-/// The oracle's phase-2 directive-validity checks (`2-analyze/visitors/shared/
-/// element.js:92-132`), which run before it discards the SSR visit — so a
-/// combination it rejects must refuse, not compile.
+/// The oracle's phase-2 directive-validity checks (`validate_element` in
+/// `2-analyze/visitors/shared/element.js`), which run before it discards the SSR visit —
+/// so a combination it rejects must refuse, not compile.
 ///
 /// - **Transitions**: a `transition:` claims both intro and outro, `in:` intro,
 ///   `out:` outro; a channel claimed twice is `transition_duplicate`/
@@ -205,7 +205,7 @@ pub(crate) fn emit_element(
     }
     // The oracle's `RegularElement` visitor lowercases the tag name once, at the
     // top, whenever the element sits in the html namespace
-    // (`3-transform/server/visitors/RegularElement.js:18`: `const name =
+    // (`3-transform/server/visitors/RegularElement.js`: `const name =
     // context.state.namespace === 'html' ? node.name.toLowerCase() : node.name`),
     // and then reuses that ONE lowered name for every downstream decision in the
     // visitor: `is_void(name)`, the `script`/`style`/`select`/`option` special
@@ -782,8 +782,9 @@ pub(crate) fn emit_svelte_element(
     let children = env.sv.nodes(se.fragment.nodes);
 
     // CSS scope: the oracle scopes a `<svelte:element>` whenever a type/universal
-    // selector reaches it (its type match is unconditional, `css-prune.js:637-647`),
-    // synthesizing `class="svelte-…"` in its attributes closure. The upfront census
+    // selector reaches it (its type match is unconditional,
+    // `relative_selector_might_apply_to_node` in `css-prune.js`), synthesizing
+    // `class="svelte-…"` in its attributes closure. The upfront census
     // (`element_census`) holds it as a scoping leaf and owner, so this is the same
     // span lookup as a regular element's — passed through `emit_host_attributes`,
     // where a scoped element with no `class` markup synthesizes one.

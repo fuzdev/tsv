@@ -4,11 +4,11 @@ Comprehensive reference for TypeScript/JS language features supported by tsv's p
 
 ## Coverage
 
-Every syntax feature of the published ECMAScript standard is supported, as enumerated below — through **ES2025**, the most recent edition that added grammar (import attributes; its two RegExp additions ride the opaque regex body, see [Regular Expressions](#regular-expressions)). ES2026 added library APIs only, no new syntax. The finished (Stage 4) `using` declarations, awaiting publication in a later edition, are supported too — see [Explicit Resource Management](#explicit-resource-management). On the TypeScript side every construct the `tsc` oracle parses is parsed here, down to its newest contextual keyword (`defer`); the `conformance:ts-fixtures` and `conformance:ts-repo` gates pin those oracles' versions, so this doc names none.
+Every syntax feature of the published ECMAScript standard is supported, as enumerated below — through **ES2025**, the most recent edition that added grammar (import attributes; its two RegExp additions ride the opaque regex body, see [Regular Expressions](#regular-expressions)). ES2026 added library APIs only, no new syntax. The `using` declarations of the Explicit Resource Management proposal, not yet in a published edition, are supported too — see [Explicit Resource Management](#explicit-resource-management). On the TypeScript side every construct the `tsc` oracle parses is parsed here, down to its newest contextual keyword (`defer`); the `conformance:ts-fixtures` and `conformance:ts-repo` gates pin those oracles' versions, so this doc names none.
 
 Annex B's web-browser-host grammar is excluded by design; core sloppy-mode constructs are parsed at a `Script` goal (see [Out of Scope](#out-of-scope)). ECMAScript conformance is measured against test262 (see [conformance_test262.md](./conformance_test262.md)). Constructs tsv does not parse — all of them TC39 proposals — are listed under [Future Work](#future-work).
 
-**On proposal maturity**: this doc deliberately carries **no TC39 stage labels**. A stage can change at any TC39 meeting, and no gate here can catch a label that has gone stale — so a stage quoted in this file would be a claim nothing keeps honest. Year tags on shipped features (`- ES2020`) are a different thing: an edition is a historical fact and does not rot, so those stay. For a construct's current stage, read the oracle — `../../proposals/`, where `finished-proposals.md` is Stage 4, `README.md` is Stage 2 and up, and the rest are `stage-1-proposals.md`, `stage-0-proposals.md`, `inactive-proposals.md`.
+**On proposal maturity**: this doc deliberately carries **no TC39 stage labels**. A stage can change at any TC39 meeting, and no gate here can catch a label that has gone stale — so a stage quoted in this file would be a claim nothing keeps honest. Year tags on shipped features (`- ES2020`) are a different thing: an edition is a historical fact and does not rot, so those stay. For a construct's current stage, read the oracle — the TC39 proposals repository.
 
 **Spec References**:
 
@@ -491,7 +491,7 @@ ES2015 module syntax with ES2025 additions.
 - Property decorators
 - Accessor decorators
 - Decorator factories (`@decorator()`)
-- Type arguments on a decorator, with a trailing call (`@g<number>()`, `@a.b<T>()`) or without one (`@a.b<number>`, a `TSInstantiationExpression` — prettier parenthesizes it, `@(a.b<number>)`, since it is no decorator member expression)
+- Type arguments on a decorator, with a trailing call (`@g<number>()`, `@a.b<T>()`) or without one across a line break (`@a.b<number>⏎class C {}`, a `TSInstantiationExpression` — prettier parenthesizes it, `@(a.b<number>)`, since it is no decorator member expression); on the same line `@a.b<number> class` is a comparison and rejects ([conformance_svelte.md §TypeScript Corrections](./conformance_svelte.md#typescript-corrections))
 - Parameter decorators (`fn(@dec x: T)`)
 - Decorators on ambient class members (`declare class C { @dec m() {} }`)
 - Decorators on ambient class declarations (`@dec declare class C {}`, `@dec declare abstract class C {}`)
@@ -513,7 +513,7 @@ Note: Two class members no decorator grammar reaches still keep a decorator list
 - `override` modifier, including the `abstract override` pair. `abstract override` is tsc's canonical order and the only one it accepts; tsv prints that order (as prettier does) whichever way the source spells it
 - Class-member modifiers in any ORDER and REPEATED (`readonly static x`, `async static m() {}`, `public public x`, `declare declare readonly x`) — tsc's parser reads any run of modifiers and leaves the order (TS1029) and the repeat (TS1028, TS1030) to its grammar checker, so tsv defers both: each modifier is a flag on the member, a repeat folds into it, and the printer prints each once in the canonical order, as prettier does — each comment staying after the keyword it followed in the source, so a line break stays after `static` (where prettier's relocation changes the program). Rejected still: two different accessibility modifiers (`public private x`, the representability floor), a second `static` (the member's name in tsc's parser, so `static static x` rejects at `x`), any modifier on a static block. The name test runs on every modifier, so a trailing repeat is the name (`readonly readonly;`). Repeated or reordered parameter-property modifiers (`constructor(readonly public x)`) still reject, a known gap ([conformance_svelte.md §TypeScript Corrections](./conformance_svelte.md#typescript-corrections), [conformance_tsc.md §The reject-vs-defer line](./conformance_tsc.md#the-reject-vs-defer-line))
 - `accessor` keyword
-- Parameter properties (`constructor(public x: T)`) — all modifiers: `public`/`private`/`protected`, `override`, `readonly` (canonical order `accessibility → override → readonly`)
+- Parameter properties (`constructor(public x: T)`) — all modifiers: `public`/`private`/`protected`, `override`, `readonly` (canonical order `accessibility → override → readonly`); a non-canonical order (`readonly public x`) rejects, as acorn does — the known gap the modifier bullet above names
 
 ---
 
@@ -666,7 +666,7 @@ Note: Two class members no decorator grammar reaches still keep a decorator list
 - Numeric enums (`enum E { A, B }`)
 - String enums (`enum E { A = 'a' }`)
 - Heterogeneous enums
-- Computed members
+- Computed member values (`C = "x".length`); a computed member *name* (`["a"] = 1`) rejects
 - `const enum`
 - `declare enum`
 
@@ -784,12 +784,9 @@ Note: Two class members no decorator grammar reaches still keep a decorator list
 
 ## Explicit Resource Management
 
-A **finished (Stage 4)** TC39 proposal — `../../proposals/finished-proposals.md` lists it with an
-expected publication year of 2027, so the grammar is settled but has not yet landed in a
-published edition. It is absent from the `../../ecma262/` draft, and that proves nothing either
-way: a finished proposal is one that "is (or soon will be) included in the latest draft", so
-the draft's silence is not evidence of an earlier stage. Svelte's parser
-rejects it; tsv is native — see
+A TC39 proposal whose grammar is settled but has not yet landed in a published edition. It is
+absent from the `../../ecma262/` draft, and that proves nothing about its maturity either way.
+Svelte's parser rejects it; tsv is native — see
 [conformance_svelte.md](./conformance_svelte.md#typescript-corrections).
 
 - `using` declarations
@@ -803,8 +800,8 @@ rejects it; tsv is native — see
 # Future Work
 
 Everything here is a TC39 **proposal** — no published ECMAScript syntax is missing (see
-[Coverage](#coverage)). No stage is quoted, for the reason given there; `../../proposals/` is
-the oracle. Each row below was verified against the binary rather than assumed.
+[Coverage](#coverage)). No stage is quoted, for the reason given there; the TC39 proposals
+repository is the oracle. Each row below was verified against the binary rather than assumed.
 
 ## Not Parsed
 
@@ -833,8 +830,8 @@ them; they sit here rather than under Supported only because tsv models nothing 
 
 ## Not Coming
 
-**Records and tuples** (`#{a: 1}` / `#[1, 2]`) was **withdrawn** — `../../proposals/inactive-proposals.md`
-records it as "Withdrawn; subsumed by [Composites]", and Composites adds a library API, not
+**Records and tuples** (`#{a: 1}` / `#[1, 2]`) was **withdrawn** — the TC39 proposals repository's
+inactive list records it as "Withdrawn; subsumed by [Composites]", and Composites adds a library API, not
 syntax. There is nothing here to parse, now or later. Named only so it is not re-added to the
 list above.
 
@@ -890,6 +887,7 @@ Early errors that still parse (not yet enforced):
   on both sides, pinned at Script goal by
   [script_goal/nonsimple_params_directive](../tests/fixtures/typescript/script_goal/nonsimple_params_directive_svelte_prettier_divergence/)
 - Duplicate parameter names (`function f(a, a) {}`)
+- Duplicate `__proto__` in an object literal (`({ __proto__: 1, __proto__: 2 })`)
 - A non-simple `=` target (`foo() = bar`, `1 >>= 2`, `this = x`, `(a => a) = 1`) — the
   `AssignmentTargetType` early error of §13.15.1; the target is kept as written, its
   pair included (`(-a) = 1` reprints with the pair). A BARE type assertion (`a as T = 1`,
@@ -1001,4 +999,4 @@ Key test262 features relevant to parser/formatter:
 - `Symbol` — Primitives; ES2015
 - `template` — Literals; ES2015
 - `top-level-await` — Modules; ES2022
-- `explicit-resource-management` — Statements; finished (Stage 4) proposal, publication expected 2027. test262 still files it under "Proposed language features" because the spec draft has not merged it yet — that placement tracks the draft, not the stage
+- `explicit-resource-management` — Statements; a TC39 proposal not yet in a published edition. test262 still files it under "Proposed language features" because the spec draft has not merged it yet — that placement tracks the draft

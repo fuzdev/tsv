@@ -39,7 +39,7 @@ fn compile_inspect_with_wrong_arity_refuses() {
 
 #[test]
 fn compile_rune_call_with_spread_refuses() {
-    // The oracle's `rune_invalid_spread` (`CallExpression.js:24`): any rune but
+    // The oracle's `rune_invalid_spread` (`CallExpression.js`): any rune but
     // `$inspect` called with a spread argument. It fires wherever the call sits —
     // the oracle checks it on every call before dispatch — so all three positions
     // below over-accepted (each is rewritten/dropped, so the spread rode into

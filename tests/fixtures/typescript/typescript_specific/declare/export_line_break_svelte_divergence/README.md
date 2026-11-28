@@ -5,9 +5,9 @@ on its line. Behind `export` a break therefore has no valid reading, because `ex
 is then left with nothing to attach to — **tsc rejects with TS1128 "Declaration or
 statement expected"**, and so does prettier.
 
-The rule is uniform across every head `declare` takes — `class`, `function`,
-`namespace`, `enum`, `const`, `interface`, `type`, `abstract class` — all eight are
-TS1128 in tsc and all are rejected by prettier. This fixture pins one; the parser
+The rule is uniform across every head `declare` takes — e.g. `class`, `function`,
+`namespace`, `enum`, `const`, `interface`, `type`, `abstract class` — each is TS1128
+in tsc and rejected by prettier. This fixture pins one; the parser
 applies the check once, at the post-`declare` dispatch, so the heads cannot drift
 apart.
 

@@ -41,7 +41,7 @@ pub(crate) enum ScriptDeclaration {
         /// Whether this declarator reached script scope by hoisting **through a
         /// POROUS scope** — a block, a for-head/body, a switch, a try/catch. The
         /// oracle re-declares such a `var` on the parent scope and passes NO
-        /// initializer while doing so (`phases/scope.js:673-681` —
+        /// initializer while doing so (`declare` in `phases/scope.js` —
         /// `return this.parent.declare(node, kind, declaration_kind)`, the
         /// 4-argument `initial` defaulting to `null`), so the binding it creates
         /// reads as having no initializer at all. A declarator at the script's
@@ -100,13 +100,13 @@ pub(crate) fn each_script_declaration<E>(
 /// `if (x) { var state = $state(0); }` loses it (the oracle DOES).
 ///
 /// A `LabeledStatement` is transparent here, which is exact for every label but
-/// one. The oracle's visitor (`phases/scope.js:1063-1069`) falls through to a bare
+/// one. The oracle's visitor (`phases/scope.js`) falls through to a bare
 /// `next()` unless the label is at `path.length === 1`, is named `$`, AND the
 /// script was scoped with `allow_reactive_declarations`. That flag is NOT
-/// mode-keyed: `2-analyze/index.js:336-337` passes `false` for the MODULE script
+/// mode-keyed: `analyze_component` in `2-analyze/index.js` passes `false` for the MODULE script
 /// and `true` for the INSTANCE script, in runes mode as much as in legacy mode. So
 /// a top-level `$:` in the instance script does get a scope — a NON-porous one
-/// (`scope.child()`, `porous = false` by default, `scope.js:702`), meaning its
+/// (`scope.child()`, `porous = false` by default, `scope.js`), meaning its
 /// `var` should not reach script scope at all, and this walk over-collects it.
 /// Harmless: a top-level `$:` is invalid in runes mode and refuses on its own
 /// path, so the only effect is which refusal bucket a `$: var state = …` document

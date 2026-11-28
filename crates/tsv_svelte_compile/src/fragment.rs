@@ -323,7 +323,7 @@ pub(crate) fn emit_fragment(
     // this block's init); an element-child fragment leaves them to the block. The
     // collection order is recursive-direct-first — a fragment's own snippets
     // before its descendant elements' — mirroring the oracle's push-order timing
-    // (Fragment.js:35-44 + RegularElement.js:229-231; see
+    // (`Fragment.js` + `RegularElement.js`; see
     // `collect_hoisted_snippets`).
     let hoisted_snippets = if ctx.hoist_snippets {
         let mut collected: Vec<&SnippetBlock> = Vec::new();
@@ -486,13 +486,13 @@ pub(crate) fn emit_child_body(
 /// Emit ORDER is recursive-direct-first, not document pre-order: at each level
 /// the fragment's OWN direct-child snippets come first in source order, THEN each
 /// non-Component element subtree is recursed with the same rule. This mirrors the
-/// oracle's push-order timing — `server/visitors/Fragment.js:35-44` drains a
+/// oracle's push-order timing — `server/visitors/Fragment.js` drains a
 /// fragment's own hoisted `SnippetBlock`s into `state.init` before it processes
 /// the rest of its children, and the **transparent** branch of
-/// `server/visitors/RegularElement.js:229-231` flattens each element's own `init`
+/// `server/visitors/RegularElement.js` flattens each element's own `init`
 /// onto the ancestor's shared array only as that element is reached during that
 /// later walk — so a transparent element's snippets always follow the ancestor's
-/// own. A **non-transparent** element takes the other branch (`:221-224`),
+/// own. A **non-transparent** element takes the other branch,
 /// wrapping its `init` + `template` in a nested `b.block` pushed to the parent
 /// template, so a snippet inside it stays sealed in that block rather than
 /// hoisting to the block scope.

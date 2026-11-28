@@ -177,17 +177,17 @@ pub(crate) fn emit_attribute(
         [AttributeValue::ExpressionTag(tag)] => {
             // An `on`-prefixed single-expression attribute is an event handler —
             // tested on the RAW authored name, exactly like the oracle
-            // (`is_event_attribute`, server `element.js:71`, runs before any
-            // lowercasing): `onClick` drops, but `ONCLICK`/`oNclick` are NOT
-            // events and emit as regular `$.attr('onclick', …)` attributes
-            // (probe-verified). A dropped handler's expression still feeds
-            // `needs_context` (walked up front in `needs_context.rs`), so a
-            // `new`/prop-rooted member or call inside it still forces the
-            // wrapper — only the attribute markup is dropped. Raw `onload`/
-            // `onerror` (exact match — `onLoad` on `<img>` is a plain drop,
-            // probe-verified) on a load-error element are the exception (the
-            // oracle injects an `on{name}="this.__e=event"` capture attribute),
-            // refused for now.
+            // (`is_event_attribute`, server `build_element_attributes` in
+            // `element.js`, runs before any lowercasing): `onClick` drops, but
+            // `ONCLICK`/`oNclick` are NOT events and emit as regular
+            // `$.attr('onclick', …)` attributes (probe-verified). A dropped
+            // handler's expression still feeds `needs_context` (walked up front
+            // in `needs_context.rs`), so a `new`/prop-rooted member or call
+            // inside it still forces the wrapper — only the attribute markup is
+            // dropped. Raw `onload`/`onerror` (exact match — `onLoad` on
+            // `<img>` is a plain drop, probe-verified) on a load-error element
+            // are the exception (the oracle injects an
+            // `on{name}="this.__e=event"` capture attribute), refused for now.
             if raw_name.starts_with("on") {
                 if (raw_name == "onload" || raw_name == "onerror")
                     && is_load_error_element(element_name)
@@ -251,10 +251,10 @@ pub(crate) fn class_needs_clsx(expr: &Expression, quoted: bool) -> bool {
 /// The single-`Text`-chunk `class`/`style` value rule — the oracle's
 /// `WHITESPACE_INSENSITIVE_ATTRIBUTES` handling, which is literally
 /// `chunk.data.replace(regex_whitespaces_strict, ' ').trim()`
-/// (`server/visitors/shared/utils.js:208`).
+/// (`build_attribute_value` in `server/visitors/shared/utils.js`).
 ///
 /// **Two different whitespace classes, in this order.** The collapse is the
-/// NARROW `regex_whitespaces_strict = /[ \t\n\r\f]+/g` (`phases/patterns.js:11`)
+/// NARROW `regex_whitespaces_strict = /[ \t\n\r\f]+/g` (`phases/patterns.js`)
 /// — deliberately not `\s+`, so an explicit `&nbsp;` inside the value survives.
 /// The trim is then JS's WIDE `String.prototype.trim`
 /// ([`js_trim`]). Fusing the two into one narrow-class pass — collapsing and

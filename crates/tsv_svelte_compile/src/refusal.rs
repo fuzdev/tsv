@@ -100,7 +100,7 @@ pub enum Refusal {
     GenericsAttribute,
     /// A `<script>` whose `context` attribute is anything but a plain
     /// `context="module"` — the oracle's parse-time `script_invalid_context`
-    /// (`1-parse/read/script.js:66-78`). The only valid `context` value is the
+    /// (`read_script` in `1-parse/read/script.js`). The only valid `context` value is the
     /// text `"module"` (the legacy spelling of `<script module>`); a boolean
     /// `context`, an expression value `context={x}`, a multi-chunk value, or any
     /// other text (`context="default"`, `context="server"`, …) is rejected. tsv's
@@ -112,7 +112,7 @@ pub enum Refusal {
     #[error("<script> context attribute other than context=\"module\" (the oracle rejects it)")]
     ScriptInvalidContext,
     /// A `<script>` `module` attribute carrying a VALUE — the oracle's parse-time
-    /// `script_invalid_attribute_value` (`1-parse/read/script.js:57-64`, the
+    /// `script_invalid_attribute_value` (`read_script` in `1-parse/read/script.js`, the
     /// sibling of [`Self::ScriptInvalidContext`] in the same attribute loop). The
     /// `module` attribute must be a plain BOOLEAN (`<script module>`); the oracle
     /// rejects `attribute.value !== true`, so `module="foo"`, `module="module"`,
@@ -126,7 +126,7 @@ pub enum Refusal {
     ScriptInvalidAttributeValue,
     /// A `<script>` carrying one of the oracle's `RESERVED_ATTRIBUTES` —
     /// `server`, `client`, `worker`, `test`, or `default` — the oracle's
-    /// parse-time `script_reserved_attribute` (`1-parse/read/script.js:49-51`,
+    /// parse-time `script_reserved_attribute` (`read_script` in `1-parse/read/script.js`,
     /// the FIRST check in the same attribute loop as [`Self::ScriptInvalidContext`]
     /// and [`Self::ScriptInvalidAttributeValue`]). The check fires regardless of the
     /// attribute's VALUE (`<script server>` and `<script server="x">` both reject).
@@ -247,8 +247,8 @@ pub enum Refusal {
     )]
     PropsBindingPattern,
     /// A prop whose name starts with `$$` — the oracle's `props_illegal_name`
-    /// (`2-analyze/visitors/VariableDeclarator.js:94-103` for a destructure key, and
-    /// `MemberExpression.js:11-16` for a `rest_prop.$$…` access; `$$`-prefixed names
+    /// (`2-analyze/visitors/VariableDeclarator.js` for a destructure key, and
+    /// `MemberExpression.js` for a `rest_prop.$$…` access; `$$`-prefixed names
     /// are reserved for Svelte internals). One variant covers both call sites, as the
     /// oracle uses one error code. **Declare-site** (`script_props`): a
     /// `$props()` ObjectPattern property with a non-computed Identifier key starting
@@ -265,7 +265,7 @@ pub enum Refusal {
     /// A `$props()` ObjectPattern property that is COMPUTED (`{ [x]: a }`) or whose
     /// value — after stripping an `= default` — is not a plain Identifier (a nested
     /// pattern, `{ a: { b } }` / `{ a: [b] }`). The oracle's `props_invalid_pattern`
-    /// (`2-analyze/visitors/VariableDeclarator.js:97-110`). The three per-property
+    /// (`2-analyze/visitors/VariableDeclarator.js`). The three per-property
     /// checks fire in source order, first-wins (the oracle's `e.*` throws): computed →
     /// this, then a `$$` Identifier key → [`Self::PropsIllegalName`], then a
     /// non-Identifier value → this. Independent of `$$`: a computed `$$` key
@@ -347,7 +347,7 @@ pub enum Refusal {
         name: String,
     },
     /// A `$`-prefixed **binding** name — the oracle's `dollar_prefix_invalid`
-    /// (`phases/2-analyze/visitors/shared/utils.js:278`). Distinct from
+    /// (`validate_identifier_name` in `phases/scope.js`). Distinct from
     /// [`Self::DollarPrefixedIdentifier`], which is a *read*: the oracle accepts
     /// a `$$slots` read and rejects a `$$slots` declaration, so the two
     /// positions cannot share one verdict.
@@ -390,12 +390,12 @@ pub enum Refusal {
     /// initializer is a rune call; those keep compiling.
     ///
     /// Scope is the oracle's `instance.scope.get`, which walks UP the chain
-    /// (`phases/scope.js:748`) into the MODULE scope — so a `<script module>`
+    /// (`phases/scope.js`) into the MODULE scope — so a `<script module>`
     /// binding collides too. It never walks DOWN, so a function parameter, a
     /// block-scoped `let`, or a name bound in a nested function body is a child
     /// scope and does not collide. Two nested forms still reach script scope: a
     /// function-scoped `var` in any block, for-head, switch, or try/catch (which
-    /// arrives with its initializer DROPPED, `scope.js:673-681`, so the rune
+    /// arrives with its initializer DROPPED, `declare` in `scope.js`, so the rune
     /// exemption can never apply to it), and a declaration in a class STATIC
     /// BLOCK, which the oracle gives no scope at all (no `StaticBlock` visitor)
     /// so the initializer survives. The first is modelled exactly; the second is
@@ -569,7 +569,7 @@ pub enum Refusal {
     #[error("nested {{#each}} (the nested emission path is not yet validated)")]
     NestedEach,
     /// An `{#each}` carrying a `(key)` but no `as` clause, when the block is
-    /// **keyed** — the oracle's `each_key_without_as` (`EachBlock.js:26-34`).
+    /// **keyed** — the oracle's `each_key_without_as` (`EachBlock.js`).
     /// `keyed` is `key.type !== 'Identifier' || !index || key.name !== index`, so
     /// `{#each x, i (i)}` (the key IS the index) is a plain indexed block and
     /// compiles, while a member/expression key, a missing index, or an identifier
@@ -620,7 +620,7 @@ pub enum Refusal {
         name: String,
     },
     /// A **top-level** `{#snippet}` whose name is also declared by the instance
-    /// script (`2-analyze/visitors/SnippetBlock.js:34`). A distinct rule from
+    /// script (`2-analyze/visitors/SnippetBlock.js`). A distinct rule from
     /// [`Refusal::DuplicateSnippetName`]: this one is snippet-vs-*script*, and it
     /// fires only for a direct child of the root fragment.
     #[error(
@@ -632,7 +632,7 @@ pub enum Refusal {
     },
     /// A `{#snippet}` directly inside a `<Component>` that also passes a plain
     /// attribute or `bind:` of the same name
-    /// (`2-analyze/visitors/SnippetBlock.js:59`).
+    /// (`2-analyze/visitors/SnippetBlock.js`).
     #[error(
         "{{#snippet}} {name} shadows the component prop of the same name (the oracle rejects it)"
     )]
@@ -642,18 +642,18 @@ pub enum Refusal {
     },
     /// A `{#snippet children()}` inside a component that also has other
     /// non-whitespace default content
-    /// (`2-analyze/visitors/SnippetBlock.js:77`).
+    /// (`2-analyze/visitors/SnippetBlock.js`).
     #[error("{{#snippet children()}} alongside other default content (the oracle rejects it)")]
     SnippetChildrenConflict,
     /// `export { name }` from a module script naming a `{#snippet}` that does not
-    /// hoist to module scope (`2-analyze/index.js:831`).
+    /// hoist to module scope (`analyze_component` in `2-analyze/index.js`).
     #[error("exported {{#snippet}} {name} is not module-hoistable (the oracle rejects it)")]
     SnippetInvalidExport {
         /// The exported snippet name.
         name: String,
     },
     /// `export { name }` from a module script naming something that script does
-    /// not declare (`2-analyze/index.js:833`). Instance-script declarations do
+    /// not declare (`analyze_component` in `2-analyze/index.js`). Instance-script declarations do
     /// **not** count — the instance scope is a CHILD of the module scope.
     #[error("module script exports {name}, which it does not declare (the oracle rejects it)")]
     ExportUndefined {
@@ -673,7 +673,7 @@ pub enum Refusal {
 
     /// An assignment / update / `bind:` whose target the oracle rejects outright
     /// — its `validate_assignment` family
-    /// (`phases/2-analyze/visitors/shared/utils.js:18-120`, reached from
+    /// (`phases/2-analyze/visitors/shared/utils.js`, reached from
     /// `AssignmentExpression`, `UpdateExpression`, and `BindDirective`). Three
     /// oracle rules share one refusal because they share one call site and one
     /// question ("may this name be written?"): `constant_assignment` (a `const`
@@ -697,7 +697,7 @@ pub enum Refusal {
 
     /// A reference to `arguments` with no `FunctionDeclaration` /
     /// `FunctionExpression` ancestor — the oracle's `invalid_arguments_usage`
-    /// (`phases/2-analyze/visitors/Identifier.js:27-32`). `arguments` is legal
+    /// (`phases/2-analyze/visitors/Identifier.js`). `arguments` is legal
     /// only inside a **non-arrow** function: an **arrow** does not count as such
     /// an ancestor, and neither does a `{#snippet}` body, a class field
     /// initializer, or a static block, so a reference in any of those (or at the
@@ -752,7 +752,7 @@ pub enum Refusal {
     #[error("use: directive on a load-error element (event-capture markup not implemented)")]
     UseDirectiveOnLoadErrorElement,
     /// Two or more transition directives on one element claim the same animation
-    /// channel. The oracle's phase-2 placement check (`shared/element.js:115-132`)
+    /// channel. The oracle's phase-2 placement check (`validate_element` in `shared/element.js`)
     /// runs before it discards the SSR visit: a `transition:` contributes both
     /// intro and outro, `in:` intro only, `out:` outro only, and a channel claimed
     /// twice is `transition_duplicate` (same signature) or `transition_conflict`
@@ -766,7 +766,7 @@ pub enum Refusal {
     )]
     TransitionDirectiveConflict,
     /// An `animate:` directive in a position the oracle rejects at phase-2
-    /// (`shared/element.js:92-114`): it is legal only as the **sole** non-trivial
+    /// (`validate_element` in `shared/element.js`): it is legal only as the **sole** non-trivial
     /// child of a **keyed** `{#each}` body (comments, `{@const}`/declaration tags,
     /// and whitespace-only text are the trivial siblings the filter ignores), and
     /// only one may appear on the element — `animation_invalid_placement` /
@@ -982,7 +982,7 @@ pub enum Refusal {
     #[error("<svelte:head> alongside a {{@const}} in the same fragment (hoist order)")]
     SvelteHeadWithConstTag,
     /// A rune call (any rune but `$inspect`) carrying a `SpreadElement` argument —
-    /// the oracle's `rune_invalid_spread` (`2-analyze/visitors/CallExpression.js:24`,
+    /// the oracle's `rune_invalid_spread` (`2-analyze/visitors/CallExpression.js`,
     /// checked on EVERY rune call before its dispatch, so it fires wherever the call
     /// sits — a script declarator init `$derived.by(...args)`, a statement-position
     /// `$effect(...args)`, a template `{$state.snapshot(...args)}`). tsv recognizes
@@ -1009,7 +1009,7 @@ pub enum Refusal {
         message: String,
     },
     /// An attribute name carrying a character the oracle forbids — its phase-2
-    /// `attribute_invalid_name` (`2-analyze/visitors/shared/element.js:59`,
+    /// `attribute_invalid_name` (`validate_element` in `2-analyze/visitors/shared/element.js`,
     /// `regex_illegal_attribute_character`). tsv's parser is permissive here, so
     /// the compiler refuses rather than emit output for a component the oracle
     /// rejects.
@@ -1025,7 +1025,7 @@ pub enum Refusal {
     },
     /// An `on…` attribute whose value is not a single expression — the oracle's
     /// `attribute_invalid_event_handler`
-    /// (`2-analyze/visitors/shared/element.js:64`). `onclick="foo"`, a
+    /// (`validate_element` in `2-analyze/visitors/shared/element.js`). `onclick="foo"`, a
     /// multi-chunk `onclick="{a}{b}"`, and a BARE `onclick` all qualify; only
     /// `onclick={expr}` is legal.
     ///
@@ -1042,7 +1042,7 @@ pub enum Refusal {
     },
     /// An UNQUOTED attribute value of two or more chunks — `href=/{path}`,
     /// `data-x={a}{b}` — the oracle's `attribute_unquoted_sequence`, the error
-    /// half of `validate_attribute` (`2-analyze/visitors/shared/attribute.js:41-48`):
+    /// half of `validate_attribute` (`2-analyze/visitors/shared/attribute.js`):
     /// a value containing `{…}` must be quote-delimited unless it is exactly one
     /// expression. tsv's parser is permissive here (it parses the multi-chunk
     /// unquoted value happily), so the compiler refuses rather than emit output
@@ -1056,8 +1056,8 @@ pub enum Refusal {
     /// quoting.
     ///
     /// ⚠️ Unlike the name/event-handler rules this one is NOT element-only:
-    /// `validate_attribute` is called from `shared/element.js:43` AND
-    /// `shared/component.js:93`, so `<F x=a{b} />` is rejected exactly like
+    /// `validate_attribute` is called from `validate_element` in `shared/element.js` AND
+    /// `visit_component` in `shared/component.js`, so `<F x=a{b} />` is rejected exactly like
     /// `<a href=/{path}>` (live-probed on both paths).
     #[error("`{name}` attribute value with multiple parts must be quoted (the oracle rejects it)")]
     AttributeUnquotedSequence {
@@ -1066,8 +1066,8 @@ pub enum Refusal {
     },
     /// An attribute value that is an UNPARENTHESIZED sequence expression —
     /// `foo={x, y}` — the oracle's `attribute_invalid_sequence_expression`
-    /// (`2-analyze/visitors/shared/element.js:52`,
-    /// `2-analyze/visitors/shared/component.js:174`).
+    /// (`validate_element` in `2-analyze/visitors/shared/element.js`,
+    /// `disallow_unparenthesized_sequences` in `2-analyze/visitors/shared/component.js`).
     ///
     /// The oracle discriminates by scanning the source BACKWARD from the
     /// sequence's start: a `(` first means the author parenthesized it and it is
@@ -1084,7 +1084,7 @@ pub enum Refusal {
     AttributeInvalidSequenceExpression,
     /// A `slot="…"` attribute whose slot OWNER is not its direct parent — the
     /// oracle's `slot_attribute_invalid_placement`
-    /// (`2-analyze/visitors/shared/attribute.js:90,123`).
+    /// (`validate_slot_attribute` in `2-analyze/visitors/shared/attribute.js`).
     ///
     /// ⚠️ Distinct from the [`Self::ComponentNamedSlot`] FENCE, and the split is
     /// load-bearing for the achievable-parity denominator. The fence covers the
@@ -1096,7 +1096,7 @@ pub enum Refusal {
     #[error("misplaced slot=\"…\" attribute (the oracle rejects it)")]
     SlotAttributeInvalidPlacement,
     /// Two attributes of the same kind and name on one element — the oracle's
-    /// parse-time `attribute_duplicate` (`phases/1-parse/state/element.js:250`).
+    /// parse-time `attribute_duplicate` (`phases/1-parse/state/element.js`).
     /// tsv's parser is permissive here, so the compiler refuses rather than emit
     /// output for a component the oracle rejects.
     #[error("duplicate `{name}` attribute on one element (the oracle rejects it)")]

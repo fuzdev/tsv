@@ -62,11 +62,11 @@ use tsv_ts::ast::{
     ModuleExportName, StatementKind, StmtId,
 };
 
-/// The oracle's `each_key_without_as` (`EachBlock.js:26-34`): an `{#each}` with a
+/// The oracle's `each_key_without_as` (`EachBlock.js`): an `{#each}` with a
 /// `(key)` but no `as` clause, when the block is **keyed**.
 ///
 /// `keyed = key.type !== 'Identifier' || !index || key.name !== index`
-/// (`EachBlock.js:28-29`), so `{#each x, i (i)}` — the key IS the index — is a
+/// (`EachBlock.js`), so `{#each x, i (i)}` — the key IS the index — is a
 /// plain indexed block and compiles, while a member/expression key, a missing
 /// index, or an identifier key naming something other than the index is keyed. An
 /// escaped key identifier reads as unnamed and is treated as keyed: a **safe
@@ -129,8 +129,8 @@ enum PathEntry<'s> {
     /// `{#snippet}`.
     Barrier,
     /// ⚠️ The oracle's one asymmetric node: `<svelte:fragment>` resets
-    /// `parent_element` (`SvelteFragment.js:26`) but is **absent** from the walk's
-    /// break set (`RegularElement.js:201-207`), so an ancestor check can still see
+    /// `parent_element` (`SvelteFragment.js`) but is **absent** from the walk's
+    /// break set (`RegularElement.js`), so an ancestor check can still see
     /// past it. Unreachable today — `<svelte:fragment>` is a deliberate runes-only
     /// fence, so such a component refuses before validation — but modelled rather
     /// than collapsed into `Barrier` so the quirk survives a future un-fencing.
@@ -199,7 +199,7 @@ impl<'s> Validator<'s> {
                 let attributes = sv.attributes(element.attributes);
                 let name = element.name_span.extract(self.source);
                 // No `svelte_meta_invalid_tag` check here: the oracle raises it at PARSE
-                // (`phases/1-parse/state/element.js:142`) and so does tsv's parser, which
+                // (`phases/1-parse/state/element.js`) and so does tsv's parser, which
                 // rejects a `svelte:`-prefixed name that is not a known meta tag. A regular
                 // element can no longer carry the prefix, so there is nothing left to refuse.
                 refuse_duplicate_attributes(attributes, self.source)?;
@@ -312,7 +312,7 @@ impl<'s> Validator<'s> {
     }
 
     /// The attribute rules of the oracle's `validate_element`
-    /// (`2-analyze/visitors/shared/element.js:29`).
+    /// (`2-analyze/visitors/shared/element.js`).
     ///
     /// ⚠️ The grouping is the point: these fire together because they are checks
     /// inside ONE oracle function, whose only callers are `RegularElement.js`
@@ -359,14 +359,14 @@ impl<'s> Validator<'s> {
     }
 
     /// The attribute rules of the oracle's `visit_component`
-    /// (`2-analyze/visitors/shared/component.js:78-117`), for the subset tsv
+    /// (`2-analyze/visitors/shared/component.js`), for the subset tsv
     /// reaches — a `<Foo>`, `<svelte:component>` or `<svelte:self>`.
     ///
     /// ⚠️ This is NOT `validate_element`'s rule set with the element bits removed;
     /// the two oracle functions overlap only on `validate_attribute` (the
     /// unquoted-sequence rule) and the sequence-expression check — and on the
     /// latter they differ in REACH. The component half additionally applies it
-    /// to an `{@attach}` expression (`:115`), which the element half does not — so
+    /// to an `{@attach}` expression (in `visit_component`), which the element half does not — so
     /// `<span {@attach a, b} />` compiles and `<Foo {@attach a, b} />` does not.
     /// Both directions live-probed; collapsing the two sites breaks one of them.
     fn validate_component(&self, attributes: &[AttributeNode]) -> Result<(), CompileError> {
@@ -376,7 +376,7 @@ impl<'s> Validator<'s> {
                     // The oracle's order: `validate_attribute` (the
                     // unquoted-sequence rule — the ONE rule this path shares
                     // with `validate_element` besides the sequence scan) runs
-                    // before the sequence check (`shared/component.js:93-100`).
+                    // before the sequence check (`visit_component` in `shared/component.js`).
                     refuse_unquoted_attribute_sequence(self.sv, a, self.source)?;
                     if let Some(expression) = expression_attribute_value(self.sv, a) {
                         refuse_unparenthesized_sequence(self.view.expr(expression), self.source)?;
@@ -395,7 +395,7 @@ impl<'s> Validator<'s> {
     }
 
     /// The oracle's `validate_slot_attribute`
-    /// (`2-analyze/visitors/shared/attribute.js:56-125`), for the `is_component =
+    /// (`2-analyze/visitors/shared/attribute.js`), for the `is_component =
     /// false` callers — a regular element or `<svelte:element>`.
     ///
     /// The component caller (`is_component = true`) suppresses both error branches,
@@ -456,7 +456,7 @@ impl<'s> Validator<'s> {
     /// `node_invalid_placement` for a text node or an `{expression}`.
     ///
     /// ⚠️ A DIFFERENT rule from the element check below, not a special case of it:
-    /// `Text.js:21` / `ExpressionTag.js:15` call `is_tag_valid_with_parent` and
+    /// `Text.js` / `ExpressionTag.js` call `is_tag_valid_with_parent` and
     /// STOP. No ancestor walk, and — because neither visitor carries `only_warn` —
     /// **no block downgrade**, so a violation under an `{#if}` is still an error
     /// here while the same violation by an element is only a warning.
@@ -471,7 +471,7 @@ impl<'s> Validator<'s> {
     }
 
     /// `node_invalid_placement` for an element — a faithful transcription of the
-    /// ancestor loop in `2-analyze/visitors/RegularElement.js:160-211`.
+    /// ancestor loop in `2-analyze/visitors/RegularElement.js`.
     fn refuse_invalid_element_placement(&self, child_tag: &str) -> Result<(), CompileError> {
         let Some(parent_element) = self.parent_element() else {
             return Ok(());
@@ -529,12 +529,12 @@ impl<'s> Validator<'s> {
 }
 
 /// The oracle's `Scope.declare` same-scope collision for snippet names
-/// (`phases/scope.js:684-691`, reached from the `SnippetBlock` scope visitor at
-/// `:1331-1335`, which declares into `state.scope` — the scope of the fragment
+/// (`phases/scope.js`, reached from the `SnippetBlock` scope visitor, which
+/// declares into `state.scope` — the scope of the fragment
 /// the snippet sits in).
 ///
 /// ⚠️ The scope is the **fragment**, not the component. Every `Fragment` visitor
-/// opens a child scope (`scope.js:1349`), and `declare` forwards to the parent
+/// opens a child scope (`scope.js`), and `declare` forwards to the parent
 /// only for `var` and `import` — a snippet declares `'function'` — so two
 /// `{#snippet a}` siblings collide while `<div>{#snippet a}{/snippet}</div>` +
 /// a root-level `{#snippet a}` do not. Both live-probed.
@@ -566,7 +566,7 @@ fn refuse_duplicate_snippet_names(
 }
 
 /// The oracle's `snippet_shadowing_prop` and `snippet_conflict`
-/// (`2-analyze/visitors/SnippetBlock.js:51-79`), applied to the direct
+/// (`2-analyze/visitors/SnippetBlock.js`), applied to the direct
 /// `{#snippet}` children of `node`'s own fragment.
 ///
 /// Both read `path.at(-2)` — the parent of the snippet's containing `Fragment`,
@@ -648,7 +648,7 @@ fn refuse_component_snippet_rules(
     Ok(())
 }
 
-/// The oracle's `declaration_duplicate` at `2-analyze/visitors/SnippetBlock.js:34`
+/// The oracle's `declaration_duplicate` at `2-analyze/visitors/SnippetBlock.js`
 /// — a **top-level** `{#snippet}` (a direct child of the root fragment) whose name
 /// the instance script also declares.
 ///
@@ -660,7 +660,7 @@ fn refuse_component_snippet_rules(
 ///
 /// ⚠️ An **import** local is not an instance-scope declaration and must NOT fire
 /// this rule: `Scope.declare` forwards an `import` to the PARENT scope
-/// (`phases/scope.js:679-681`), and the instance scope's parent is the module
+/// (`phases/scope.js`), and the instance scope's parent is the module
 /// scope — so an instance-script `import C from './C.svelte'` lands in
 /// `module.scope.declarations` and is never in the `instance.scope.declarations`
 /// this rule tests. `import_names` is therefore subtracted, exactly as
@@ -694,13 +694,13 @@ pub(crate) fn validate_top_level_snippets(
     Ok(())
 }
 
-/// The oracle's module-export check (`2-analyze/index.js:823-836`): every
+/// The oracle's module-export check (`analyze_component` in `2-analyze/index.js`): every
 /// `export { … }` specifier in the **module** script must name something the
 /// module scope holds.
 ///
 /// ⚠️ **Module scope FIRST, snippet names second.** A hoistable top-level snippet
 /// has its binding written INTO the module scope
-/// (`SnippetBlock.js:40-44`), so `<script module>export {foo}</script>{#snippet
+/// (`SnippetBlock.js`), so `<script module>export {foo}</script>{#snippet
 /// foo()}static{/snippet}` is valid and must NOT report `snippet_invalid_export`.
 /// Only a snippet the oracle could not hoist — one referencing the instance script,
 /// or one nested below the root fragment — reaches the error. Both directions
@@ -719,7 +719,7 @@ pub(crate) fn validate_module_exports(
     source: &str,
     snippets: &SnippetAnalysis,
 ) -> Result<(), CompileError> {
-    // `module_illegal_default_export` (`ExportNamedDeclaration.js:14-23`): an
+    // `module_illegal_default_export` (`ExportNamedDeclaration.js`): an
     // `export { x as default }` specifier. Runs FIRST — before the opaque
     // early-return below and regardless of `export.source` — because the oracle
     // gates neither on the module scope being readable nor on a re-export's
@@ -782,7 +782,7 @@ pub(crate) fn export_named_has_default_specifier(
 }
 
 /// The oracle's `specifier.exported.type === 'Identifier' ? .name === 'default'
-/// : .value === 'default'` (`ExportNamedDeclaration.js:17-19`): an identifier
+/// : .value === 'default'` (`ExportNamedDeclaration.js`): an identifier
 /// `default` or a string-literal `"default"` export name. Both sides decode
 /// exactly — the identifier via [`tsv_ts::ast::Identifier::name`] (so an
 /// escaped alias `default` is caught) and the string via
@@ -846,7 +846,7 @@ fn collect_module_declared(
 /// The name the oracle passes for a text node or an `{expression}`.
 const TEXT_PSEUDO_TAG: &str = "#text";
 
-/// The oracle's `regex_not_whitespace` (`phases/patterns.js:9`) is `/[^ \t\r\n]/`
+/// The oracle's `regex_not_whitespace` (`phases/patterns.js`) is `/[^ \t\r\n]/`
 /// — a narrow four-character class, deliberately NOT JS `\s` and so also not
 /// Rust's `char::is_whitespace`.
 fn is_not_html_whitespace(c: char) -> bool {
@@ -856,7 +856,7 @@ fn is_not_html_whitespace(c: char) -> bool {
 /// Classify one fragment node for the slot rule's ancestor stack.
 ///
 /// The owner set is transcribed from the oracle
-/// (`2-analyze/visitors/shared/attribute.js:69-77`): a component,
+/// (`validate_slot_attribute` in `2-analyze/visitors/shared/attribute.js`): a component,
 /// `<svelte:component>`, `<svelte:self>`, `<svelte:element>`, or a
 /// **custom-element** regular element.
 ///
@@ -907,7 +907,7 @@ fn slot_ancestor(sv: SvelteView<'_>, node: &FragmentNode, source: &str) -> SlotA
     }
 }
 
-/// The oracle's `is_custom_element_node` (`phases/nodes.js:40-46`): a regular
+/// The oracle's `is_custom_element_node` (`phases/nodes.js`): a regular
 /// element whose tag contains a `-`, **or** which carries an `is` attribute.
 fn is_custom_element(name: &str, attributes: &[AttributeNode], source: &str) -> bool {
     name.contains('-') || has_plain_attribute(attributes, source, "is")
@@ -925,8 +925,8 @@ fn has_plain_attribute(attributes: &[AttributeNode], source: &str, name: &str) -
 }
 
 /// The oracle's `attribute_invalid_name`
-/// (`2-analyze/visitors/shared/element.js:56-60`) — a transcription of
-/// `regex_illegal_attribute_character` (`phases/patterns.js:23`):
+/// (`validate_element` in `2-analyze/visitors/shared/element.js`) — a transcription of
+/// `regex_illegal_attribute_character` (`phases/patterns.js`):
 ///
 /// ```text
 /// /(^[0-9-.])|[\^$@%&#?!|()[\]{}^*+~;]/
@@ -954,7 +954,7 @@ fn refuse_invalid_attribute_name(attribute: &Attribute, source: &str) -> Result<
 }
 
 /// The oracle's `attribute_unquoted_sequence` — the error half of
-/// `validate_attribute` (`2-analyze/visitors/shared/attribute.js:41-48`): a plain
+/// `validate_attribute` (`2-analyze/visitors/shared/attribute.js`): a plain
 /// attribute whose value is TWO OR MORE chunks (`href=/{path}`, `data-x={a}{b}`)
 /// must be quote-delimited.
 ///
@@ -968,9 +968,10 @@ fn refuse_invalid_attribute_name(attribute: &Attribute, source: &str) -> Result<
 /// legal.
 ///
 /// ⚠️ Reached from BOTH paths — `validate_attribute` is called from
-/// `shared/element.js:43` AND `shared/component.js:93` — unlike the
-/// name/event-handler rules, which are element-only. Its warning half
-/// (`w.attribute_quoted`) gates nothing and is not ported.
+/// `validate_element` in `shared/element.js` AND `visit_component` in
+/// `shared/component.js` — unlike the name/event-handler rules, which are
+/// element-only. Its warning half (`w.attribute_quoted`) gates nothing and is
+/// not ported.
 fn refuse_unquoted_attribute_sequence(
     sv: SvelteView<'_>,
     attribute: &Attribute,
@@ -998,7 +999,7 @@ fn refuse_unquoted_attribute_sequence(
 }
 
 /// The oracle's `is_expression_attribute` + `get_attribute_expression`
-/// (`utils/ast.js:43,59`) as one operation: the attribute's value when it is a
+/// (`utils/ast.js`) as one operation: the attribute's value when it is a
 /// SINGLE expression, `None` otherwise.
 ///
 /// The three `None` shapes are all real inputs and all distinct: a BARE attribute
@@ -1014,7 +1015,7 @@ fn expression_attribute_value(sv: SvelteView<'_>, attribute: &Attribute) -> Opti
 }
 
 /// The oracle's `attribute_invalid_event_handler`
-/// (`2-analyze/visitors/shared/element.js:62-66`).
+/// (`validate_element` in `2-analyze/visitors/shared/element.js`).
 ///
 /// ⚠️ `length > 2` is load-bearing and is NOT a guard against a short slice: the
 /// bare attribute `on` is LEGAL and `onx` is not (both live-probed). Writing it as
@@ -1037,8 +1038,8 @@ fn refuse_invalid_event_handler(
 }
 
 /// The oracle's `disallow_unparenthesized_sequences`
-/// (`2-analyze/visitors/shared/component.js:168-178`, duplicated inline at
-/// `shared/element.js:48-56`).
+/// (`2-analyze/visitors/shared/component.js`, duplicated inline at
+/// `validate_element` in `shared/element.js`).
 ///
 /// ⚠️ The backward SOURCE scan is reproduced rather than replaced by a span test,
 /// because the two are not equivalent. A parenthesized sequence is not a distinct
@@ -1091,7 +1092,7 @@ fn has_illegal_attribute_character(name: &str) -> bool {
     ])
 }
 
-/// The oracle's `attribute_duplicate` (`phases/1-parse/state/element.js:238-256`).
+/// The oracle's `attribute_duplicate` (`phases/1-parse/state/element.js`).
 ///
 /// A parse-time rule over ONE element's attribute list, so it is local and needs no
 /// context beyond the list itself. Three details are load-bearing and each is the

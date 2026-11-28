@@ -402,9 +402,9 @@ the short version:
   ([supports_selector_list_comment](../tests/fixtures/css/at_rules/supports_selector_list_comment_prettier_divergence/))
   and a double-printed at-rule prelude comment after a same-line sibling
   ([atrule_prelude_after_sibling](../tests/fixtures/css/tokens/comments/atrule_prelude_after_sibling/)),
-  both fixed-point outputs no other gate could reach; the cost measured about +16% sites and
-  +8–12% CPU over `tests/fixtures`, and with both fixed the region yields no shape over the
-  fixtures or the real-code corpus. Switching it on is the queued follow-up. Every `<style>`
+  both fixed-point outputs no other gate could reach; with both fixed the region yields no
+  shape over the fixtures or the real-code corpus. It is off: `<style>` content is not a named
+  region (`audit/sites.rs`). Every `<style>`
   island qualifies alike — the top-level section and an element nested in markup both
   register host-absolute spans under the host's ledger key.
   A **foreign-language `<script>` body** (a `lang`/`type` outside the JS/TS family) is a

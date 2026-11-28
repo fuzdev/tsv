@@ -16,7 +16,7 @@ fn compile_rejects_bare_rune_reference() {
 #[test]
 fn compile_refuses_dollar_prefixed_bindings() {
     // The oracle's `dollar_prefix_invalid`
-    // (`phases/2-analyze/visitors/shared/utils.js:278` —
+    // (`validate_identifier_name` in `phases/scope.js` —
     // `node.name.startsWith('$')` on a Binding) is a Svelte reserved-prefix rule
     // on a BINDING, not on a reference and not a JS early error. `$$slots` is
     // the sharp edge: a *reference* is the real runtime value the transform
@@ -214,7 +214,7 @@ fn compile_refuses_dollar_prefixed_class_expression_id() {
 fn compile_refuses_dollar_prefixed_binding_the_oracle_exempts_by_depth() {
     // Two of the guarded positions are oracle-rejected only at the TOP LEVEL: a
     // function-expression id and a catch-clause parameter both declare through
-    // `scope.js:695`, the one `validate_identifier_name` call path that passes
+    // `declare` in `scope.js`, the one `validate_identifier_name` call path that passes
     // `function_depth`, and the instance script's top-level scope sits at depth
     // 1. So the oracle ACCEPTS these three inside a function body
     // (probe-verified against the pinned compiler) and tsv refuses them anyway.
@@ -222,7 +222,7 @@ fn compile_refuses_dollar_prefixed_binding_the_oracle_exempts_by_depth() {
     // The over-refusal is deliberate, not a missing depth check. tsv's
     // `WalkCtx::fn_depth` is NOT the oracle's `function_depth`: the oracle's
     // non-porous increment happens at a function's `BlockStatement`
-    // (`scope.js:1174-1188`), so an expression-bodied arrow does not increment
+    // (`scope.js`), so an expression-bodied arrow does not increment
     // it and does increment tsv's. Gating on `fn_depth == 0` would compile the
     // oracle-REJECTED `const h = () => function $$slots() {}` — an
     // over-acceptance, which is a refusal-contract bug, where this is only an
@@ -302,7 +302,7 @@ fn compile_allows_dollar_member_names() {
 
 #[test]
 fn compile_refuses_props_illegal_name_declare_site() {
-    // The oracle's `props_illegal_name` (VariableDeclarator.js:94-103): a `$props()`
+    // The oracle's `props_illegal_name` (`VariableDeclarator.js`): a `$props()`
     // destructure property whose non-computed Identifier key starts with `$$` is
     // reserved for Svelte internals and rejected. Reaches the check even without a
     // rest/bindable (the plain `{ $$slots: a }` form).
@@ -341,7 +341,7 @@ fn compile_refuses_props_illegal_name_declare_site() {
 
 #[test]
 fn compile_refuses_props_invalid_pattern() {
-    // The oracle's `props_invalid_pattern` (VariableDeclarator.js:97-110): a `$props()`
+    // The oracle's `props_invalid_pattern` (`VariableDeclarator.js`): a `$props()`
     // ObjectPattern property that is COMPUTED or whose value (after stripping a default)
     // is not a plain Identifier. The three per-property checks fire in source order,
     // first-wins (`e.*` throws): computed → props_invalid_pattern, then a `$$` key →
@@ -405,10 +405,10 @@ fn compile_refuses_props_invalid_pattern() {
 #[test]
 fn compile_refuses_props_illegal_name_member_site() {
     // The oracle's `props_illegal_name` REFERENCE-site rule
-    // (`MemberExpression.js:11-16`): a non-computed `.$$…` access on a plain
+    // (`MemberExpression.js`): a non-computed `.$$…` access on a plain
     // Identifier bound to a `$props()` rest_prop. A `rest_prop` arises from the
-    // whole-object `let props = $props()` (`VariableDeclarator.js:87-90`) and from
-    // the REST element of `let { a, ...rest } = $props()` (`:46-47`); the NAMED
+    // whole-object `let props = $props()` (`VariableDeclarator.js`) and from
+    // the REST element of `let { a, ...rest } = $props()`; the NAMED
     // props are `prop`, never `rest_prop`.
     for source in [
         // The three declaration forms: destructure rest, whole-object, mixed.

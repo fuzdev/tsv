@@ -239,7 +239,7 @@ pub(crate) fn rewrite_script_statement(
         // this path passes — before the rune dispatch below, mirroring the
         // oracle's own `VariableDeclarator` visitor, which runs
         // `validate_identifier_name` over every `extract_paths` leaf ahead of
-        // its rune branch (`2-analyze/visitors/VariableDeclarator.js:24-26`).
+        // its rune branch (`2-analyze/visitors/VariableDeclarator.js`).
         // It cannot ride the guard walk: none of the three arms below reaches
         // the binding leaves with the rule applied — a rune declarator's id is
         // not walked at all, and the two that are walked go through

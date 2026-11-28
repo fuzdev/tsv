@@ -162,8 +162,9 @@ pub(crate) fn analyze_script(
 ) -> Result<(), CompileError> {
     // The oracle's duplicate-`$props()` flag is per-SCRIPT state — its analyze phase
     // seeds a fresh `has_props_rune: false` for the module and the instance analysis
-    // alike (`phases/2-analyze/index.js:313,725,793`) — so the flag is scoped to one
-    // `analyze_script` call and the export recursion inside it, not to the component.
+    // alike (`analyze_module` and `analyze_component` in `phases/2-analyze/index.js`) — so
+    // the flag is scoped to one `analyze_script` call and the export recursion inside it,
+    // not to the component.
     let mut seen_props = false;
     analyze_script_in(
         view,
@@ -222,16 +223,16 @@ fn analyze_script_in(
 /// destructured runes, so the destructure and non-destructure arms of a rune can
 /// never disagree on how a leaf folds.
 ///
-/// The fold rule is the oracle's `phases/scope.js:1204-1213`: it declares EVERY
-/// destructuring leaf with `initial = declarator.init` (the whole
-/// `$state(...)`/`$derived(...)` call), then evaluates that init through the
-/// rune's argument. So every leaf folds to the value the *non-destructured*
-/// binding of that rune would — a `let {a} = $state(d)` with `d`→5 folds `{a}` to
-/// `5` (the CONTAINER value, ignoring the `.a` projection: the fold uses
-/// `eval(arg)`, not the runtime `(5).a`). Passing the rune's computed initial to
-/// every leaf reproduces that byte-for-byte; a foldable scalar arg is
-/// corpus-absent, while an object/array arg stays UNKNOWN (no fold) — the
-/// corpus-common case, unchanged.
+/// The fold rule is the oracle's `VariableDeclaration` visitor in
+/// `phases/scope.js`: it declares EVERY destructuring leaf with `initial =
+/// declarator.init` (the whole `$state(...)`/`$derived(...)` call), then
+/// evaluates that init through the rune's argument. So every leaf folds to the
+/// value the *non-destructured* binding of that rune would — a `let {a} =
+/// $state(d)` with `d`→5 folds `{a}` to `5` (the CONTAINER value, ignoring the
+/// `.a` projection: the fold uses `eval(arg)`, not the runtime `(5).a`). Passing
+/// the rune's computed initial to every leaf reproduces that byte-for-byte; a
+/// foldable scalar arg is corpus-absent, while an object/array arg stays UNKNOWN
+/// (no fold) — the corpus-common case, unchanged.
 ///
 /// `kind` is `Derived` for `$derived`/`$derived.by` (each leaf added to
 /// `derived_names` so a `{name}` read lowers to `name()`) and `Normal` for
@@ -344,7 +345,7 @@ fn analyze_declarator(
         Some(RuneInit::Props) => {
             // The oracle rejects a second `$props()` (`props_duplicate`) from its
             // analyze-phase `CallExpression` visitor
-            // (`phases/2-analyze/visitors/CallExpression.js:68-73`), BEFORE the
+            // (`phases/2-analyze/visitors/CallExpression.js`), BEFORE the
             // placement check — so the duplicate wins over `props_invalid_placement`
             // when both apply. Only a top-level declarator init is inspected here;
             // a `$props()` in any other position already refuses on its own path,

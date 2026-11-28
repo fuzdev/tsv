@@ -14,7 +14,7 @@ fn compile_module_refuses_default_export() {
 
 #[test]
 fn compile_refuses_invalid_script_context() {
-    // The oracle's parse-time `script_invalid_context` (read/script.js:66-78): a
+    // The oracle's parse-time `script_invalid_context` (`read_script` in `read/script.js`): a
     // `context` attribute is valid ONLY as the text "module". Any other text.
     assert_unsupported(
         "<script context=\"foo\">\n\tlet x = 1;\n</script>\n<p>{x}</p>",
@@ -51,7 +51,7 @@ fn compile_refuses_invalid_script_context() {
 
 #[test]
 fn compile_refuses_valued_module_attribute() {
-    // The oracle's parse-time `script_invalid_attribute_value` (read/script.js:57-64):
+    // The oracle's parse-time `script_invalid_attribute_value` (`read_script` in `read/script.js`):
     // the `module` attribute must be a plain BOOLEAN; any value refuses.
     assert_unsupported(
         "<script module=\"foo\">\n\tconst a = 1;\n</script>\n<p>x</p>",
@@ -89,7 +89,7 @@ fn compile_refuses_valued_module_attribute() {
 
 #[test]
 fn compile_refuses_reserved_script_attribute() {
-    // The oracle's parse-time `script_reserved_attribute` (read/script.js:49-51):
+    // The oracle's parse-time `script_reserved_attribute` (`read_script` in `read/script.js`):
     // the FIRST check in the attribute loop — a `<script>` attribute named
     // server/client/worker/test/default is rejected. Each name is pinned to prove
     // the carried `{name}` is faithful.
@@ -140,7 +140,7 @@ fn compile_refuses_reserved_script_attribute() {
 fn compile_module_refuses_export_as_default() {
     // The oracle's single `module_illegal_default_export` fires from its
     // `ExportNamedDeclaration` visitor too: an `export { x as default }` specifier
-    // (`ExportNamedDeclaration.js:15-23`). Identifier form.
+    // (`ExportNamedDeclaration.js`). Identifier form.
     assert_unsupported(
         "<script module>\n\tlet answer = 42;\n\texport { answer as default };\n</script>\n<p>hi</p>",
         "default export in <script module>",
@@ -483,9 +483,9 @@ fn compile_module_comment_in_erased_region_refuses() {
 
 #[test]
 fn compile_rejects_exporting_a_non_hoistable_snippet() {
-    // `snippet_invalid_export` (`2-analyze/index.js:831`): the snippet references
-    // the INSTANCE script, so the oracle cannot hoist it into module scope and the
-    // export names nothing there.
+    // `snippet_invalid_export` (`analyze_component` in `2-analyze/index.js`): the
+    // snippet references the INSTANCE script, so the oracle cannot hoist it into
+    // module scope and the export names nothing there.
     assert_unsupported(
         "<script module>export { foo };</script><script>let x = 42;</script>{#snippet foo()}{x}{/snippet}",
         "exported {#snippet} foo is not module-hoistable",
@@ -501,7 +501,7 @@ fn compile_rejects_exporting_a_non_hoistable_snippet() {
 
 #[test]
 fn compile_rejects_exporting_an_undeclared_name() {
-    // `export_undefined` (`2-analyze/index.js:833`).
+    // `export_undefined` (`analyze_component` in `2-analyze/index.js`).
     assert_unsupported(
         "<script module>export { blah };</script>",
         "module script exports blah, which it does not declare",
@@ -517,7 +517,7 @@ fn compile_rejects_exporting_an_undeclared_name() {
 #[test]
 fn compile_accepts_the_module_export_rule_s_exemptions() {
     // ⚠️ The hoist interaction: a hoistable top-level snippet's binding is written
-    // INTO the module scope (`SnippetBlock.js:40-44`), so the export resolves and
+    // INTO the module scope (`SnippetBlock.js`), so the export resolves and
     // there is no error — the reason module scope must be consulted BEFORE the
     // snippet-name set. Live-probed.
     let _ = compile_js("<script module>export { foo };</script>{#snippet foo()}static{/snippet}");

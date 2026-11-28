@@ -369,15 +369,14 @@ Quirk name — description (example):
 
 - `prettier_variant_compact` — No spaces (compact) (`@container (min-width:700px)`)
 - `prettier_variant_spaces` — Extra spaces preserved (`@layer base,  components`)
-- `prettier_variant_parens_spaces` — Spaces inside parentheses (`@scope ( .card )`)
-- `prettier_variant_comma_spaces` — Extra spaces after commas (`@scope (.card,  .panel)`)
-- `prettier_variant_to_spaces` — Extra spaces around 'to' keyword (`@scope (.card)  to  (.ignore)`)
+- `prettier_variant_scope_spaces` — Extra whitespace after a comma in a `@scope` prelude
+- `prettier_variant_label_spaces` — Extra spaces before a statement label's `:` (`lll   :`)
 - `prettier_variant_minus_space` — Space before minus in nth notation (`:nth-child(2n - 1)`)
 - `prettier_variant_minus_compact` — No space around minus (`:nth-child(2n-1)`)
 - `prettier_variant_missing_space` — Missing required space (`@media screen and(min-width:768px)`)
 - `prettier_variant_bom` — BOM preserved (for BOM fixtures) (File starts with UTF-8 BOM)
 
-**Naming convention** (`prettier_variant_*`): the suffix describes WHAT is quirky (not just "variant1"), specifically (`parens_spaces`, not just `spaces`), matching the pattern consistently across fixtures.
+**Naming convention** (`prettier_variant_*`): the suffix describes WHAT is quirky (not just "variant1"), prefer the specific suffix (`scope_spaces` over `spaces`) when one fixture holds several spacing quirks, matching the pattern consistently across fixtures.
 
 **For testing our normalization** (`unformatted_ours_*.*`) — only in `_prettier_divergence` directories, extension matching the input file: our formatter must normalize these to input (N5), and prettier must NOT (N6 verifies the `_ours` designation).
 
@@ -714,18 +713,18 @@ input_invalid_<what>_<where>.svelte
 - `input_invalid_await_const.svelte` — `const await = ...` (await as variable name)
 - `input_invalid_await_param.svelte` — `function fn(await)` (await as parameter)
 - `input_invalid_await_destructure_array.svelte` — `const [await] = ...` (await in array pattern)
-- `input_invalid_yield_shorthand.svelte` — `{yield}` (yield as shorthand property)
-- `input_invalid_let_label.svelte` — `let: for(...)` (let as label)
+- `input_invalid_await_destructure_shorthand.svelte` — `const { await } = obj` (await as shorthand pattern)
+- `input_invalid_await_let.svelte` — `let await = 'a'` (await as `let` binding)
 
 ### Naming Guidelines
 
 Category → pattern — example:
 
-- Declaration → `_const`, `_let`, `_var` — `input_invalid_yield_const.svelte`
+- Declaration → `_const`, `_let`, `_var` — `input_invalid_await_const.svelte`
 - Parameter → `_param`, `_param_arrow` — `input_invalid_await_param.svelte`
-- Destructuring → `_destructure_array`, `_destructure_shorthand` — `input_invalid_yield_destructure_array.svelte`
-- Property → `_shorthand`, `_method` — `input_invalid_yield_shorthand.svelte`
-- Control flow → `_label` — `input_invalid_let_label.svelte`
+- Destructuring → `_destructure_array`, `_destructure_shorthand` — `input_invalid_await_destructure_array.svelte`
+- Property → `_shorthand`, `_method` — `input_invalid_yield_shorthand.svelte` (illustrative)
+- Control flow → `_label` — `input_invalid_let_label.svelte` (illustrative)
 
 ### Best Practices
 

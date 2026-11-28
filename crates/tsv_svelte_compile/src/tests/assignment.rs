@@ -4,11 +4,11 @@ use super::support::*;
 
 #[test]
 fn compile_constant_assignment_refuses() {
-    // `validate_no_const_assignment` (`shared/utils.js:84`): a write to a `const`
+    // `validate_no_const_assignment` (`shared/utils.js`): a write to a `const`
     // declarator or an import local is `constant_assignment`, keyed on the
     // DECLARATION KEYWORD — so a reactive `const a = $state(0)` is refused too.
-    // Both operator forms reach it (`AssignmentExpression.js:11`,
-    // `UpdateExpression.js:11`).
+    // Both operator forms reach it (`AssignmentExpression.js`,
+    // `UpdateExpression.js`).
     assert_unsupported("<script>const a = c(); a += 1;</script>", "a constant");
     assert_unsupported("<script>const a = c(); a++;</script>", "a constant");
     assert_unsupported(
@@ -118,10 +118,10 @@ fn compile_shadow_scope_does_not_leak() {
 
 #[test]
 fn compile_each_item_assignment_refuses() {
-    // `validate_assignment` (`shared/utils.js:33`): a write to an `{#each}`
+    // `validate_assignment` (`shared/utils.js`): a write to an `{#each}`
     // context binding is `each_item_invalid_assignment` in runes mode, which this
     // compiler unconditionally is. Reached from an assignment, an update, and a
-    // `bind:` alike (`BindDirective.js:181`).
+    // `bind:` alike (`BindDirective.js`).
     assert_unsupported(
         "<script>let arr = $state([1]);</script>\
          {#each arr as value}<button onclick={() => value += 1}>x</button>{/each}",
@@ -137,7 +137,7 @@ fn compile_each_item_assignment_refuses() {
          {#each arr as {element}}<input bind:this={element} />{/each}",
         "an {#each} item",
     );
-    // The fallback shares the block's scope (`scope.js:1280`).
+    // The fallback shares the block's scope (the `EachBlock` visitor in `scope.js`).
     assert_unsupported(
         "<script>let arr = $state([1]);</script>\
          {#each arr as value}<p>a</p>{:else}<button onclick={() => value = 1}>x</button>{/each}",
@@ -147,12 +147,13 @@ fn compile_each_item_assignment_refuses() {
 
 #[test]
 fn compile_template_scoped_const_assignment_refuses() {
-    // The TEMPLATE-scoped consts: a `{@const}` name (`phases/scope.js:1205`, whose
-    // `declaration_kind` is the `VariableDeclaration`'s own `const`), a
-    // `{:then}`/`{:catch}` value (`:1310`/`:1324`) and an `{#each}` INDEX
-    // (`:1273`). All three are `declaration_kind: 'const'` to the oracle, so a
-    // write to one is `constant_assignment` — live-verified, the oracle rejects
-    // every case below with `Cannot assign to constant`.
+    // The TEMPLATE-scoped consts: a `{@const}` name (the `VariableDeclaration`
+    // visitor in `phases/scope.js`, whose `declaration_kind` is the
+    // `VariableDeclaration`'s own `const`), a `{:then}`/`{:catch}` value
+    // (the `AwaitBlock` visitor) and an `{#each}` INDEX (the `EachBlock` visitor). All three are
+    // `declaration_kind: 'const'` to the oracle, so a write to one is
+    // `constant_assignment` — live-verified, the oracle rejects every case below
+    // with `Cannot assign to constant`.
     //
     // ⚠️ These are OVER-ACCEPTANCES when unrecorded, not over-refusals: the names
     // are purely template-local, so nothing falls through to a component-level set
@@ -220,10 +221,10 @@ fn compile_template_scoped_const_assignment_refuses() {
 fn compile_each_index_is_not_an_each_item() {
     // ⭐ The two bindings of ONE construct take DIFFERENT oracle rules, and
     // conflating them is a bug in either direction. In `{#each xs as x, i}` the
-    // ITEM is declared `('each', 'const')` (`phases/scope.js:1244`) and
+    // ITEM is declared `('each', 'const')` (the `EachBlock` visitor in `phases/scope.js`) and
     // `validate_no_const_assignment` EXCLUDES `kind === 'each'`, so it carries
     // `each_item_invalid_assignment`; the INDEX is `('template' | 'static',
-    // 'const')` (`:1273`) and carries `constant_assignment`. Both live-verified
+    // 'const')` (the same visitor) and carries `constant_assignment`. Both live-verified
     // against the oracle, which reports "Cannot reassign or bind to each block
     // argument" for the first and "Cannot assign to constant" for the second.
     assert_unsupported(
@@ -272,7 +273,7 @@ fn compile_template_scoped_const_boundary_accepts() {
 
 #[test]
 fn compile_snippet_parameter_assignment_refuses() {
-    // `validate_assignment` (`shared/utils.js:37`): a write to a `{#snippet}`
+    // `validate_assignment` (`shared/utils.js`): a write to a `{#snippet}`
     // parameter is `snippet_parameter_assignment` — and, unlike the each rule,
     // NOT gated on runes mode.
     assert_unsupported(
@@ -406,7 +407,7 @@ fn compile_nested_const_before_its_declaration_refuses() {
 
 #[test]
 fn compile_switch_case_const_shares_one_scope() {
-    // `phases/scope.js:1173` — `SwitchStatement: create_block_scope`. The oracle
+    // `create_scopes` in `phases/scope.js` — `SwitchStatement: create_block_scope`. The oracle
     // gives a `switch` ONE block scope shared by every case, so a `const` in one
     // case is in scope for a write in another and refuses. Live-verified: the
     // oracle rejects both orderings with `Cannot assign to constant`.

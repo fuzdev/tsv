@@ -4,7 +4,7 @@ use super::support::*;
 
 #[test]
 fn compile_rejects_conflicting_transition_directives() {
-    // The oracle's phase-2 placement check (shared/element.js:115-132): a
+    // The oracle's phase-2 placement check (`validate_element` in `shared/element.js`): a
     // `transition:` claims BOTH intro and outro, `in:` only intro, `out:` only
     // outro; a channel claimed twice is `transition_duplicate`/`transition_conflict`.
     // tsv folds the whole union into one refusal — modifiers are irrelevant.
@@ -37,7 +37,7 @@ fn compile_allows_legal_transition_directives() {
 #[test]
 fn compile_rejects_invalid_animate_placement() {
     // `animate:` is legal only on the sole non-trivial child of a keyed `{#each}`
-    // (shared/element.js:92-114). Every other placement refuses.
+    // (`validate_element` in `shared/element.js`). Every other placement refuses.
     // Duplicate `animate:` even in the sanctioned spot still refuses.
     assert_unsupported(
         "{#each xs as x (x)}<div animate:a animate:b></div>{/each}",

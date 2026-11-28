@@ -42,7 +42,7 @@ use crate::transform_server::{EmitEnv, unsupported};
 use crate::{CompileError, Refusal};
 
 /// Whether a component is *dynamic* — the oracle's `metadata.dynamic`
-/// (`2-analyze/visitors/Component.js:14`): `binding !== null && (binding.kind !==
+/// (`2-analyze/visitors/Component.js`): `binding !== null && (binding.kind !==
 /// 'normal' || name.includes('.'))`. A dynamic component compiles to an
 /// `if (expr) {…}` truthiness guard with hydration anchors, not a plain call —
 /// refused in this slice.
@@ -210,11 +210,12 @@ fn plan_component_children(
 /// slot).
 ///
 /// Case-**sensitive**, mirroring its oracle site: the server component visitor
-/// matches `node.name === 'slot'` (`server/visitors/shared/component.js:50`).
-/// ⚠️ Do NOT unify this with `element_census.rs`'s `has_slot_attribute`, which is
-/// case-**insensitive** because CSS pruning lowercases
-/// (`css-prune.js:1015`) — the oracle is split, so the two predicates are
-/// deliberately different, and merging them would break CSS-prune parity.
+/// matches `node.name === 'slot'` (`build_inline_component` in
+/// `server/visitors/shared/component.js`). ⚠️ Do NOT unify this with
+/// `element_census.rs`'s `has_slot_attribute`, which is case-**insensitive**
+/// because CSS pruning lowercases (`get_possible_element_siblings` in
+/// `css-prune.js`) — the oracle is split, so the two predicates are deliberately
+/// different, and merging them would break CSS-prune parity.
 fn child_slot_attribute(env: &EmitEnv<'_>, element: &Element) -> bool {
     component_has_named_attribute(env, element, "slot")
 }
@@ -223,8 +224,9 @@ fn child_slot_attribute(env: &EmitEnv<'_>, element: &Element) -> bool {
 /// the named-slot marker on a `<svelte:element>` component child.
 ///
 /// The case-sensitivity matches `child_slot_attribute` and the same oracle site
-/// (`server/visitors/shared/component.js:50`); see that function for why it must
-/// NOT be unified with the census's case-insensitive `has_slot_attribute`.
+/// (`build_inline_component` in `server/visitors/shared/component.js`); see that
+/// function for why it must NOT be unified with the census's case-insensitive
+/// `has_slot_attribute`.
 fn special_element_slot_attribute(env: &EmitEnv<'_>, se: &SpecialElement) -> bool {
     env.sv.attributes(se.attributes).iter().any(|attr_node| {
         let AttributeNode::Attribute(attr) = attr_node else {
