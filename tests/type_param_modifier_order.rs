@@ -8,27 +8,34 @@
 //! rule — "only on a class, interface or type alias" — already is). Prettier formats
 //! every ordering.
 //!
-//! Both of tsv's outputs are order-blind:
+//! A REPEATED modifier is deferred alike (`<const const T>`; TS1030 for `in`/`out` is
+//! the same grammar checker's, and a repeated `const` draws no tsc diagnostic at all).
+//!
+//! Both of tsv's outputs are order-blind and repeat-blind:
 //!
 //! - the **wire** writes the modifier keys in one order, `const`, `in`, `out` — tsv's
 //!   wire takes one key order per node type, where acorn-typescript's `tsParseModifiers`
 //!   stamps each flag as it consumes the keyword, so its key order follows the source
 //!   (key order is not graded against the oracle; keys, values and presence are);
-//! - the **printer** emits the canonical `const in out` however the source spells it,
-//!   exactly as prettier does.
+//! - the **printer** emits the canonical `const in out`, each modifier once, however the
+//!   source spells it, exactly as prettier does.
 //!
 //! The accepts and the normalization are pinned by
 //! `typescript/typescript_specific/generics/type_param_modifier_order`; the one wire for
 //! every spelling is pinned here.
 //!
-//! ⚠️ One spelling has no fixture form at ALL, not even a variant: the **reversed
-//! variance pair** `<out in T>`, which acorn-typescript *rejects* in every declaration
-//! kind (it is order-free for `const` against a variance modifier, but not for `in`
-//! against `out`). tsc's parser accepts it with an empty `parseDiagnostics` and raises
-//! TS1029 `'in' modifier must precede 'out' modifier` from its grammar checker, so tsv
-//! defers it with the rest of the family — and this file is its only pin, both for the
-//! accept and for the wire keys. See `docs/conformance_svelte.md` §TypeScript
-//! Corrections.
+//! ⚠️ Two spellings have no `input.*` form, since neither is a formatting fixed point and
+//! acorn-typescript *rejects* both, so their normalization rides the fixture's variants
+//! (which only the two formatters read) and their wire is pinned here alone:
+//!
+//! - the **reversed variance pair** `<out in T>`, refused by acorn in every declaration
+//!   kind (it is order-free for `const` against a variance modifier, but not for `in`
+//!   against `out`) — tsc's parser accepts it with an empty `parseDiagnostics` and raises
+//!   TS1029 `'in' modifier must precede 'out' modifier` from its grammar checker
+//!   (`unformatted_reversed_modifier_order`);
+//! - a **repeat** (`unformatted_repeated_modifiers`).
+//!
+//! See `docs/conformance_svelte.md` §TypeScript Corrections.
 
 use serde_json::Value;
 
@@ -120,48 +127,49 @@ fn printer_normalizes_to_canonical_order() {
     }
 }
 
-/// Order-free is not repeat-free: a REPEATED modifier is a syntax error tsv raises at
-/// the offending keyword, with acorn's own message.
+/// Order-free is repeat-free too: a REPEATED modifier is accepted and folds into the
+/// set, so its wire carries the single spelling's modifier keys and the printer prints
+/// the modifier once — which is what prettier emits.
 ///
-/// ⚠️ This is a **deliberate rejection of input prettier formats** (it collapses the
-/// repeat, printing `<out T>`), and the one place this family parts from tsc: tsc's
-/// parser accepts with an empty `parseDiagnostics` and raises TS1030 `'out' modifier
-/// already seen` from its grammar checker, exactly as it does the TS1029 ordering rule
-/// tsv *defers*. The two are graded differently on purpose: under the reject-vs-defer
-/// line (`docs/conformance_tsc.md`) a checker-raised rule only *normally* defers, and
-/// rejecting the repeat keeps the line the sibling positions already draw — a repeated
-/// class-member modifier (`public public foo`) rejects too.
-/// acorn agrees with the verdict, so the drop-in rejection is pinned as ordinary
-/// `input_invalid_*` files in
-/// `typescript/typescript_specific/generics/type_param_modifier_order`; what lives here
-/// is the message and the boundary below.
+/// tsc's parser accepts every repeat with an empty `parseDiagnostics`; its grammar
+/// checker raises TS1030 `'in' modifier already seen` / `'out' modifier already seen`,
+/// and a repeated `const` draws no diagnostic at all. So the repeat is deferred with the
+/// TS1029 ordering rule (`docs/conformance_tsc.md` §The reject-vs-defer line).
+/// acorn-typescript rejects every repeat (`Duplicate modifier: 'out'`), so the accept is
+/// an over-acceptance cataloged in `docs/conformance_svelte.md` §TypeScript Corrections;
+/// the normalization is pinned by the `unformatted_repeated_modifiers` variant of
+/// `typescript/typescript_specific/generics/type_param_modifier_order`, and the wire
+/// here.
 #[test]
-fn repeated_modifier_rejects() {
-    for (source, expected) in [
-        ("class C<const const T> {}", "Duplicate modifier: 'const'"),
-        ("class C<in in T> {}", "Duplicate modifier: 'in'"),
-        ("class C<out out T> {}", "Duplicate modifier: 'out'"),
-        ("class C<out out out> {}", "Duplicate modifier: 'out'"),
+fn repeated_modifier_folds_into_the_set() {
+    for (source, single) in [
+        ("class C<const const T> {}\n", "class C<const T> {}\n"),
+        ("class C<in in T> {}\n", "class C<in T> {}\n"),
+        ("class C<out out T> {}\n", "class C<out T> {}\n"),
+        ("class C<out out out> {}\n", "class C<out out> {}\n"),
+        ("class C<const in const T> {}\n", "class C<const in T> {}\n"),
+        ("class C<in out in out T> {}\n", "class C<in out T> {}\n"),
         (
-            "class C<const in const T> {}",
-            "Duplicate modifier: 'const'",
+            "function f<const const T>() {}\n",
+            "function f<const T>() {}\n",
         ),
     ] {
-        let err = tsv_ts::__private::parse(source)
-            .expect_err(&format!("expected a parse error for {source:?}"));
-        let message = err.to_string();
-        assert!(
-            message.contains(expected),
-            "{source:?} should report {expected:?}, got {message:?}",
+        assert_eq!(
+            modifier_keys(source),
+            modifier_keys(single),
+            "{source:?} writes the modifier keys {single:?} does",
         );
+        let once = format(source);
+        assert_eq!(once, single, "format of {source:?}");
+        assert_eq!(format(&once), once, "idempotent for {source:?}");
     }
 }
 
-/// The repeat check must stay BEHIND the "can a name still follow?" guard, so a trailing
-/// repeat that is really the parameter NAME is untouched: `<out out>` is variance `out`
-/// on a parameter named `out`, which acorn accepts and which
+/// The "can a name still follow?" guard runs on every modifier, a repeat included, so a
+/// trailing repeat that is really the parameter NAME stays the name: `<out out>` is
+/// variance `out` on a parameter named `out`, which acorn accepts and which
 /// `typescript/typescript_specific/generics/type_param_named_out` pins against its wire.
-/// Getting the two in the wrong order turns that valid form into a duplicate error.
+/// Folding a repeat ahead of that guard would swallow the name and reject the valid form.
 #[test]
 fn trailing_repeat_is_the_name() {
     for (source, expected) in [

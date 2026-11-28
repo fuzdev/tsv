@@ -107,16 +107,6 @@ impl HeritageKeyword {
     }
 }
 
-/// The class-member modifiers that print as one canonical run, shared by properties
-/// and methods — see [`Printer::push_class_member_modifiers_doc`].
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct ClassMemberModifiers {
-    pub accessibility: Option<ast::Accessibility>,
-    pub is_static: bool,
-    pub r#abstract: bool,
-    pub r#override: bool,
-}
-
 impl<'a> Printer<'a> {
     /// Emit a member keyword (modifier like `static ` / `readonly `, or
     /// accessor `get ` / `set `) preserving comments BEFORE it: the range
@@ -143,44 +133,91 @@ impl<'a> Printer<'a> {
         parts.push(self.d().text(kind_text));
     }
 
-    /// Emit the modifier keywords a class **property** and a class **method** share,
-    /// in tsc's canonical order: `accessibility → static → abstract → override`.
+    /// Emit a class member's modifier run — `keywords`, the modifiers present, each with
+    /// its trailing space, in the CANONICAL order the caller prints them in (a property's
+    /// `declare → accessibility → static → abstract → override → readonly → accessor`, a
+    /// method's `accessibility → static → abstract → override → async`, an index
+    /// signature's `static → readonly`).
     ///
-    /// One emitter rather than two parallel chains, so the ordering rule and the hazard
-    /// below have a single home; the two member printers diverge only after this run
-    /// (`readonly`/`accessor` on a property, `async`/`*` on a method), and `declare` sits
-    /// ahead of it on the property alone — a method has no `declare` form.
+    /// The parser takes the run in ANY order and with repeats (tsc's `parseModifiers`;
+    /// the order and repeat rules are its checker's), so the source order is not the print
+    /// order. The run is therefore walked in SOURCE order and printed in canonical order,
+    /// each comment run going right after the keyword it followed in the source — every
+    /// run after any occurrence of a repeated keyword, in source order, after its one
+    /// printed copy — and a run ahead of the first source keyword going ahead of the first
+    /// printed one. That is what keeps the output meaning what the source meant: every
+    /// modifier but `static` is line-guarded (`readonly⏎x` is two fields), so the only
+    /// keyword a valid source puts a line break after is `static`, and a `//` or a
+    /// multi-line block comment after it must stay after it — printed after whichever
+    /// keyword came LAST, it would put the break behind a line-guarded one
+    /// (`readonly static // c⏎x` must not become `static readonly // c⏎x`). Prettier
+    /// prints the run's comments after the last keyword and breaks those inputs; tsv
+    /// diverges there (`docs/conformance_prettier_ts_comments.md` §Comment relocation).
     ///
-    /// ⚠️ **`abstract` precedes `override`** — tsc's canonical order, the only one it
-    /// accepts (TS1029 otherwise), and what prettier emits. tsv's parser deliberately
-    /// takes the reversed spelling too, so this run *normalizes* it.
-    ///
-    /// TODO: [`Self::push_member_keyword_doc`] scans FORWARD from `cursor`, so on that
-    /// reversed `override abstract` source the `abstract` lookup runs first and the
-    /// `override` one then finds nothing. Harmless for the keywords themselves, but a
-    /// comment between the two relocates (`override /* c */ abstract x` →
-    /// `/* c */ abstract override x`, where prettier gives `abstract override /* c */ x`).
-    /// Fixing it needs this emitter to walk the modifiers in SOURCE order while printing
-    /// them in canonical order.
-    pub(crate) fn push_class_member_modifiers_doc(
+    /// The comments after the LAST source keyword are left to the caller's pre-name
+    /// emitter when that keyword is also printed last (the source and printed runs end
+    /// alike), so `cursor` stops at its end; otherwise they ride the keyword and `cursor`
+    /// moves to the token after them. Comment-free and in-order runs print exactly as a
+    /// keyword-by-keyword forward walk would.
+    pub(crate) fn push_member_modifier_run_doc(
         &self,
         parts: &mut DocBuf,
-        modifiers: ClassMemberModifiers,
+        keywords: &[&'static str],
         cursor: &mut u32,
         bound: u32,
     ) {
-        if let Some(accessibility) = modifiers.accessibility {
-            self.push_member_keyword_doc(parts, accessibility.as_keyword(), cursor, bound);
+        let d = self.d();
+        let from = *cursor;
+        // Every source occurrence, as (position, index into `keywords`), in source order.
+        let mut occurrences: SmallVec<[(u32, usize); 8]> = SmallVec::new();
+        for (index, text) in keywords.iter().enumerate() {
+            let keyword = text.trim_end();
+            let mut at = from;
+            while let Some(pos) = self.find_keyword_in_range(at, bound, keyword) {
+                occurrences.push((pos, index));
+                at = pos + keyword.len() as u32;
+            }
         }
-        if modifiers.is_static {
-            self.push_member_keyword_doc(parts, "static ", cursor, bound);
+        occurrences.sort_unstable();
+        let Some(&(first_pos, _)) = occurrences.first() else {
+            for text in keywords {
+                parts.push(d.text(text));
+            }
+            return;
+        };
+        let keyword_end =
+            |(pos, index): (u32, usize)| pos + keywords[index].trim_end().len() as u32;
+        let last = occurrences[occurrences.len() - 1];
+        let last_printed = keywords.len() - 1;
+        // Where the run's claimed gaps end: the last source keyword's end when it prints
+        // last (its trailing run is the caller's), else the token after its comments.
+        let run_end = if last.1 == last_printed {
+            keyword_end(last)
+        } else {
+            // The lexer's whitespace class (`js_whitespace_at`), not ASCII alone: a
+            // U+00A0 / U+3000 / U+FEFF after `static` is whitespace too, and stopping on it
+            // would leave the comments behind it to the pre-name emitter, after the last
+            // printed keyword (`override static<NBSP>// c⏎x` → `static override // c⏎x`).
+            self.next_significant_byte(keyword_end(last), bound)
+                .map_or(bound, |p| p as u32)
+        };
+        if self.has_comments_to_emit_between(from, first_pos) {
+            parts.push(self.build_trailing_comments_hang_next(from, first_pos));
         }
-        if modifiers.r#abstract {
-            self.push_member_keyword_doc(parts, "abstract ", cursor, bound);
+        for (index, text) in keywords.iter().enumerate() {
+            parts.push(d.text(text));
+            for (n, &occurrence) in occurrences.iter().enumerate() {
+                if occurrence.1 != index {
+                    continue;
+                }
+                let gap_start = keyword_end(occurrence);
+                let gap_end = occurrences.get(n + 1).map_or(run_end, |next| next.0);
+                if gap_end > gap_start && self.has_comments_to_emit_between(gap_start, gap_end) {
+                    parts.push(self.build_trailing_comments_hang_next(gap_start, gap_end));
+                }
+            }
         }
-        if modifiers.r#override {
-            self.push_member_keyword_doc(parts, "override ", cursor, bound);
-        }
+        *cursor = run_end;
     }
 
     /// Emit comments between the last member keyword and the member name

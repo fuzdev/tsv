@@ -1,0 +1,304 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 481,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Every class-member modifier prints once, in the canonical order — the reordered",
+			"start": 20,
+			"end": 102
+		},
+		{
+			"type": "Line",
+			"value": " and repeated spellings normalize to it (see the variants).",
+			"start": 104,
+			"end": 165
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 480,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 471,
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 167,
+					"end": 470,
+					"abstract": true,
+					"id": {
+						"type": "Identifier",
+						"start": 182,
+						"end": 183,
+						"name": "A"
+					},
+					"superClass": {
+						"type": "Identifier",
+						"start": 192,
+						"end": 196,
+						"name": "Base"
+					},
+					"body": {
+						"type": "ClassBody",
+						"start": 197,
+						"end": 470,
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 201,
+								"end": 228,
+								"declare": true,
+								"readonly": true,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 218,
+									"end": 219,
+									"name": "a"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 219,
+									"end": 227,
+									"typeAnnotation": {
+										"type": "TSNumberKeyword",
+										"start": 221,
+										"end": 227
+									}
+								},
+								"value": null
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 231,
+								"end": 260,
+								"accessibility": "public",
+								"static": true,
+								"readonly": true,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 254,
+									"end": 255,
+									"name": "b"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 258,
+									"end": 259,
+									"value": 1,
+									"raw": "1"
+								}
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 263,
+								"end": 292,
+								"accessibility": "protected",
+								"abstract": true,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 282,
+									"end": 283,
+									"name": "c"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 283,
+									"end": 291,
+									"typeAnnotation": {
+										"type": "TSNumberKeyword",
+										"start": 285,
+										"end": 291
+									}
+								},
+								"value": null
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 295,
+								"end": 339,
+								"accessibility": "public",
+								"abstract": true,
+								"override": true,
+								"readonly": true,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 329,
+									"end": 330,
+									"name": "d"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 330,
+									"end": 338,
+									"typeAnnotation": {
+										"type": "TSNumberKeyword",
+										"start": 332,
+										"end": 338
+									}
+								},
+								"value": null
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 342,
+								"end": 364,
+								"static": true,
+								"accessor": true,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 358,
+									"end": 359,
+									"name": "e"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 362,
+									"end": 363,
+									"value": 1,
+									"raw": "1"
+								}
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 367,
+								"end": 398,
+								"static": true,
+								"override": true,
+								"readonly": true,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 392,
+									"end": 393,
+									"name": "f"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 396,
+									"end": 397,
+									"value": 1,
+									"raw": "1"
+								}
+							},
+							{
+								"type": "MethodDefinition",
+								"start": 401,
+								"end": 427,
+								"accessibility": "public",
+								"static": true,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 421,
+									"end": 422,
+									"name": "g"
+								},
+								"kind": "method",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 422,
+									"end": 427,
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": true,
+									"params": [],
+									"body": {
+										"type": "BlockStatement",
+										"start": 425,
+										"end": 427,
+										"body": []
+									}
+								}
+							},
+							{
+								"type": "MethodDefinition",
+								"start": 430,
+								"end": 467,
+								"accessibility": "private",
+								"static": true,
+								"override": true,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 461,
+									"end": 462,
+									"name": "h"
+								},
+								"kind": "method",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 462,
+									"end": 467,
+									"id": null,
+									"expression": false,
+									"generator": true,
+									"async": true,
+									"params": [],
+									"body": {
+										"type": "BlockStatement",
+										"start": 465,
+										"end": 467,
+										"body": []
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Every class-member modifier prints once, in the canonical order — the reordered",
+							"start": 20,
+							"end": 102
+						},
+						{
+							"type": "Line",
+							"value": " and repeated spellings normalize to it (see the variants).",
+							"start": 104,
+							"end": 165
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

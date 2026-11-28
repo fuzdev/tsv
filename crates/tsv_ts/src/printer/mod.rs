@@ -58,10 +58,9 @@ use analysis::{
 };
 pub(crate) use calls::{call_may_print_whole, spine_first_call_within};
 use comments::{
-    ClassMemberModifiers, CommentFilter, CommentSpacing, CommentVec, ContinuationValue,
-    HeritageKeyword, LeadingGlue, MemberBlankScan, MemberBody, MemberFloor, MemberFreeze,
-    MemberGap, MemberSeam, RunLeadingBlank, ShellLeadingRun, ShellPair, StandaloneGlue,
-    next_significant_byte, paren_shell_close_after,
+    CommentFilter, CommentSpacing, CommentVec, ContinuationValue, HeritageKeyword, LeadingGlue,
+    MemberBlankScan, MemberBody, MemberFloor, MemberFreeze, MemberGap, MemberSeam, RunLeadingBlank,
+    ShellLeadingRun, ShellPair, StandaloneGlue, next_significant_byte, paren_shell_close_after,
 };
 pub(crate) use comments::{leading_regex_start, left_spine_has_no_shell};
 use decorators::class_expr_has_decorators;

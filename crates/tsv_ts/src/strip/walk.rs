@@ -1979,23 +1979,26 @@ impl<'s, 'b> Walk<'s, 'b> {
             .filter_map(|keyword| self.src.find_keyword(from, to, keyword))
             .min()
             .unwrap_or(u32::MAX);
-        let found = removed.map(|keyword| {
-            let keyword = keyword?;
-            let at = self.src.find_keyword(from, to, keyword)?;
-            Some(Span::new(at, at + keyword.len() as u32))
-        });
-        let first_removed = found.iter().flatten().map(|s| s.start).min();
-        for span in found.into_iter().flatten() {
-            let mark = if semicolon
-                && !decorated
-                && Some(span.start) == first_removed
-                && span.start < first_kept
-            {
-                Mark::Semicolon
-            } else {
-                Mark::Plain
-            };
-            self.blank_marked(span.start, span.end, mark);
+        let first_removed = removed
+            .into_iter()
+            .flatten()
+            .filter_map(|keyword| self.src.find_keyword(from, to, keyword))
+            .min();
+        // Every occurrence blanks: tsc's parser takes a repeated modifier
+        // (`public public x`, `readonly static readonly x`), its repeat rule the checker's.
+        for keyword in removed.into_iter().flatten() {
+            let mut cursor = from;
+            while let Some(at) = self.src.find_keyword(cursor, to, keyword) {
+                let end = at + keyword.len() as u32;
+                let mark =
+                    if semicolon && !decorated && Some(at) == first_removed && at < first_kept {
+                        Mark::Semicolon
+                    } else {
+                        Mark::Plain
+                    };
+                self.blank_marked(at, end, mark);
+                cursor = end;
+            }
         }
     }
 }

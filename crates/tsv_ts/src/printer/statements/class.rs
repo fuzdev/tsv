@@ -7,10 +7,9 @@ use crate::printer::class_common::ClassTypeParamsGap;
 use crate::printer::comments::ValueGap;
 use crate::printer::expressions::assignment::{AssignmentLeft, RhsCommentInfo};
 use crate::printer::{
-    ClassMemberModifiers, ContinuationValue, MemberBlankScan, MemberBody, MemberFloor,
-    MemberFreeze, MemberSeam,
+    ContinuationValue, MemberBlankScan, MemberBody, MemberFloor, MemberFreeze, MemberSeam,
 };
-use smallvec::smallvec;
+use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::after_operator::hang_after_operator;
@@ -442,32 +441,33 @@ impl<'a> Printer<'a> {
         let key_start = key.span().start;
         let mut cursor = next_token_start;
 
-        // Declare modifier (property-only, and first — ahead of accessibility)
+        // The modifier run, printed in the canonical order `declare → accessibility →
+        // static → abstract → override → readonly → accessor` whatever order the source
+        // took, each comment kept after the keyword it followed
+        let mut keywords: SmallVec<[&'static str; 8]> = SmallVec::new();
         if prop.declare {
-            self.push_member_keyword_doc(&mut parts, "declare ", &mut cursor, key_start);
+            keywords.push("declare ");
         }
-
-        // Accessibility → static → abstract → override, the run shared with methods
-        self.push_class_member_modifiers_doc(
-            &mut parts,
-            ClassMemberModifiers {
-                accessibility: prop.accessibility,
-                is_static: prop.is_static,
-                r#abstract: prop.r#abstract,
-                r#override: prop.r#override,
-            },
-            &mut cursor,
-            key_start,
-        );
-
-        // Readonly modifier
+        if let Some(accessibility) = prop.accessibility {
+            keywords.push(accessibility.as_keyword());
+        }
+        if prop.is_static {
+            keywords.push("static ");
+        }
+        if prop.r#abstract {
+            keywords.push("abstract ");
+        }
+        if prop.r#override {
+            keywords.push("override ");
+        }
         if prop.readonly {
-            self.push_member_keyword_doc(&mut parts, "readonly ", &mut cursor, key_start);
+            keywords.push("readonly ");
         }
-
-        // Accessor keyword
         if prop.accessor {
-            self.push_member_keyword_doc(&mut parts, "accessor ", &mut cursor, key_start);
+            keywords.push("accessor ");
+        }
+        if !keywords.is_empty() {
+            self.push_member_modifier_run_doc(&mut parts, &keywords, &mut cursor, key_start);
         }
 
         // Key (track key_region_end to avoid double-counting comments inside brackets)
@@ -774,23 +774,27 @@ impl<'a> Printer<'a> {
         let key_start = key.span().start;
         let mut cursor = next_token_start;
 
-        // Accessibility → static → abstract → override, the run shared with properties
-        // (a method has no `declare` form, so the run starts at accessibility here)
-        self.push_class_member_modifiers_doc(
-            &mut parts,
-            ClassMemberModifiers {
-                accessibility: method.accessibility,
-                is_static: method.is_static,
-                r#abstract: method.r#abstract,
-                r#override: method.r#override,
-            },
-            &mut cursor,
-            key_start,
-        );
-
-        // Async modifier
+        // The modifier run, printed in the canonical order `accessibility → static →
+        // abstract → override → async` whatever order the source took, each comment kept
+        // after the keyword it followed (a method has no `declare` form)
+        let mut keywords: SmallVec<[&'static str; 8]> = SmallVec::new();
+        if let Some(accessibility) = method.accessibility {
+            keywords.push(accessibility.as_keyword());
+        }
+        if method.is_static {
+            keywords.push("static ");
+        }
+        if method.r#abstract {
+            keywords.push("abstract ");
+        }
+        if method.r#override {
+            keywords.push("override ");
+        }
         if method.value.r#async {
-            self.push_member_keyword_doc(&mut parts, "async ", &mut cursor, key_start);
+            keywords.push("async ");
+        }
+        if !keywords.is_empty() {
+            self.push_member_modifier_run_doc(&mut parts, &keywords, &mut cursor, key_start);
         }
 
         // Generator marker (owns the `*` and comment handling around it)

@@ -13,7 +13,7 @@ use crate::ast::AstView;
 use crate::ast::{self, TSTypeElement};
 use crate::printer::LeadingGlue;
 use crate::printer::analysis::skip_identifier_at;
-use smallvec::smallvec;
+use smallvec::{SmallVec, smallvec};
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
@@ -591,13 +591,17 @@ impl<'a> Printer<'a> {
             // Modifier keywords (`static`/`readonly`, the former class-only),
             // preserving comments before each and before the `[`
             // (e.g., `static /* c */ readonly /* d */ [k: string]: T`).
+            // The class parser takes them in either order (`readonly static [k]`), so the
+            // run is walked in source order and printed `static readonly`.
             let mut cursor = sig_start;
+            let mut keywords: SmallVec<[&'static str; 2]> = SmallVec::new();
             if idx.is_static {
-                self.push_member_keyword_doc(&mut parts, "static ", &mut cursor, bracket_bound);
+                keywords.push("static ");
             }
             if idx.readonly {
-                self.push_member_keyword_doc(&mut parts, "readonly ", &mut cursor, bracket_bound);
+                keywords.push("readonly ");
             }
+            self.push_member_modifier_run_doc(&mut parts, &keywords, &mut cursor, bracket_bound);
             self.push_pre_name_comments_doc(&mut parts, cursor, bracket_open_pos.unwrap_or(cursor));
         }
 

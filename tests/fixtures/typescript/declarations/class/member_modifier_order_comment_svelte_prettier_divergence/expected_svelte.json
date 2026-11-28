@@ -1,0 +1,501 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 529,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A reordered modifier run prints in canonical order, each comment after the keyword it",
+			"start": 20,
+			"end": 108
+		},
+		{
+			"type": "Line",
+			"value": " followed — so a line break stays after `static`, the one keyword it may follow",
+			"start": 110,
+			"end": 191
+		},
+		{
+			"type": "Line",
+			"value": " l",
+			"start": 238,
+			"end": 242
+		},
+		{
+			"type": "Block",
+			"value": " m\n ",
+			"start": 277,
+			"end": 287
+		},
+		{
+			"type": "Line",
+			"value": " l",
+			"start": 313,
+			"end": 317
+		},
+		{
+			"type": "Block",
+			"value": " m\n ",
+			"start": 345,
+			"end": 355
+		},
+		{
+			"type": "Line",
+			"value": " l",
+			"start": 381,
+			"end": 385
+		},
+		{
+			"type": "Block",
+			"value": " m\n ",
+			"start": 413,
+			"end": 423
+		},
+		{
+			"type": "Block",
+			"value": " b ",
+			"start": 449,
+			"end": 456
+		},
+		{
+			"type": "Block",
+			"value": " a ",
+			"start": 466,
+			"end": 473
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 502,
+			"end": 506
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 528,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 519,
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 193,
+					"end": 518,
+					"abstract": true,
+					"id": {
+						"type": "Identifier",
+						"start": 208,
+						"end": 209,
+						"name": "A"
+					},
+					"superClass": {
+						"type": "Identifier",
+						"start": 218,
+						"end": 219,
+						"name": "B"
+					},
+					"body": {
+						"type": "ClassBody",
+						"start": 220,
+						"end": 518,
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 224,
+								"end": 237,
+								"accessibility": "public",
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 231,
+									"end": 237,
+									"name": "static"
+								},
+								"value": null,
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " l",
+										"start": 238,
+										"end": 242
+									}
+								]
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 245,
+								"end": 260,
+								"override": true,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 254,
+									"end": 255,
+									"name": "x"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 258,
+									"end": 259,
+									"value": 1,
+									"raw": "1"
+								}
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 263,
+								"end": 276,
+								"accessibility": "public",
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 270,
+									"end": 276,
+									"name": "static"
+								},
+								"value": null,
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " m\n ",
+										"start": 277,
+										"end": 287
+									}
+								]
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 288,
+								"end": 303,
+								"override": true,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 297,
+									"end": 298,
+									"name": "y"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 301,
+									"end": 302,
+									"value": 1,
+									"raw": "1"
+								}
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 306,
+								"end": 312,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 306,
+									"end": 312,
+									"name": "static"
+								},
+								"value": null,
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " l",
+										"start": 313,
+										"end": 317
+									}
+								]
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 320,
+								"end": 335,
+								"readonly": true,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 329,
+									"end": 330,
+									"name": "z"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 333,
+									"end": 334,
+									"value": 1,
+									"raw": "1"
+								}
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 338,
+								"end": 344,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 338,
+									"end": 344,
+									"name": "static"
+								},
+								"value": null,
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " m\n ",
+										"start": 345,
+										"end": 355
+									}
+								]
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 356,
+								"end": 371,
+								"readonly": true,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 365,
+									"end": 366,
+									"name": "w"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 369,
+									"end": 370,
+									"value": 1,
+									"raw": "1"
+								}
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 374,
+								"end": 380,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 374,
+									"end": 380,
+									"name": "static"
+								},
+								"value": null,
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " l",
+										"start": 381,
+										"end": 385
+									}
+								]
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 388,
+								"end": 403,
+								"accessor": true,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 397,
+									"end": 398,
+									"name": "v"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 401,
+									"end": 402,
+									"value": 1,
+									"raw": "1"
+								}
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 406,
+								"end": 412,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 406,
+									"end": 412,
+									"name": "static"
+								},
+								"value": null,
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " m\n ",
+										"start": 413,
+										"end": 423
+									}
+								]
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 424,
+								"end": 439,
+								"accessor": true,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 433,
+									"end": 434,
+									"name": "u"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 437,
+									"end": 438,
+									"value": 1,
+									"raw": "1"
+								}
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 442,
+								"end": 480,
+								"static": true,
+								"readonly": true,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 474,
+									"end": 475,
+									"name": "t",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " b ",
+											"start": 449,
+											"end": 456
+										},
+										{
+											"type": "Block",
+											"value": " a ",
+											"start": 466,
+											"end": 473
+										}
+									]
+								},
+								"value": {
+									"type": "Literal",
+									"start": 478,
+									"end": 479,
+									"value": 1,
+									"raw": "1"
+								}
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 483,
+								"end": 501,
+								"accessibility": "public",
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 495,
+									"end": 501,
+									"name": "static"
+								},
+								"value": null,
+								"decorators": [
+									{
+										"type": "Decorator",
+										"start": 483,
+										"end": 487,
+										"expression": {
+											"type": "Identifier",
+											"start": 484,
+											"end": 487,
+											"name": "dec"
+										}
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c",
+										"start": 502,
+										"end": 506
+									}
+								]
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 509,
+								"end": 515,
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 509,
+									"end": 510,
+									"name": "s"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 513,
+									"end": 514,
+									"value": 1,
+									"raw": "1"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A reordered modifier run prints in canonical order, each comment after the keyword it",
+							"start": 20,
+							"end": 108
+						},
+						{
+							"type": "Line",
+							"value": " followed — so a line break stays after `static`, the one keyword it may follow",
+							"start": 110,
+							"end": 191
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

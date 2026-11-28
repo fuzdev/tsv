@@ -783,6 +783,22 @@ impl<'a> Parser<'a> {
         })
     }
 
+    /// [`Self::eat_modifier_keyword`] over the three accessibility keywords, returning the
+    /// one consumed.
+    fn eat_accessibility_modifier(&mut self) -> Option<Accessibility> {
+        let accessibility = match self.current_kind() {
+            TokenKind::Identifier => match self.current_value() {
+                "public" => Accessibility::Public,
+                "private" => Accessibility::Private,
+                "protected" => Accessibility::Protected,
+                _ => return None,
+            },
+            _ => return None,
+        };
+        self.eat_modifier_keyword(accessibility.as_str())
+            .then_some(accessibility)
+    }
+
     /// Consume the contextual keyword `kw` as a class-member modifier iff the
     /// current token is the identifier `kw` and the next token begins a member
     /// name or a generator `*` **on the same line** — otherwise `kw` is itself
@@ -790,8 +806,8 @@ impl<'a> Parser<'a> {
     /// break makes `readonly` a bodiless field via ASI and `x` the next member).
     /// The same-line requirement mirrors acorn's `tsTokenCanFollowModifier`
     /// (`!hasPrecedingLineBreak()`). Returns whether it was consumed. Shared by
-    /// the `declare`/`override`/`abstract`/`readonly` detectors; `declare` is
-    /// probed in three positions (before/after accessibility, after `static`).
+    /// the `declare`/accessibility/`override`/`abstract`/`readonly` arms of
+    /// `parse_class_member`'s modifier loop.
     #[inline]
     fn eat_modifier_keyword(&mut self, kw: &str) -> bool {
         if matches!(self.current_kind(), TokenKind::Identifier)
@@ -822,50 +838,91 @@ impl<'a> Parser<'a> {
         // the diagnostics layer.
         let decorators = self.parse_decorators(DecoratorListKind::Class)?;
 
-        // Handle 'declare' contextual keyword - only if followed by a class member name or another modifier
-        // Otherwise `declare` itself is the property name: `declare = 1;`
-        // Note: declare must be parsed BEFORE accessibility because `declare public a` is valid
-        let is_declare = self.eat_modifier_keyword("declare");
-
-        // Handle accessibility modifiers (public, private, protected). Like the
-        // other shared detectors, each is consumed only if followed by a class
-        // member name or `*` (generator); otherwise the keyword itself is the
-        // property name (`private = 1;`).
-        let accessibility = if self.eat_modifier_keyword("public") {
-            Some(Accessibility::Public)
-        } else if self.eat_modifier_keyword("private") {
-            Some(Accessibility::Private)
-        } else if self.eat_modifier_keyword("protected") {
-            Some(Accessibility::Protected)
-        } else {
-            None
-        };
-
-        // Handle 'declare' after accessibility (for non-canonical order like `public declare a`)
-        let is_declare = is_declare || self.eat_modifier_keyword("declare");
-
-        // Handle 'static' contextual keyword - only if followed by a class member name or `{` (static block)
-        // Otherwise `static` itself is the property name: `static = 2;`
-        // Stays inline: unlike the shared detectors, `static {` (a static block) is also a valid follow.
-        // Note: `static` is deliberately NOT line-break-guarded (unlike the contextual TS
-        // modifiers and `async`). ECMAScript's `ClassElement: static FieldDefinition` has no
-        // `[no LineTerminator here]`, so `static⏎x = 1` is the static field `x` — matching the
-        // spec, tsc, and prettier's parser. (acorn's parser quirkily ASI-splits it into two
-        // fields; here tsv follows the spec/tsc over that acorn shape quirk.)
-        let is_static = if matches!(self.current_kind(), TokenKind::Identifier)
-            && self.current_value() == "static"
-            && (self.peek_is_class_member_name()
-                || self.peek_is(&TokenKind::BraceOpen)
-                || self.peek_is(&TokenKind::Star))
-        {
-            self.advance().ok();
-            true
-        } else {
-            false
-        };
-
-        // Handle 'declare' after static (for non-canonical order like `static declare a`)
-        let is_declare = is_declare || self.eat_modifier_keyword("declare");
+        // The modifier run, in ANY order and with repeats, as tsc's `parseModifiers` reads
+        // it: one loop over every class-member modifier, each a flag on the member. tsc
+        // leaves both the ordering rule (TS1029 `'static' modifier must precede 'readonly'
+        // modifier`) and the repeat rule (TS1028 `Accessibility modifier already seen`,
+        // TS1030 `'readonly' modifier already seen`) to its grammar checker, so tsv defers
+        // both (`docs/conformance_tsc.md` §The reject-vs-defer line): a repeat folds into
+        // its flag and the printer prints each modifier once, in the canonical order, as
+        // prettier does. acorn-typescript rejects every repeat and several orders.
+        //
+        // Each keyword is a modifier only when what follows can still start the member —
+        // its own follow test below, or the keyword IS the member's name (`readonly = 1;`,
+        // `readonly readonly;`), as tsc's `nextTokenCanFollowModifier` decides.
+        let mut is_declare = false;
+        let mut accessibility = None;
+        let mut is_static = false;
+        let mut is_override = false;
+        let mut is_abstract = false;
+        let mut readonly = false;
+        let mut accessor = false;
+        let mut is_async = false;
+        loop {
+            let at = self.current_pos().0;
+            if self.eat_modifier_keyword("declare") {
+                is_declare = true;
+            } else if let Some(this) = self.eat_accessibility_modifier() {
+                // Two DIFFERENT accessibility modifiers reject: the wire holds one
+                // `accessibility` and the printer could reprint only one of them (the
+                // representability floor), though tsc's parser accepts them (TS1028 is its
+                // checker's). acorn and prettier reject them too, with this message.
+                if accessibility.is_some_and(|seen| seen != this) {
+                    return Err(self.error_msg_at("Accessibility modifier already seen", at));
+                }
+                accessibility = Some(this);
+            } else if !is_static
+                && matches!(self.current_kind(), TokenKind::Identifier)
+                && self.current_value() == "static"
+                && (self.peek_is_class_member_name()
+                    || self.peek_is(&TokenKind::BraceOpen)
+                    || self.peek_is(&TokenKind::Star))
+            {
+                // `static` is consumed once: a second `static` is not a modifier in tsc's
+                // parser (`tryParseModifier`'s `hasSeenStaticModifier`) but the member's
+                // NAME, so `static static x` rejects at `x`, as tsc's parser does (TS1434).
+                // It is deliberately NOT line-break-guarded (unlike the contextual TS
+                // modifiers and `async`): ECMAScript's `ClassElement: static
+                // FieldDefinition` has no `[no LineTerminator here]`, so `static⏎x = 1` is
+                // the static field `x` — matching the spec, tsc, and prettier's parser
+                // (acorn's parser quirkily ASI-splits it into two fields; here tsv follows
+                // the spec/tsc over that acorn shape quirk). A `{` after it opens a static
+                // block, which ends the run.
+                self.advance().ok();
+                is_static = true;
+                if matches!(self.current_kind(), TokenKind::BraceOpen) {
+                    break;
+                }
+            } else if self.eat_modifier_keyword("override") {
+                is_override = true;
+            } else if self.eat_modifier_keyword("abstract") {
+                is_abstract = true;
+            } else if self.eat_modifier_keyword("readonly") {
+                readonly = true;
+            } else if matches!(self.current_kind(), TokenKind::Identifier)
+                && self.current_value() == "accessor"
+                && self.peek_is_class_member_name()
+                && !self.peek_preceded_by_line_terminator()
+            {
+                // `accessor` (the decorators proposal) may not prefix a generator, so it
+                // omits the `*` follow. A line break makes `accessor` a bodiless field via
+                // ASI (acorn parses it as a class-accessor modifier, subject to the same
+                // `!hasPrecedingLineBreak()` rule).
+                self.advance().ok();
+                accessor = true;
+            } else if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Async))
+                && (self.peek_is_class_member_name() || self.peek_is(&TokenKind::Star))
+                && !self.peek_preceded_by_line_terminator()
+            {
+                // ECMAScript `async [no LineTerminator here] MethodDefinition` — a line
+                // break makes `async` a bodiless field via ASI (`async⏎x = 1` → two
+                // members). `async` is a reserved Keyword token, not an Identifier.
+                self.advance().ok();
+                is_async = true;
+            } else {
+                break;
+            }
+        }
 
         // Check for static initialization block: `static { ... }` (ES2022).
         // Parsed in ambient (`declare class`) context too, as a `StaticBlock` — the
@@ -877,10 +934,17 @@ impl<'a> Parser<'a> {
             // `static { … }`). tsc reports `public static {}` / `declare static {}`
             // from its checker (TS1184), but the drop-in wire has no field for the
             // modifier, so it cannot be reprinted (the representability floor) and tsv
-            // rejects it; acorn rejects it too. A decorator list is a different call:
-            // acorn keeps it on the block and tsc reports TS1206 from its checker, so
-            // tsv keeps it too, deferring the error.
-            if accessibility.is_some() || is_declare {
+            // rejects it, wherever in the run the modifier stands; acorn rejects it too.
+            // A decorator list is a different call: acorn keeps it on the block and tsc
+            // reports TS1206 from its checker, so tsv keeps it too, deferring the error.
+            if accessibility.is_some()
+                || is_declare
+                || is_override
+                || is_abstract
+                || readonly
+                || accessor
+                || is_async
+            {
                 return Err(self.error_msg("Static class blocks cannot have any modifier"));
             }
             // Parse the block body. A class static initialization block is a
@@ -899,58 +963,6 @@ impl<'a> Parser<'a> {
                 span: Span::new(start as u32, end),
             }));
         }
-
-        // Handle 'override' contextual keyword - only if followed by a class member name or `*`
-        // Otherwise `override` itself is the property name: `override = 1;`
-        let is_override = self.eat_modifier_keyword("override");
-
-        // Handle 'abstract' contextual keyword - only if followed by a class member name or `*`
-        // Otherwise `abstract` itself is the property name: `abstract = 1;`
-        let is_abstract = self.eat_modifier_keyword("abstract");
-
-        // Handle 'override' after abstract. `abstract override` is tsc's CANONICAL
-        // order, so probing `override` only before `abstract` rejected the valid
-        // spelling; the second probe mirrors the three-position `declare` idiom above.
-        // ⚠️ Deliberately widen-only: this leaves the reversed `override abstract`
-        // (which tsc flags TS1029 and acorn rejects) still accepted. Flipping that is
-        // a reject-flip, and the honest structure for both is a modifier LOOP — what
-        // tsc and acorn-typescript each do — which is a `parse_class_member` refactor.
-        let is_override = is_override || self.eat_modifier_keyword("override");
-
-        // Handle 'readonly' contextual keyword - only if followed by a class member name
-        // Otherwise `readonly` itself is the property name: `readonly = 1;`
-        let readonly = self.eat_modifier_keyword("readonly");
-
-        // Handle 'accessor' contextual keyword (ES decorator proposal)
-        // Only consume as modifier if followed by a class member name on the same line.
-        // Stays inline: `accessor` may not prefix a generator, so it omits the `*` follow.
-        // A line break makes `accessor` a bodiless field via ASI (acorn parses it as a
-        // class-accessor modifier, subject to the same `!hasPrecedingLineBreak()` rule).
-        let accessor = if matches!(self.current_kind(), TokenKind::Identifier)
-            && self.current_value() == "accessor"
-            && self.peek_is_class_member_name()
-            && !self.peek_preceded_by_line_terminator()
-        {
-            self.advance().ok();
-            true
-        } else {
-            false
-        };
-
-        // Handle 'async' keyword for async methods
-        // async is only a modifier if followed by: identifier, [, #, or * on the same line
-        // (ECMAScript `async [no LineTerminator here] MethodDefinition` — a line break makes
-        // `async` a bodiless field via ASI, `async⏎x = 1` → two members).
-        // Stays inline: `async` is a reserved Keyword token, not an Identifier.
-        let is_async = if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Async))
-            && (self.peek_is_class_member_name() || self.peek_is(&TokenKind::Star))
-            && !self.peek_preceded_by_line_terminator()
-        {
-            self.advance().ok();
-            true
-        } else {
-            false
-        };
 
         // Handle '*' for generator methods
         let is_generator = self.eat(TokenKind::Star)?;

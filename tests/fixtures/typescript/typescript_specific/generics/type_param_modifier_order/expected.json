@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 319,
+	"end": 358,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,46 +12,52 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " `const in out` is the canonical modifier order, and the only one either",
+			"value": " `const in out` is the canonical modifier order, each modifier once, and the only",
 			"start": 20,
-			"end": 94
+			"end": 103
 		},
 		{
 			"type": "Line",
-			"value": " formatter emits — the reversed spellings normalize to it (see the variant).",
-			"start": 96,
-			"end": 174
+			"value": " form either formatter emits — the reversed and repeated spellings normalize to it",
+			"start": 105,
+			"end": 189
+		},
+		{
+			"type": "Line",
+			"value": " (see the variants).",
+			"start": 191,
+			"end": 213
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 318,
+		"end": 357,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 309,
+			"end": 348,
 			"body": [
 				{
 					"type": "ClassDeclaration",
-					"start": 176,
-					"end": 204,
+					"start": 215,
+					"end": 243,
 					"id": {
 						"type": "Identifier",
-						"start": 182,
-						"end": 189,
+						"start": 221,
+						"end": 228,
 						"name": "Ordered"
 					},
 					"typeParameters": {
 						"type": "TSTypeParameterDeclaration",
-						"start": 189,
-						"end": 201,
+						"start": 228,
+						"end": 240,
 						"params": [
 							{
 								"type": "TSTypeParameter",
-								"start": 190,
-								"end": 200,
+								"start": 229,
+								"end": 239,
 								"const": true,
 								"in": true,
 								"name": "T"
@@ -61,44 +67,50 @@
 					"superClass": null,
 					"body": {
 						"type": "ClassBody",
-						"start": 202,
-						"end": 204,
+						"start": 241,
+						"end": 243,
 						"body": []
 					},
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " `const in out` is the canonical modifier order, and the only one either",
+							"value": " `const in out` is the canonical modifier order, each modifier once, and the only",
 							"start": 20,
-							"end": 94
+							"end": 103
 						},
 						{
 							"type": "Line",
-							"value": " formatter emits — the reversed spellings normalize to it (see the variant).",
-							"start": 96,
-							"end": 174
+							"value": " form either formatter emits — the reversed and repeated spellings normalize to it",
+							"start": 105,
+							"end": 189
+						},
+						{
+							"type": "Line",
+							"value": " (see the variants).",
+							"start": 191,
+							"end": 213
 						}
 					]
 				},
 				{
 					"type": "ClassDeclaration",
-					"start": 206,
-					"end": 238,
+					"start": 245,
+					"end": 277,
 					"id": {
 						"type": "Identifier",
-						"start": 212,
-						"end": 222,
+						"start": 251,
+						"end": 261,
 						"name": "OrderedOut"
 					},
 					"typeParameters": {
 						"type": "TSTypeParameterDeclaration",
-						"start": 222,
-						"end": 235,
+						"start": 261,
+						"end": 274,
 						"params": [
 							{
 								"type": "TSTypeParameter",
-								"start": 223,
-								"end": 234,
+								"start": 262,
+								"end": 273,
 								"const": true,
 								"out": true,
 								"name": "T"
@@ -108,30 +120,30 @@
 					"superClass": null,
 					"body": {
 						"type": "ClassBody",
-						"start": 236,
-						"end": 238,
+						"start": 275,
+						"end": 277,
 						"body": []
 					}
 				},
 				{
 					"type": "TSInterfaceDeclaration",
-					"start": 241,
-					"end": 273,
+					"start": 280,
+					"end": 312,
 					"id": {
 						"type": "Identifier",
-						"start": 251,
-						"end": 260,
+						"start": 290,
+						"end": 299,
 						"name": "Invariant"
 					},
 					"typeParameters": {
 						"type": "TSTypeParameterDeclaration",
-						"start": 260,
-						"end": 270,
+						"start": 299,
+						"end": 309,
 						"params": [
 							{
 								"type": "TSTypeParameter",
-								"start": 261,
-								"end": 269,
+								"start": 300,
+								"end": 308,
 								"in": true,
 								"out": true,
 								"name": "T"
@@ -140,19 +152,19 @@
 					},
 					"body": {
 						"type": "TSInterfaceBody",
-						"start": 271,
-						"end": 273,
+						"start": 310,
+						"end": 312,
 						"body": []
 					}
 				},
 				{
 					"type": "FunctionDeclaration",
-					"start": 276,
-					"end": 308,
+					"start": 315,
+					"end": 347,
 					"id": {
 						"type": "Identifier",
-						"start": 285,
-						"end": 294,
+						"start": 324,
+						"end": 333,
 						"name": "withConst"
 					},
 					"expression": false,
@@ -160,13 +172,13 @@
 					"async": false,
 					"typeParameters": {
 						"type": "TSTypeParameterDeclaration",
-						"start": 294,
-						"end": 303,
+						"start": 333,
+						"end": 342,
 						"params": [
 							{
 								"type": "TSTypeParameter",
-								"start": 295,
-								"end": 302,
+								"start": 334,
+								"end": 341,
 								"const": true,
 								"name": "T"
 							}
@@ -175,8 +187,8 @@
 					"params": [],
 					"body": {
 						"type": "BlockStatement",
-						"start": 306,
-						"end": 308,
+						"start": 345,
+						"end": 347,
 						"body": []
 					}
 				}

@@ -451,15 +451,6 @@ pub enum TSTypeParameterModifier {
 }
 
 impl TSTypeParameterModifier {
-    /// The wire's key for this modifier — also its source spelling.
-    pub fn as_str(self) -> &'static str {
-        match self {
-            TSTypeParameterModifier::Const => "const",
-            TSTypeParameterModifier::In => "in",
-            TSTypeParameterModifier::Out => "out",
-        }
-    }
-
     /// This modifier's bit in [`TSTypeParameterModifiers`].
     const fn bit(self) -> u8 {
         match self {
@@ -472,8 +463,11 @@ impl TSTypeParameterModifier {
 
 /// The modifiers a type parameter carries, as a set.
 ///
-/// The order the source spells them in is not kept: the wire writes them in one order
-/// (`const`, `in`, `out`) and the printer prints them in it, as prettier does.
+/// Neither the order the source spells them in nor a repeat is kept: the wire writes
+/// them in one order (`const`, `in`, `out`) and the printer prints each once in it, as
+/// prettier does. Both rules the source form can break (TS1029 order, TS1030 repeat) are
+/// tsc's checker's, and the modifier run stays re-readable from source between the
+/// parameter's span start and its name.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct TSTypeParameterModifiers {
     /// One bit per [`TSTypeParameterModifier`] (`TSTypeParameterModifier::bit`).
@@ -481,14 +475,10 @@ pub struct TSTypeParameterModifiers {
 }
 
 impl TSTypeParameterModifiers {
-    /// Append `modifier`, or return `false` if it is already present — a repeat
-    /// (`<const const T>`) is a syntax error the caller reports.
-    pub fn push(&mut self, modifier: TSTypeParameterModifier) -> bool {
-        if self.contains(modifier) {
-            return false;
-        }
+    /// Add `modifier`. A repeat (`<const const T>`) is already present and changes
+    /// nothing — the set keeps no count, as it keeps no order.
+    pub fn insert(&mut self, modifier: TSTypeParameterModifier) {
         self.bits |= modifier.bit();
-        true
     }
 
     /// Whether `modifier` is present.

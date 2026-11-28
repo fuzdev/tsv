@@ -1906,25 +1906,20 @@ impl<'a> Parser<'a> {
             if !self.peek_is_identifier_or_keyword() || self.peek_preceded_by_line_terminator() {
                 break;
             }
-            // A REPEAT is rejected HERE, at the offending keyword, rather than left to
-            // fail as a stray token further along: `<out out T>`. ⚠️ tsc's parser
-            // instead accepts and raises TS1030 `'out' modifier already seen` from its
-            // grammar checker, and prettier collapses the repeat. Under the
-            // reject-vs-defer line (`docs/conformance_tsc.md`) a checker-raised rule only
-            // *normally* defers, and this keeps the line the sibling positions already
-            // draw — a repeated class-member modifier (`public public foo`) rejects too,
-            // as a stray token. A deliberate rejection of input prettier formats, not a
-            // gap. acorn agrees with tsv, message and all (`Duplicate modifier: 'out'`).
+            // A REPEAT is accepted and folds into the set (`<const const T>` reads as
+            // `<const T>`): tsc's parser takes any run of modifiers, and the repeat is
+            // never a parse diagnostic — `'out' modifier already seen` (TS1030) is its
+            // grammar checker's, and a repeated `const` draws no diagnostic at all. So
+            // the repeat joins the static-semantic early-errors tsv defers
+            // (`docs/conformance_tsc.md` §The reject-vs-defer line), beside the ordering
+            // rule above. acorn rejects every repeat (`Duplicate modifier: 'out'`), a
+            // cataloged over-acceptance; prettier collapses the repeat, and so does
+            // tsv's printer, which reads the set.
             //
             // The guard above runs FIRST, so a trailing repeat that is really the NAME
             // never reaches this: `<out out>` is variance `out` on a parameter named
             // `out`, which every oracle accepts.
-            if !modifiers.push(modifier) {
-                return Err(self.error_msg_at(
-                    &format!("Duplicate modifier: '{}'", modifier.as_str()),
-                    self.current_pos().0,
-                ));
-            }
+            modifiers.insert(modifier);
             self.advance()?;
         }
 

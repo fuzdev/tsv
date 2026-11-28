@@ -318,12 +318,23 @@ export const TS_FIXTURES_PINS: GatePins = { scanned: 226, both_accept: 202, over
  * `classExtendingPrimitive2.ts` (`class C4a extends void {}`, TS1109) left it for reject
  * parity when `void` stopped reading as a name at a primary (it is the unary operator,
  * an ECMAScript ReservedWord); every other bucket unmoved.
+ *
+ * 467 → 485 `over_acceptance_checker`: eighteen files left reject parity when a class
+ * member's modifiers became one order-free, repeat-folding run, as tsc's `parseModifiers`
+ * reads them — each baseline's error is the checker's order (TS1029) or repeat (TS1028,
+ * TS1030) rule: `multipleClassPropertyModifiers.ts`, `staticMustPrecedePublic.ts`,
+ * `classAbstractMixedWithModifiers.ts`, `privateNameStaticMethodAsync.ts`,
+ * `override5.ts`, `override7.ts`, `overrideKeywordOrder.ts`,
+ * `parserConstructorDeclaration6.ts`, `parserAccessibilityAfterStatic{1,7,10}.ts`,
+ * `parserMemberAccessorDeclaration{7,9}.ts`, `parserMemberFunctionDeclaration{1,3}.ts`,
+ * `parserMemberVariableDeclaration{1,3}.ts` and `Protected6.ts` (conformance_svelte.md
+ * §TypeScript Corrections, the class-member modifier entry); every other bucket unmoved.
  */
 export const TS_REPO_PINS = {
 	scanned: 13708,
 	accept_parity: 12284,
 	over_acceptance_parser: 14,
-	over_acceptance_checker: 467,
+	over_acceptance_checker: 485,
 	units_scanned: 7874,
 	units_accept_parity: 7858
 };

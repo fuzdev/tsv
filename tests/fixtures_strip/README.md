@@ -88,6 +88,8 @@ every declared one must still fire. The accepted ones:
   where ts-blank-space moves it to the `<`. The same program.
 - **Node blanks an assertion whose erasure regroups the expression** (`b + c as T / d`),
   emitting a different program, where ts-blank-space refuses it.
+- **Node refuses a repeated class-member modifier** (`public public a`), which tsc's parser
+  accepts (the repeat rule is its checker's) and ts-blank-space blanks keyword by keyword.
 - **Node drops a leading BOM.**
 - **Node blanks `import type X = require(...)`** as type-only, where ts-blank-space refuses
   it and tsc's `erasableSyntaxOnly` rejects it.

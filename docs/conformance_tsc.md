@@ -266,16 +266,19 @@ layering, not a tsv-invented label:
   `binderBinaryExpressionStress` files, at 5,440 of the 6,000 units. A long `else if`
   ladder is nesting, not a chain — each `if` is the alternate of the one before it, and
   every walk recurses into it — so one is refused a little short of 256 links, by design.
-- Where the rules leave a row open, accept is the default; a reject must pay for itself —
-  forced by a floor, or the simpler line to state because the sibling positions already
-  draw it (a repeated type-parameter modifier, `<out out T>`, rejects as a repeated
-  class-member modifier does). Prettier is the formatting reference only, never by
-  itself an accept/reject signal.
+- Where the rules leave a row open, accept is the default; a reject must pay for itself,
+  forced by a floor. A modifier run shows the line: tsc's parser takes any order and any
+  repeat of a class member's or a type parameter's modifiers, its checker reporting the
+  order (TS1029) and the repeat (TS1028, TS1030), so tsv defers both and folds a repeat
+  into its flag — but two *different* accessibility modifiers (`public private x`) reject,
+  since the wire holds one `accessibility` (the representability floor). Prettier is the
+  formatting reference only, never by itself an accept/reject signal.
 
 Some rows still sit on the wrong side of the line — early errors that reject inline
-(e.g. `get`/`set constructor`, duplicate `import`-attribute keys) and a production rule
-that still parses (a top-level `return`, excluded by the `[Return]` parameter). They
-are known gaps against the line, not exceptions to it.
+(e.g. `get`/`set constructor`, duplicate `import`-attribute keys, a repeated or reordered
+parameter-property modifier such as `constructor(readonly public x)`, which tsc's parser
+accepts) and a production rule that still parses (a top-level `return`, excluded by the
+`[Return]` parameter). They are known gaps against the line, not exceptions to it.
 
 The exceptions are stated, each argued where it is cataloged: a cover production
 defers (above); the strict-mode rules — the `with` statement, the leading-zero numeric
