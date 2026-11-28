@@ -161,7 +161,7 @@ fn census_file(path: &Path) -> Result<Option<FileResult>, String> {
     }
 
     let mut exposed_by_kind = [0usize; 7];
-    for comment in &root.comments {
+    for comment in root.view().ts().comments(root.comments) {
         let (c_start, c_end) = (comment.span.start as usize, comment.span.end as usize);
         // First matching span classifies the comment; each comment counts once.
         if let Some(span) = spans.iter().find(|s| {

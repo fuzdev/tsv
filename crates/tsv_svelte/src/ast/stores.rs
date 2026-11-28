@@ -10,9 +10,10 @@
 //! strings: one store per element type of a list — a fragment's nodes, an element's
 //! attributes, an attribute's value parts, a directive's modifier spans, the wire's
 //! `{#snippet}` parameter lists — each with the scratch stack that builds its lists, which
-//! `tsv_lang`'s `value_runs!` declares from one entry per element type; and a text pool, for
-//! the one string the template keeps as text of its own. It has a slot of its own in this
-//! crate.
+//! `tsv_lang`'s `value_runs!` declares from one entry per element type; a text pool, for
+//! the one string the template keeps as text of its own; and the scratch stack the template's
+//! comments gather on before they join the TypeScript half as `Root.comments`. It has a slot
+//! of its own in this crate.
 //!
 //! Every list element type is `Copy`, so a finished list is copied into its store as a
 //! block.
@@ -28,11 +29,11 @@ use std::cell::Cell;
 use std::fmt;
 
 use tsv_css::ast::CssStores;
-use tsv_lang::Span;
-use tsv_lang::store::TextPool;
 use tsv_lang::store::park::{self, Parkable};
+use tsv_lang::store::{ListBuf, TextPool};
 #[cfg(test)]
 use tsv_lang::value_runs::FieldShape;
+use tsv_lang::{Comment, Span};
 use tsv_ts::ast::AstStores;
 
 use super::{AttributeNode, AttributeValue, FragmentNode, SnippetWireParameters, SvelteView};
@@ -81,13 +82,21 @@ const _: () = {
 };
 
 /// A document's own lists and strings: the template's list stores, the scratch stacks that
-/// build their lists, and its text pool.
+/// build their lists, its text pool, and the template's comment scratch.
 ///
 /// A fresh one allocates nothing: a store's buffer is allocated by its first write, a scratch
 /// stack's by its first push, and the pool's by its first string.
 pub(crate) struct SvelteOwn {
     pub(crate) runs: SvelteRuns,
     pub(crate) text: TextPool<SvelteText>,
+    /// The template's comments while the markup is read: every expression island's, copied
+    /// out of the TypeScript half as the island is parsed, and the ones the template reader
+    /// reads itself (a `//` or `/* */` inside a tag). One frame, open for the whole parse and
+    /// rewound with the embedded-parse ledgers (`SvelteParser::rewind_embedded_parses`); the
+    /// root merges it with the scripts' runs into `Root.comments`, a run of the TypeScript
+    /// half's comment store, and closes it. A scratch with no store of its own: the comments
+    /// it holds end up in the TypeScript half, beside the scripts'.
+    pub(crate) comment_scratch: ListBuf<Comment>,
 }
 
 impl SvelteOwn {
@@ -97,13 +106,18 @@ impl SvelteOwn {
         Self {
             runs: SvelteRuns::new(),
             text: TextPool::new(),
+            comment_scratch: ListBuf::new(),
         }
     }
 
     /// The bytes every store's, scratch stack's and the pool's allocation holds.
     pub(crate) fn capacity_bytes(&self) -> usize {
-        let Self { runs, text } = self;
-        runs.capacity_bytes() + text.capacity_bytes()
+        let Self {
+            runs,
+            text,
+            comment_scratch,
+        } = self;
+        runs.capacity_bytes() + text.capacity_bytes() + comment_scratch.capacity_bytes()
     }
 
     /// Rewinds the stores in place between documents. Every store once written keeps its
@@ -122,9 +136,14 @@ impl SvelteOwn {
     pub(crate) fn reset(&mut self) {
         // destructured whole, so a field added to the stores without a reset here is a build
         // error rather than growth across documents
-        let Self { runs, text } = self;
+        let Self {
+            runs,
+            text,
+            comment_scratch,
+        } = self;
         runs.reset();
         text.reset();
+        comment_scratch.reset();
     }
 
     /// Empties every scratch stack, discarding the frames a failed parse left open. The
@@ -137,23 +156,39 @@ impl SvelteOwn {
     pub(crate) fn clear_scratch(&mut self) {
         // destructured whole, as `reset` is, so a scratch stack added to the stores beside the
         // generated ones is a build error here rather than a frame a failed parse leaves open
-        let Self { runs, text: _ } = self;
+        let Self {
+            runs,
+            text: _,
+            comment_scratch,
+        } = self;
         runs.clear_scratch();
+        comment_scratch.reset();
     }
 
     /// Whether every scratch stack is empty, as the parse driver finds and leaves them.
     #[cfg(debug_assertions)]
     pub(crate) fn scratch_is_empty(&self) -> bool {
-        let Self { runs, text: _ } = self;
-        runs.scratch_is_empty()
+        let Self {
+            runs,
+            text: _,
+            comment_scratch,
+        } = self;
+        runs.scratch_is_empty() && comment_scratch.is_empty()
     }
 
     /// Every field's shape, for the tests that read what a reset leaves. Destructured whole,
     /// as [`SvelteOwn::reset`] is, so no field is missed.
     #[cfg(test)]
     pub(crate) fn shapes(&self) -> Vec<FieldShape> {
-        let Self { runs, text } = self;
-        let mut out = vec![FieldShape::pool("text", text)];
+        let Self {
+            runs,
+            text,
+            comment_scratch,
+        } = self;
+        let mut out = vec![
+            FieldShape::pool("text", text),
+            FieldShape::scratch("comment_scratch", comment_scratch),
+        ];
         runs.shapes(&mut out);
         out
     }
@@ -702,6 +737,9 @@ mod tests {
         };
         let value = view.attribute_values(*value)[0];
         let wire = view.wire_params(parsed.snippet_wire_parameters)[0];
+        let commented = crate::__private::parse("{a /* c */}").expect("the document parses");
+        let comment = commented.view().ts().comments(commented.comments)[0];
+        stores.own.comment_scratch.push(comment);
         let runs = &mut stores.own.runs;
         runs.node_scratch.push(node);
         runs.attribute_scratch.push(attribute);

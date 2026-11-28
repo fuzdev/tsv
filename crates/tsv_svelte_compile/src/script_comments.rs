@@ -64,7 +64,7 @@ pub(crate) fn collect_script_comments(
     let Some(script) = &root.instance else {
         // No instance script to carry into: any comment that is not a (dropped)
         // module comment is a template comment we don't thread — refuse.
-        for comment in &root.comments {
+        for comment in view.comments(root.comments) {
             if !in_module(comment) {
                 return Err(unsupported(Refusal::TemplateComments));
             }
@@ -128,7 +128,7 @@ pub(crate) fn collect_script_comments(
         .first()
         .map_or(content.end, |&stmt| view.stmt(stmt).span().start);
     let mut comments = Vec::with_capacity(root.comments.len());
-    for comment in &root.comments {
+    for comment in view.comments(root.comments) {
         // A module-script comment drops — but ONLY when the module script comes
         // FIRST. The oracle's drop is not a rule about module scripts; it is
         // where esrap's single comment index happens to be. The component body
@@ -272,7 +272,7 @@ pub(crate) fn collect_module_script_comments(
     let census = BlockCensus::of(view, module_body.iter().copied());
     let min_block = census.min_block_start();
     let mut kept = Vec::new();
-    for comment in &root.comments {
+    for comment in view.comments(root.comments) {
         // Only comments physically inside the module `<script>` content.
         if comment.span.start < module_content.start || comment.span.end > module_content.end {
             continue;

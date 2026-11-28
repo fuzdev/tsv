@@ -1765,7 +1765,8 @@ fn format_root<'a>(
     // rule is a JS-parse postprocess and its own Svelte printer drops those outright, so
     // there is no oracle for them either way.
     let root = parsed.root;
-    let comments = tsv_lang::merge_nestled_block_comments(source, &root.comments);
+    let comments =
+        tsv_lang::merge_nestled_block_comments(source, parsed.view.ts().comments(root.comments));
 
     // The template printer deliberately leaves `EmbedContext::printer_owns_line` at its
     // default: after an island's closing `}` the rest of the line is this printer's markup,
@@ -1840,8 +1841,8 @@ fn format_root<'a>(
 
     // The print-once comment ledger's expectation for this document (diagnostic; see
     // `tsv_lang::comment_ledger`). `Root.comments` is the `<script>` + template-expression
-    // JS comments, registered as MERGED — the list the printers emit; the `<style>` island
-    // registers its own through `tsv_css`. The template's
+    // JS comments (a run of the TypeScript half), registered as MERGED — the list the printers
+    // emit; the `<style>` island registers its own through `tsv_css`. The template's
     // `<!-- -->` (`FragmentNode::Comment`) comments are AST nodes rather than detached, so
     // they register by span through a recursive fragment walk — hoisted section comments
     // included, since they still live in `Root.fragment.nodes` (see `print_root`).

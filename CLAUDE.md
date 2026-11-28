@@ -579,7 +579,7 @@ Worked example + full design: ./docs/architecture.md §Two-AST Design.
 
 ### Comment Handling: Detached Model
 
-Comments live **separately from AST nodes**, in a flat `Comment` list at the root (`Program.comments`, a `Run<Comment>` over the TypeScript stores; `CssStyleSheet.comments` and `Root.comments`, `Vec`s) — a `Copy` POD of spans + flags whose text is recovered via `Comment::content(source)` — and the printer finds them by span position. Glued block comments are **owned** (`owned_by_node`): printed by the node they're bound to, not the enclosing gap. **Ownership is a fact about who PRINTS a comment, never about whether it EXISTS.** A lookup names one of three axes (`tsv_lang::comment`):
+Comments live **separately from AST nodes**, in a flat `Comment` list at the root (`Program.comments` and Svelte's `Root.comments`, each a `Run<Comment>` over the TypeScript stores; `CssStyleSheet.comments`, a `Vec`) — a `Copy` POD of spans + flags whose text is recovered via `Comment::content(source)` — and the printer finds them by span position. Glued block comments are **owned** (`owned_by_node`): printed by the node they're bound to, not the enclosing gap. **Ownership is a fact about who PRINTS a comment, never about whether it EXISTS.** A lookup names one of three axes (`tsv_lang::comment`):
 
 | axis | question | owned comments | who asks |
 | --- | --- | --- | --- |

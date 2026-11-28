@@ -159,7 +159,7 @@ pub const WIRE_COORDINATES: WireCoordinates =
 fn refuse_lone_cr_in_tag_line_comment(source: &str) -> Result<()> {
     let root = __private::parse(source)?;
     let bytes = source.as_bytes();
-    for comment in &root.comments {
+    for comment in root.view().ts().comments(root.comments) {
         // Only the template reader's `//` runs to a `\n` alone; acorn's and the CSS
         // parser's end at a `<CR>` already.
         if !comment.from_template_reader || comment.is_block {

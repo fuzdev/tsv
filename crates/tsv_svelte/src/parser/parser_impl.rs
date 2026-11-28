@@ -56,8 +56,13 @@ pub(crate) struct SvelteParser<'a> {
     /// One-token lookahead, lexed in place like `current` (document coordinates);
     /// cleared whenever the lexer is re-seeked.
     pub(crate) peek: Option<Token>,
-    /// TS comments collected from template expressions (e.g., {@debug /* comment */ a})
-    pub(crate) expression_comments: Vec<Comment>,
+    /// The frame the template's comments are pushed onto, on the own half's
+    /// [`comment_scratch`](crate::ast::SvelteOwn::comment_scratch), open for the whole
+    /// parse: every expression island's comments, copied out of the TypeScript half as the
+    /// island is parsed, and the ones the template reader reads itself
+    /// ([`Self::try_read_js_comment`]). The root merges the frame with the scripts' comment
+    /// runs into `Root.comments` and closes it.
+    pub(crate) expression_comments: ListMark<Comment>,
     /// The frame the wire-only parameter lists of the `{#snippet}` heads that hold a
     /// grouping pair are pushed onto, open for the whole parse: in read order — which is
     /// source order, since a head is read before its body. See
@@ -102,7 +107,7 @@ const ISLAND_LEVELS: u32 = 2;
 /// [`SvelteParser::embedded_parse_mark`].
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct EmbeddedParseMark {
-    comments: usize,
+    comments: ListMark<Comment>,
     snippet_wire_parameters: ListMark<ast::SnippetWireParameters>,
     #[cfg(feature = "_internal_ast_census")]
     ast_census_mark: u32,
@@ -202,6 +207,7 @@ impl<'a> SvelteParser<'a> {
         lexer.next_token_into(&mut current)?;
         let SvelteStores { ts, css, own } = stores;
         let snippet_wire_parameters = own.runs.wire_param_scratch.mark();
+        let expression_comments = own.comment_scratch.mark();
         Ok(Self {
             stores: Some(&mut **ts),
             css: &mut **css,
@@ -210,7 +216,7 @@ impl<'a> SvelteParser<'a> {
             lexer,
             current,
             peek: None,
-            expression_comments: Vec::new(),
+            expression_comments,
             snippet_wire_parameters,
             in_svelte_head: false,
             in_shadowroot_template: false,
@@ -265,17 +271,59 @@ impl<'a> SvelteParser<'a> {
             .expect("the island stores are out only while a `&Self` is held")
     }
 
-    /// Appends an island's comments to the document's template comments, read through the
+    /// Appends an island's comments to the template's comment frame, read through the
     /// document's stores.
     #[expect(clippy::expect_used)]
     #[inline]
     pub(crate) fn merge_island_comments(&mut self, comments: Run<Comment>) {
+        if comments.is_empty() {
+            return;
+        }
         let stores = self
             .stores
             .as_deref()
             .expect("the island stores are out only while a `&Self` is held");
-        self.expression_comments
+        self.own
+            .comment_scratch
             .extend_from_slice(stores.view().comments(comments));
+    }
+
+    /// Closes the template's comment frame into `Root.comments`: the frame merged with the
+    /// two top-level scripts' comment runs (`[instance, module]`) into one run of the
+    /// TypeScript half, ascending by start — or, when one script alone holds comments, that
+    /// script's run itself, with no copy.
+    ///
+    /// Every input is already in source order — a script's comments are its lexer's, and the
+    /// template's are pushed as the markup is read, an island's as it is parsed — so this is
+    /// a merge, never a sort. A comment of the frame out of order would be a reader that
+    /// parsed an island out of source order: a debug build asserts it, and a release build
+    /// sorts the frame first rather than hand the printer's binary searches an unordered list.
+    pub(crate) fn flush_root_comments(&mut self, scripts: [Run<Comment>; 2]) -> Run<Comment> {
+        let mark = self.expression_comments;
+        let template = self.own.comment_scratch.frame_mut(mark);
+        let ordered = template.is_sorted_by_key(|comment| comment.span.start);
+        debug_assert!(
+            ordered,
+            "the template's comments were gathered out of source order"
+        );
+        if !ordered {
+            sort_comments(template);
+        }
+        let Self { stores, own, .. } = self;
+        #[expect(clippy::expect_used)]
+        let stores = stores
+            .as_deref_mut()
+            .expect("the island stores are out only while a `&Self` is held");
+        let comments = merge_root_comments(stores, scripts, own.comment_scratch.frame(mark));
+        own.comment_scratch.truncate(mark);
+        own.comment_scratch.close_empty(mark);
+        comments
+    }
+
+    /// Pushes a comment the template reader read itself onto the template's comment frame.
+    #[inline]
+    fn push_template_comment(&mut self, comment: Comment) {
+        self.own.comment_scratch.push(comment);
     }
 
     /// The view reading the document's stores outside an island parse.
@@ -530,7 +578,7 @@ impl<'a> SvelteParser<'a> {
     ///
     /// Called when the current token is `Slash`, to check whether the slash begins
     /// a comment rather than a self-closing `/>`. If a comment is found, it is pushed
-    /// to `expression_comments` and the lexer is advanced past the comment.
+    /// to the template's comment frame and the lexer is advanced past the comment.
     ///
     /// Returns `true` if a comment was consumed, `false` if it's a regular slash.
     pub(crate) fn try_read_js_comment(&mut self) -> Result<bool, Error> {
@@ -551,7 +599,7 @@ impl<'a> SvelteParser<'a> {
                 }
 
                 let content = &self.source[content_start..end];
-                self.expression_comments.push(expression_comment(
+                self.push_template_comment(expression_comment(
                     Span::new(pos as u32, end as u32),
                     Span::new(content_start as u32, end as u32),
                     false,
@@ -579,7 +627,7 @@ impl<'a> SvelteParser<'a> {
 
                 let content = &self.source[content_start..end];
                 let comment_end = end + 2; // past */
-                self.expression_comments.push(expression_comment(
+                self.push_template_comment(expression_comment(
                     Span::new(pos as u32, comment_end as u32),
                     Span::new(content_start as u32, end as u32),
                     true,
@@ -739,7 +787,8 @@ impl<'a> SvelteParser<'a> {
 
     /// Parse a TypeScript expression and collect any comments.
     ///
-    /// Comments are added to `self.expression_comments` for later inclusion in `Root.comments`.
+    /// Comments are added to the template's comment frame for later inclusion in
+    /// `Root.comments`.
     ///
     /// ⚠️ **`source` must keep its trailing whitespace.** A head reader may trim the LEADING
     /// run — Svelte reaches every one of these reads through `allow_whitespace()`, so acorn
@@ -921,7 +970,7 @@ impl<'a> SvelteParser<'a> {
     /// identical.
     pub(crate) fn embedded_parse_mark(&self) -> EmbeddedParseMark {
         EmbeddedParseMark {
-            comments: self.expression_comments.len(),
+            comments: self.own.comment_scratch.mark(),
             snippet_wire_parameters: self.own.runs.wire_param_scratch.mark(),
             #[cfg(feature = "_internal_ast_census")]
             ast_census_mark: tsv_lang::ast_census_probe::mark(),
@@ -933,7 +982,7 @@ impl<'a> SvelteParser<'a> {
     pub(crate) fn rewind_embedded_parses(&mut self, mark: EmbeddedParseMark) {
         #[cfg(feature = "_internal_ast_census")]
         tsv_lang::ast_census_probe::rewind(mark.ast_census_mark);
-        self.expression_comments.truncate(mark.comments);
+        self.own.comment_scratch.truncate(mark.comments);
         self.own
             .runs
             .wire_param_scratch
@@ -961,5 +1010,142 @@ impl<'a> SvelteParser<'a> {
         })?;
         self.merge_island_comments(comments);
         Ok(stmt)
+    }
+}
+
+/// Sorts a gathered comment list by start: the release fallback behind
+/// [`SvelteParser::flush_root_comments`]'s order assertion.
+#[cold]
+#[inline(never)]
+fn sort_comments(comments: &mut [Comment]) {
+    comments.sort_by_key(|comment| comment.span.start);
+}
+
+/// `scripts` and `template` merged into one run of `stores`' comments, ascending by start,
+/// each input already ascending. A tie keeps the inputs' order — the instance script's
+/// comments, the module script's, then the template's — as a stable sort of their
+/// concatenation would. A lone non-empty script run is handed back as it is.
+///
+/// A script's comments are copied a block at a time: each block is the run of its comments
+/// that sort ahead of every other input's next one.
+fn merge_root_comments(
+    stores: &mut AstStores,
+    scripts: [Run<Comment>; 2],
+    template: &[Comment],
+) -> Run<Comment> {
+    if template.is_empty() {
+        match scripts {
+            [only, other] | [other, only] if other.is_empty() => return only,
+            _ => {}
+        }
+    }
+    // the next comment of each input as (start, input), the inputs in tie order
+    let next = |stores: &AstStores, cursors: &[usize; 3], input: usize| {
+        let comment = match input {
+            0 | 1 => stores.view().comments(scripts[input]).get(cursors[input]),
+            _ => template.get(cursors[2]),
+        };
+        comment.map(|comment| (comment.span.start, input))
+    };
+    let mut cursors = [0usize; 3];
+    let mark = tsv_ts::__private::open::<Comment>(stores);
+    loop {
+        let heads = [0, 1, 2].map(|input| next(stores, &cursors, input));
+        let Some((_, input)) = heads.iter().flatten().min().copied() else {
+            break;
+        };
+        // every other input's next comment bounds how far this one runs
+        let bound = heads
+            .iter()
+            .flatten()
+            .filter(|&&(_, other)| other != input)
+            .min()
+            .copied();
+        let runs_ahead = |start: u32| bound.is_none_or(|bound| (start, input) < bound);
+        if input == 2 {
+            let block = template[cursors[2]..]
+                .iter()
+                .take_while(|comment| runs_ahead(comment.span.start))
+                .count();
+            for &comment in &template[cursors[2]..cursors[2] + block] {
+                tsv_ts::__private::push_item(stores, comment);
+            }
+            cursors[2] += block;
+        } else {
+            let from = cursors[input];
+            let block = stores.view().comments(scripts[input])[from..]
+                .iter()
+                .take_while(|comment| runs_ahead(comment.span.start))
+                .count();
+            tsv_ts::__private::extend_from_run(stores, scripts[input], from..from + block);
+            cursors[input] += block;
+        }
+    }
+    tsv_ts::__private::flush(stores, mark)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::__private::parse;
+
+    /// `Root.comments` read as each comment's source text, in order.
+    fn root_comment_texts(source: &str) -> Vec<String> {
+        let parsed = parse(source).expect("the document parses");
+        parsed
+            .view()
+            .ts()
+            .comments(parsed.comments)
+            .iter()
+            .map(|comment| comment.span.extract(source).to_owned())
+            .collect()
+    }
+
+    /// One top-level script alone holding comments is `Root.comments` as it stands: the
+    /// script's own run, not a copy.
+    #[test]
+    fn a_lone_script_run_is_the_root_comments_run() {
+        for source in [
+            "<script>\n\t// a\n\tlet x = 1; /* b */\n</script>\n\n<p>{x}</p>\n",
+            "<script module>\n\t// a\n</script>\n\n<script>\n\tlet x = 1;\n</script>\n",
+        ] {
+            let parsed = parse(source).expect("the document parses");
+            let script = [&parsed.instance, &parsed.module]
+                .into_iter()
+                .flatten()
+                .find(|script| !script.content.comments.is_empty())
+                .expect("one script holds the comments");
+            assert_eq!(parsed.comments, script.content.comments, "{source:?}");
+        }
+    }
+
+    /// The scripts' runs and the template's comments merge into source order, whatever
+    /// order the parser reads them in, each listed once.
+    #[test]
+    fn the_inputs_merge_into_source_order() {
+        let source = "{a /* t1 */}\n\n<script module>\n\t/* m1 */\n\t// m2\n</script>\n\n\
+            <div class={b /* t2 */} /* t3 */></div>\n\n<script>\n\t// i1\n\tlet c = 1; /* i2 */\n\
+            </script>\n\n{c // t4\n}\n";
+        assert_eq!(
+            root_comment_texts(source),
+            [
+                "/* t1 */", "/* m1 */", "// m2", "/* t2 */", "/* t3 */", "// i1", "/* i2 */",
+                "// t4",
+            ]
+        );
+        assert_eq!(
+            root_comment_texts("<p class={a /* x */}>{b // y\n}</p>\n"),
+            ["/* x */", "// y"]
+        );
+        assert!(root_comment_texts("<p>{a}</p>\n").is_empty());
+    }
+
+    /// A region parsed twice registers its comments once: the re-parse rewinds the
+    /// template's comment frame to the mark taken before the first parse.
+    #[test]
+    fn a_reparsed_region_lists_its_comments_once() {
+        assert_eq!(
+            root_comment_texts("{#each xs /* c */ as A[] as item}{item}{/each}\n"),
+            ["/* c */"]
+        );
     }
 }

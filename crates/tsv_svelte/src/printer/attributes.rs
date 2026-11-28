@@ -1888,7 +1888,7 @@ mod tests {
                 !root.comments.is_empty(),
                 "no comment parsed from {source:?} — the case stopped exercising the rule"
             );
-            for comment in &root.comments {
+            for comment in root.view().ts().comments(root.comments) {
                 let whole = comment.span.extract(source);
                 let content = comment.content_span.extract(source);
                 let rebuilt = if comment.is_block {

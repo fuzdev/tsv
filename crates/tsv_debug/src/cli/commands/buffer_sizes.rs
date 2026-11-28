@@ -146,7 +146,11 @@ fn collect_file(
             if let Some(script) = &root.module {
                 collect_imports(root.view().ts(), script.content.body, named_specs);
             }
-            collect_comments(&root.comments, source, comment_lines);
+            collect_comments(
+                root.view().ts().comments(root.comments),
+                source,
+                comment_lines,
+            );
             #[cfg(feature = "_internal_buffer_stats")]
             drop(tsv_svelte::__private::format_ast(&root, source));
         }

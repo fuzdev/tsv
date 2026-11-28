@@ -55,8 +55,9 @@
 //!
 //! Two comment carriers are in scope, both registered by the format entry points:
 //!
-//! - the **detached** comments — the flat `Vec<Comment>` on each language root, registered
-//!   via [`register_parsed`].
+//! - the **detached** comments — the flat comment list on each language root (a TypeScript
+//!   `Program`'s and a Svelte `Root`'s a run of the TypeScript stores, a CSS stylesheet's a
+//!   `Vec`), registered via [`register_parsed`].
 //! - the **AST-node** comments — a Svelte `<!-- … -->` (`FragmentNode::Comment`) and a CSS
 //!   in-block `CssBlockChild::Comment`. These are carried by the tree rather than by the
 //!   positional model, but a printer can still drop one (a walk that misses a fragment, a
@@ -223,8 +224,9 @@ pub fn comment_check_enabled() -> bool {
 /// Idempotent per span: a document whose comments arrive from two lists (a Svelte
 /// `Root.comments` plus its `<style>`'s stylesheet comments) merges them, and the same
 /// list registered twice does not double the expectation — which is what makes the Svelte
-/// `<script>` case work, where the island's `Program.comments` and the `Root.comments`
-/// clones of them are two `Comment` values over one span.
+/// `<script>` case work, where the island's `Program.comments` and `Root.comments` both
+/// hold the script's comments (the same rows when one script alone holds any, copies in a
+/// merged run otherwise), one span each.
 pub fn register_parsed(source: &str, comments: &[Comment]) {
     register_parsed_spans(source, comments.iter().map(|c| c.span));
 }
@@ -376,7 +378,7 @@ pub fn parsed_comment_spans(source: &str) -> Vec<Span> {
 /// entries.
 ///
 /// A comment registered under two lists over one span (the Svelte `<script>` island's
-/// `Program.comments` and the `Root.comments` clone of it) is deduped within its document by
+/// `Program.comments` and `Root.comments`, which holds it too) is deduped within its document by
 /// [`register_parsed_spans`], so it is returned once, not twice.
 #[must_use]
 pub fn parsed_comment_texts() -> Vec<String> {

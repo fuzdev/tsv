@@ -5,7 +5,7 @@ use crate::lexer::TokenKind;
 use crate::parser::element::{ElementParent, RootOnlyMetaTag};
 use crate::whitespace::{is_svelte_ws, skip_svelte_ws, svelte_ws_width_at};
 use tsv_lang::source_scan::{TriviaProfile, skip_template_literal, skip_trivia};
-use tsv_lang::store::flush_run;
+use tsv_lang::store::{Run, flush_run};
 use tsv_lang::{Error, Span};
 
 // Module declarations
@@ -189,24 +189,20 @@ impl<'a> SvelteParser<'a> {
             nodes: self.flush_nodes(mark),
         };
 
-        // Collect all comments from scripts and template expressions
-        let mut comments = Vec::new();
-        let view = self.ts_stores().view();
-        if let Some(script) = &instance {
-            comments.extend_from_slice(view.comments(script.content.comments));
-        }
-        if let Some(script) = &module {
-            comments.extend_from_slice(view.comments(script.content.comments));
-        }
-        // Add expression comments collected during template parsing
-        // Currently extracted from: {@debug} tags (intentional divergence from prettier)
-        // Future: could extend to other template tags if needed
-        comments.append(&mut self.expression_comments);
-        // Sort by position for consistent lookup via comments_to_emit_in_range()
-        comments.sort_by_key(|c| c.span.start);
-        // CSS comments deliberately stay on the `css` island — the wire emits them under
-        // the style node via `write_css_comments`, matching where parseCss puts them —
-        // so they are never merged into `Root.comments`.
+        // The document's comments, in source order: the scripts' runs and the template's frame,
+        // each already ordered, merged into one run of the TypeScript half — or, when one
+        // script alone holds any, that script's own run. CSS comments deliberately stay on the
+        // `css` island — the wire emits them under the style node via `write_css_comments`,
+        // matching where parseCss puts them — so they are never merged into `Root.comments`.
+        let scripts = [
+            instance
+                .as_ref()
+                .map_or(Run::EMPTY, |script| script.content.comments),
+            module
+                .as_ref()
+                .map_or(Run::EMPTY, |script| script.content.comments),
+        ];
+        let comments = self.flush_root_comments(scripts);
 
         let snippet_wire_parameters = flush_run(
             &mut self.own.runs.wire_param_scratch,

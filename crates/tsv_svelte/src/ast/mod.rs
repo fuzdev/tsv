@@ -103,9 +103,13 @@ pub struct Root {
     pub css: Option<Style>,
     /// `<svelte:options>` configuration (not part of fragment)
     pub options: Option<SvelteOptions>,
-    /// All comments from scripts and template expressions.
-    /// Use `comments_to_emit_in_range(span)` to find comments for a specific node.
-    pub comments: Vec<Comment>,
+    /// Every comment of the document's `<script>`s and template expressions, ascending by
+    /// start: a run of the TypeScript half's comment store, read through the TypeScript view
+    /// (`view.ts().comments(root.comments)`). When one top-level script alone holds comments
+    /// it IS that script's `Program.comments` run, with no copy; otherwise the parser merges
+    /// the already-ordered inputs into a run of their own. A top-level `<style>`'s comments
+    /// stay on its stylesheet.
+    pub comments: Run<Comment>,
     /// The wire's parameter lists for the `{#snippet}` heads that hold a grouping pair,
     /// ascending by [`SnippetWireParameters::snippet_start`] — see
     /// [`SnippetWireParameters`].

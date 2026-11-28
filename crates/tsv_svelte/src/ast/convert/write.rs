@@ -172,8 +172,10 @@ macro_rules! document_ctx {
         // Template comments (outside `<script>` content spans) are the only comments
         // the template attach passes move; everything else stays where it is.
         let script_spans = crate::script_content_spans($root);
-        let $comments: Vec<&Comment> = $root
-            .comments
+        let $comments: Vec<&Comment> = $parsed
+            .view
+            .ts()
+            .comments($root.comments)
             .iter()
             .filter(|c| is_template_comment(c, &script_spans))
             .collect();
@@ -468,7 +470,7 @@ fn write_root(w: &mut Sink<'_>, root: &ast::Root, ctx: &Ctx<'_>) {
         write_svelte_options(w, opts, ctx);
     });
     keyed!(w, "Root", ",\"comments\":");
-    write_array(w, root.comments.iter(), |w, c| {
+    write_array(w, ctx.view.comments(root.comments).iter(), |w, c| {
         write_root_comment(w, c, ctx);
     });
     // Svelte assigns `module` before `instance` on the root.
@@ -1905,7 +1907,7 @@ fn write_value_attributes(w: &mut Sink<'_>, attributes: &[ast::AttributeNode], c
 /// `character` in final char space).
 ///
 /// Patterns DO collect comments — `parse_ts_pattern` and, for `{#each}`, the
-/// separately-read `parse_ts_type_annotation` both extend `expression_comments`
+/// separately-read `parse_ts_type_annotation` both push onto the template's comment frame
 /// — and canonical attaches each one to its adjacent node inside the subtree of
 /// the parse that read it, so a comment-bearing binding attaches over the same two
 /// windows `{@const}`'s id takes (`attach_binding_pattern`: the pattern, then its
