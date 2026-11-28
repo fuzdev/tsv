@@ -3,7 +3,9 @@
  * `target/docsrs` read-write (made when missing, opened through `target/` wherever it leads:
  * `open_target`), and `cargo` with cargo's variables
  * (`CARGO_PASS_ENV`) and the gate's `RUSTDOCFLAGS` and `CARGO_TARGET_DIR`, which replace the
- * host's.
+ * host's. The same flags go in `CARGO_ENCODED_RUSTDOCFLAGS` too: cargo reads that variable
+ * ahead of `RUSTDOCFLAGS`, even set empty, and `CARGO_PASS_ENV`'s `CARGO_*` would hand it a
+ * host's, which would drop the gate's lints.
  *
  * @module
  */
@@ -30,7 +32,13 @@ const code = await run_docsrs_audit(
 		docsrs: target.dir(DOCSRS_DIR),
 		cargo: spawn.program('cargo', {
 			pass_env: CARGO_PASS_ENV,
-			env: { RUSTDOCFLAGS: DOCSRS_RUSTDOCFLAGS, CARGO_TARGET_DIR: DOCSRS_TARGET_DIR }
+			env: {
+				RUSTDOCFLAGS: DOCSRS_RUSTDOCFLAGS,
+				// cargo's encoding: one flag per field, fields split by U+001F, the whitespace
+				// split cargo makes of `RUSTDOCFLAGS`
+				CARGO_ENCODED_RUSTDOCFLAGS: DOCSRS_RUSTDOCFLAGS.split(/\s+/).filter(Boolean).join('\x1f'),
+				CARGO_TARGET_DIR: DOCSRS_TARGET_DIR
+			}
 		})
 	},
 	args

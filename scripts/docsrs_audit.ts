@@ -82,8 +82,8 @@
  *
  * The checkout read-only (the manifests), `target/docsrs` read-write (the renders removed
  * before each build and read back after), and `cargo`, which runs `cargo doc` in the checkout
- * with `RUSTDOCFLAGS` and `CARGO_TARGET_DIR` set (`DocsrsAuditDeps`, built by
- * `scripts/roots/docsrs_audit.ts`).
+ * with `RUSTDOCFLAGS`, `CARGO_ENCODED_RUSTDOCFLAGS` and `CARGO_TARGET_DIR` set
+ * (`DocsrsAuditDeps`, built by `scripts/roots/docsrs_audit.ts`).
  */
 
 import type { FsDir, FsReadDir } from '@fuzdev/gro/fs.ts';
@@ -121,7 +121,10 @@ export interface DocsrsAuditDeps {
 	checkout: FsReadDir;
 	/** `target/docsrs`, the build's own target directory. */
 	docsrs: FsDir;
-	/** `cargo`, with `RUSTDOCFLAGS` (`DOCSRS_RUSTDOCFLAGS`) and `CARGO_TARGET_DIR` set. */
+	/**
+	 * `cargo`, with `RUSTDOCFLAGS` and `CARGO_ENCODED_RUSTDOCFLAGS` (both `DOCSRS_RUSTDOCFLAGS`)
+	 * and `CARGO_TARGET_DIR` set.
+	 */
 	cargo: SpawnProgram;
 }
 

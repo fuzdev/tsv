@@ -1100,7 +1100,9 @@ backticks in exactly the build that matters.
 for day-to-day work (IDE, a bare `cargo doc`) along with the rationale. The task re-states
 them as `RUSTDOCFLAGS` because `tsv_ffi` and `tsv_napi` define their own `[lints.clippy]`
 tables, which Cargo cannot merge with `[lints] workspace = true` — so they do not inherit,
-and only the task's flags cover every workspace crate.
+and only the task's flags cover every workspace crate. It runs under `env -u
+CARGO_ENCODED_RUSTDOCFLAGS`, since cargo reads that variable ahead of `RUSTDOCFLAGS`, even set
+empty, and a caller's would drop every one of them.
 
 **Blind spots.** It checks that a link *resolves*, never that the surrounding prose is
 true. A doc that describes behavior the code no longer has passes cleanly; so does a
@@ -1198,7 +1200,9 @@ resolves, never that the prose is true.
 
 **Build world.** Its own target directory, `target/docsrs`, since its lint flags differ
 from `docs:audit`'s and a shared `target/doc` would make the two rebuild each other's
-output on every run.
+output on every run. The flags go to cargo as `CARGO_ENCODED_RUSTDOCFLAGS` as well as
+`RUSTDOCFLAGS` (`scripts/roots/docsrs_audit.ts`): cargo reads the encoded one first, and the
+`CARGO_*` the script passes through would otherwise let a caller's replace them.
 
 ## Published-Graph Dependency Audit (`deps:audit`)
 
