@@ -127,9 +127,6 @@ const UNREAD_DIRS = new Set(['node_modules', 'target', 'pkg']);
 /** The occurrences the test lets name no task their runner runs, each for its reason, each
  * required to still be there, so a fixed one leaves the list. */
 const UNRUNNABLE_KEPT: Record<string, string[]> = {
-	// printed into the committed `results/report.conformance.node.md`, which only a conformance
-	// bench run rewrites: the text and the report change together
-	'benches/js/bench_preflight.ts': ['deno task ts-repo:over-acceptance'],
 	// says what `deno task` would run if `deno.json` had the name
 	'scripts/roots/publish_deps_test.ts': ['deno task release'],
 	// the website's script, run in its own checkout

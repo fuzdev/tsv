@@ -353,7 +353,7 @@ const SURFACE_DISCLOSURES: ReadonlyArray<SurfaceDisclosure> = [
 			'tsc corpus it is the ORACLE that selected those files — 100% by construction, like ' +
 			'svelte/compiler on the Svelte set — and an independent parser on every other source, ' +
 			'which is what the per-source tables below are for. Coverage counts accepts and so ' +
-			'cannot show over-acceptance; that axis is `deno task ts-repo:over-acceptance`.\n'
+			'cannot show over-acceptance; that axis is `npm run ts-repo:over-acceptance`.\n'
 	}
 ];
 
