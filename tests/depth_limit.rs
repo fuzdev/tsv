@@ -1269,3 +1269,58 @@ fn an_assignment_is_charged_its_own_statements_target() {
         }
     }
 }
+
+/// A union's first member is charged the pair the printer adds around it once, however
+/// long the list: the pair is asked at every `|` (`first_member_pair`) and charged only
+/// while the open list holds the first member alone, so a list of four or eight accepts
+/// exactly the nesting a list of two does. A bare first member is charged as the pair the
+/// author could have written, which the printer keeps: `A & B | C` prints as
+/// `(A & B) | C`. A union's first member is where a bare member takes the pair, and the test
+/// uses an intersection there: a function or conditional type in that position takes the
+/// rest of the list into its own right side, and no bare member of an intersection is one the
+/// printer pairs.
+///
+/// The swept shape holding such a list (`ts_type_leaf_intersection_member`) is bounded, not
+/// calibrated, and holds two members, so an over-charge moves no gate there: these sit
+/// under a nest of type arguments, which the nesting limit refuses, and compare one list's
+/// accepted depth with another's.
+#[test]
+fn a_union_first_members_pair_is_charged_once_whatever_the_lists_length() {
+    let deepest = |union: &'static str| {
+        let make = move |n: usize| format!("type T = {}{union}{};\n", rep("A<", n), rep(">", n));
+        on_thread(format!("first member {union}"), SEARCH_STACK, move || {
+            let accepts = |n: usize| match verdict(Lang::Ts, &make(n)) {
+                Verdict::Accepted => true,
+                Verdict::TooDeep(_) => false,
+                Verdict::Invalid(error) => panic!("{union}: n={n} does not parse:\n{error}"),
+            };
+            let (mut lo, mut hi) = (0, NESTING_LIMIT as usize);
+            assert!(
+                accepts(lo) && !accepts(hi),
+                "{union}: the limit is inside the search"
+            );
+            while hi - lo > 1 {
+                let mid = lo + (hi - lo) / 2;
+                if accepts(mid) {
+                    lo = mid;
+                } else {
+                    hi = mid;
+                }
+            }
+            lo
+        })
+    };
+    let two = deepest("A & B | C");
+    for union in ["A & B | C | D | E", "A & B | C | D | E | F | G | H"] {
+        assert_eq!(
+            deepest(union),
+            two,
+            "{union}: a longer list changes the nesting its first member's pair is charged"
+        );
+    }
+    assert_eq!(
+        deepest("(A & B) | C"),
+        two,
+        "a bare first member is charged as the pair the author could write"
+    );
+}
