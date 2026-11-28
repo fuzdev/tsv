@@ -325,6 +325,21 @@ async fn validate_audit_signature(
                 break;
             }
         }
+    } else if let Some(canonical) =
+        recorded.non_canonical(&recorded_raw, ChainAnchor::OutputPrettier)
+    {
+        result.add_error(ValidationError::FormatterAuditSignatureOutdated(
+            AuditSignatureStaleness::NotCanonical,
+        ));
+        result.add_diff(
+            &format!(
+                "audit_signature not canonical: {}/audit_signature.txt",
+                fixture.relative_path
+            ),
+            &recorded_raw,
+            &canonical,
+            &diff::DiffOptions::freshness(),
+        );
     } else {
         result.add_success(ValidationSuccess::FormatterMatchesPrettier);
     }

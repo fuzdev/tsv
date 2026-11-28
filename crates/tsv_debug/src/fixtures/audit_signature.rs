@@ -53,6 +53,12 @@
 //! - Pass content must not contain `%%PASS=` at column 0. The parser uses that prefix as a
 //!   section delimiter. Implausible for valid Svelte/TS/CSS/JS content but worth stating;
 //!   a future hostile fixture would trip parsing.
+//! - A committed file is byte-for-byte `serialize(parse(file), anchor)`, the anchor named by
+//!   its filename ([`ChainAnchor::for_filename`]). `parse` skips the header and ignores pass
+//!   numbers, so without this a change to the header text, numbering, or section spacing
+//!   would leave every committed file stale with no check failing. Gated twice: pure Rust
+//!   over the whole tree in `cargo test` (`tests/audit_signature_canonical_tests.rs`), and by
+//!   the validator once the live chain matches ([`AuditSignature::non_canonical`]).
 
 use std::collections::HashSet;
 
@@ -107,6 +113,17 @@ pub enum ChainAnchor {
 }
 
 impl ChainAnchor {
+    /// The anchor a signature filename implies: `audit_signature.txt` is anchored to
+    /// `output_prettier.*`, `audit_signature_<suffix>.txt` to `unformatted_ours_<suffix>.*`.
+    /// `None` for any other name.
+    pub fn for_filename(filename: &str) -> Option<Self> {
+        if filename == AUDIT_SIGNATURE_FILENAME {
+            Some(Self::OutputPrettier)
+        } else {
+            audit_signature_variant_suffix(filename).map(|_| Self::UnformattedOurs)
+        }
+    }
+
     /// The `%%PASS=N%%` number of the signature's first recorded section.
     pub const fn first_pass_number(self) -> usize {
         match self {
@@ -347,6 +364,16 @@ impl AuditSignature {
         out
     }
 
+    /// The canonical serialization when `raw` — the file this signature was parsed from —
+    /// differs from it, `None` when the file is already canonical.
+    ///
+    /// [`Self::parse`] skips the header and ignores pass numbers, so comparing passes alone
+    /// cannot see the file's own format drift; this is the byte check that can.
+    pub fn non_canonical(&self, raw: &str, anchor: ChainAnchor) -> Option<String> {
+        let canonical = self.serialize(anchor);
+        (canonical != raw).then_some(canonical)
+    }
+
     /// Parse a signature file. Tolerates the header and any number of pass sections.
     ///
     /// The parser is intentionally lenient about whitespace between sections but strict
@@ -502,6 +529,45 @@ mod tests {
         // No suffix names no source file.
         assert_eq!(audit_signature_variant_suffix("audit_signature_.txt"), None);
         assert_eq!(audit_signature_variant_suffix("audit_signature_x.md"), None);
+    }
+
+    #[test]
+    fn anchor_follows_the_filename() {
+        assert_eq!(
+            ChainAnchor::for_filename(AUDIT_SIGNATURE_FILENAME),
+            Some(ChainAnchor::OutputPrettier)
+        );
+        assert_eq!(
+            ChainAnchor::for_filename("audit_signature_own_line.txt"),
+            Some(ChainAnchor::UnformattedOurs)
+        );
+        assert_eq!(ChainAnchor::for_filename("audit_signature_.txt"), None);
+        assert_eq!(ChainAnchor::for_filename("output_prettier.svelte"), None);
+    }
+
+    /// The byte check sees what `parse` forgives: a header line, a pass number, the
+    /// spacing between sections.
+    #[test]
+    fn non_canonical_sees_what_parse_forgives() {
+        let sig = AuditSignature {
+            passes: vec!["one\n".to_string(), "two\n".to_string()],
+        };
+        let anchor = ChainAnchor::OutputPrettier;
+        let canonical = sig.serialize(anchor);
+        assert_eq!(sig.non_canonical(&canonical, anchor), None);
+        for mutated in [
+            canonical.replacen("Do not edit manually", "Do not edit", 1),
+            canonical.replacen("%%PASS=2%%", "%%PASS=7%%", 1),
+            canonical.replacen("\n%%PASS=2%%", "\n\n%%PASS=2%%", 1),
+        ] {
+            assert_eq!(AuditSignature::parse(&mutated).unwrap(), sig);
+            assert_eq!(sig.non_canonical(&mutated, anchor), Some(canonical.clone()));
+        }
+        // The other anchor's header and numbering are not this file's canonical form.
+        assert!(
+            sig.non_canonical(&sig.serialize(ChainAnchor::UnformattedOurs), anchor)
+                .is_some()
+        );
     }
 
     #[test]

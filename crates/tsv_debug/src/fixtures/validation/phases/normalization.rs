@@ -1323,7 +1323,28 @@ async fn validate_n12_variant_chain_signatures(
         };
 
         if live.passes == recorded.passes {
+            // The chain is still prettier's, so the suffix is documented for N10 either way;
+            // the file must also be the bytes the updater writes for it, or a header /
+            // numbering change would leave it stale unseen.
             verified.insert(suffix.to_string());
+            if let Some(canonical) =
+                recorded.non_canonical(&recorded_raw, ChainAnchor::UnformattedOurs)
+            {
+                result.add_error(ValidationError::VariantChainSignatureOutdated(
+                    signature_name.clone(),
+                    AuditSignatureStaleness::NotCanonical,
+                ));
+                result.add_diff(
+                    &format!(
+                        "{signature_name} not canonical: {}/{signature_name}",
+                        fixture.relative_path
+                    ),
+                    &recorded_raw,
+                    &canonical,
+                    &diff::DiffOptions::freshness(),
+                );
+                continue;
+            }
             matched += 1;
             continue;
         }

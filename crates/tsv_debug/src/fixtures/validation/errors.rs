@@ -8,17 +8,22 @@ use crate::fixtures::InputType;
 /// Why a prettier-chain signature is stale — shared by both anchors
 /// (`audit_signature.txt`, F4; `audit_signature_<suffix>.txt`, N12).
 ///
-/// Both cases are repaired by the same command (`fixtures:update:formatted`), but the user-facing
-/// remediation differs: drift is a routine regenerate, while a collapsed chain means prettier
-/// became idempotent on the anchor since the signature was captured — the regenerate will delete
-/// the file, and the author should revisit whether the divergence still applies. The wording stays
-/// anchor-neutral; each error variant names its own file.
+/// Every case is repaired by the same command (`fixtures:update:formatted`), but the user-facing
+/// remediation differs: drift and a non-canonical file are a routine regenerate (the updater
+/// rewrites any file whose bytes differ from the serialization), while a collapsed chain means
+/// prettier became idempotent on the anchor since the signature was captured — the regenerate
+/// will delete the file, and the author should revisit whether the divergence still applies. The
+/// wording stays anchor-neutral; each error variant names its own file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AuditSignatureStaleness {
     /// Live chain differs from recorded chain — prettier's pass-K output drifted.
     Drift,
     /// Prettier is now idempotent on the anchor — chain has collapsed to depth zero.
     Collapsed,
+    /// The recorded passes match the live chain, but the file's bytes are not what
+    /// `AuditSignature::serialize` writes for them — the header, the `%%PASS=N%%` numbering,
+    /// or the section spacing has moved since the file was generated.
+    NotCanonical,
 }
 
 impl fmt::Display for AuditSignatureStaleness {
@@ -28,6 +33,11 @@ impl fmt::Display for AuditSignatureStaleness {
             Self::Collapsed => write!(
                 f,
                 "prettier is now idempotent on the anchor — chain collapsed"
+            ),
+            Self::NotCanonical => write!(
+                f,
+                "chain matches, but the file is not its canonical serialization — header, \
+                 numbering, or spacing drifted"
             ),
         }
     }
@@ -436,6 +446,9 @@ impl ValidationError {
             Self::FormatterAuditSignatureOutdated(AuditSignatureStaleness::Drift) => {
                 "Run: npm run fixtures:update:formatted -- <pattern> (regenerates audit_signature.txt)"
             }
+            Self::FormatterAuditSignatureOutdated(AuditSignatureStaleness::NotCanonical) => {
+                "Run: npm run fixtures:update:formatted -- <pattern> (rewrites audit_signature.txt in canonical form)"
+            }
             Self::FormatterAuditSignatureOutdated(AuditSignatureStaleness::Collapsed) => {
                 "Run: npm run fixtures:update:formatted -- <pattern> (deletes audit_signature.txt), then re-evaluate whether the _prettier_divergence designation still applies"
             }
@@ -583,6 +596,9 @@ impl ValidationError {
             }
             Self::VariantChainSignatureOutdated(_, AuditSignatureStaleness::Drift) => {
                 "Run: npm run fixtures:update:formatted -- <pattern> (regenerates audit_signature_<suffix>.txt)"
+            }
+            Self::VariantChainSignatureOutdated(_, AuditSignatureStaleness::NotCanonical) => {
+                "Run: npm run fixtures:update:formatted -- <pattern> (rewrites audit_signature_<suffix>.txt in canonical form)"
             }
             Self::VariantChainSignatureOutdated(_, AuditSignatureStaleness::Collapsed) => {
                 "Prettier now holds the unformatted_ours_* source itself stable — the source is a prettier fixed point, so pin it as a prettier_variant_* / variant_* instead. Run: npm run fixtures:update:formatted -- <pattern> (deletes the signature)"

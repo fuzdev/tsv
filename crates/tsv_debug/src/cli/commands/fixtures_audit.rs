@@ -228,8 +228,9 @@ enum AuditSignatureCheck {
 }
 
 /// Check whether the live prettier chain from `anchor_content` matches the signature at
-/// `signature_path`. Mirrors the F4 / N12 validation checks in audit context; the anchor
-/// file (`output_prettier.*` or an `unformatted_ours_*` variant) is supplied by the caller.
+/// `signature_path`. Mirrors the F4 / N12 chain comparison in audit context (not their
+/// canonical-bytes check, which `cargo test` and the validator own); the anchor file
+/// (`output_prettier.*` or an `unformatted_ours_*` variant) is supplied by the caller.
 async fn check_chain_signature(
     fixture: &Fixture,
     signature_path: &std::path::Path,
