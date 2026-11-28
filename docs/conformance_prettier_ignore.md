@@ -34,6 +34,7 @@ For a whole-construct freeze the `prettier-ignore` family matches prettier (both
 - a directive followed by **text** inside an element body in `<pre>` freezes that text, where prettier reaches past it to the next non-text node — ◆design_choice — [pre_text_follower](../tests/fixtures/svelte/syntax/prettier_ignore/pre_text_follower_prettier_divergence/)
 - a frozen node whose bytes span lines, inside an inline element or a component: the element lays out block-style, where prettier also keeps a dangled form for a glued authoring — ◆stable_quirk ◆design_choice — [multiline_inline_parent_long](../tests/fixtures/svelte/syntax/prettier_ignore/multiline_inline_parent_long_prettier_divergence/)
 - a frozen node whose bytes span lines, inside a block body: the block lays out block-style, where prettier keeps a glued body hugged — ◆stable_quirk ◆design_choice — [multiline_block_body](../tests/fixtures/svelte/syntax/prettier_ignore/multiline_block_body_prettier_divergence/)
+- a frozen node whose bytes span lines, inside a block element: the line after the frozen bytes holds the print width, where prettier keeps a word past it after a space or an indented last frozen line — ◆print_width — [multiline_block_parent_long](../tests/fixtures/svelte/syntax/prettier_ignore/multiline_block_parent_long_prettier_divergence/)
 - `format-ignore` over a node whose bytes span lines — ◆design_choice — [multiline](../tests/fixtures/svelte/syntax/format_ignore/multiline_prettier_divergence/)
 
 **Inside `<pre>` the directive keeps its reach.** A template directive freezes the next node
@@ -129,11 +130,7 @@ wherever a break beside it would render; see
 [conformance_prettier_svelte.md §Svelte: Inline content block-style](./conformance_prettier_svelte.md#svelte-inline-content-block-style)).
 After a frozen **inline** node it is the space it keeps unfrozen
 ([inline_space_after](../tests/fixtures/svelte/syntax/prettier_ignore/inline_space_after/),
-a parity fixture whose no-break-space control is content rather than a separator) — with one
-known exception, a layout gap that renders the same: a `<svelte:element>` / `<svelte:boundary>`
-following a frozen `<svelte:element>` / `<svelte:boundary>` can lay out unlike its unfrozen twin.
-Depending on the pair and its container, a spaced follower takes a line break where the twin
-keeps the space, and a glued one expands its body or puts a break into the text after it. After a block element whose directive owns its line, the break is
+a parity fixture whose no-break-space control is content rather than a separator). After a block element whose directive owns its line, the break is
 the parity layout ([block_space_after](../tests/fixtures/svelte/syntax/prettier_ignore/block_space_after/)); with the directive glued in front
 prettier also breaks before the element (above), and after it the two agree again. After a global
 `svelte:*` element (`<svelte:window>` / `<svelte:document>` / `<svelte:body>` / `<svelte:head>`)
@@ -177,10 +174,14 @@ as written, and a line break among them is a line break in the output, so the fr
 node lays out as it does around any content that renders over several lines — which prettier
 states the same way, joining a frozen template node's lines with a `literalline`, a break every
 enclosing group sees. In a block element that is layout parity — the content moves to its own
-indented line — though the width of the line after the frozen bytes can still part, where prettier
-keeps a word past the print width that tsv wraps
-([multiline_block_parent](../tests/fixtures/svelte/syntax/prettier_ignore/multiline_block_parent/),
-a parity fixture). In an inline element or a component — every inline ancestor of the node, and
+indented line ([multiline_block_parent](../tests/fixtures/svelte/syntax/prettier_ignore/multiline_block_parent/)).
+The width of the line after the frozen bytes can still part: when whitespace separates the text
+from the frozen node, or the frozen bytes' last line is indented, prettier keeps a word on that
+line past the print width, by more the deeper the frozen bytes' last line is indented, where tsv measures it from the column the frozen
+bytes end at and wraps the word at 101 like on any other line; text glued to an unindented last
+frozen line wraps at 101 in both
+([multiline_block_parent_long](../tests/fixtures/svelte/syntax/prettier_ignore/multiline_block_parent_long_prettier_divergence/))
+— ◆print_width. In an inline element or a component — every inline ancestor of the node, and
 one glued to text on both sides
 ([conformance_prettier_svelte.md §Moving a run](./conformance_prettier_svelte.md#moving-a-run-break-before-travel-and-welded-units),
 its third bound) — and in a block body (`{#if}` / `{:else}` / `{#each}` / `{#snippet}` / `{#key}`
@@ -357,8 +358,8 @@ more defensible:
   includes the inner leading `|`, yielding `(| aaaaaaaaaaaaa&1` — reflowing the author's
   paren layout. Surfaces on prettier's own corpus in
   `tests/format/typescript/prettier-ignore/prettier-ignore-nested-unions.ts` (an `unknown`
-  in the format gate counts); a fixture pins it when the nested-paren freeze is next
-  touched.
+  in the format gate counts) —
+  [nested paren member](../tests/fixtures/typescript/types/union_prettier_ignore_nested_paren_member_prettier_divergence/)
 
 **On single-child type positions (annotation `:` / alias `=` / constraint `extends` /
 type-parameter default `=` / named-tuple `label:` / tuple-rest `...` / mapped-type `]:` value

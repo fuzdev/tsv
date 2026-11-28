@@ -721,8 +721,9 @@ Spec: `css-grid-1`
   ([grid_template_wrap_long](../tests/fixtures/css/declarations/grid_template_wrap_long_prettier_divergence/))
 - ⚠️ A newline *inside* line names (`[a⏎b] 1fr`): prettier's value tokenizer makes `[a` and
   `b]` two nodes, so its grid rule breaks between them and keeps `1fr` beside `b]`; tsv breaks
-  the same way (off the grid properties both formatters normalize the bracket to `[a b]`). Rare,
-  unpinned
+  the same way (off the grid properties both formatters normalize the bracket to `[a b]`).
+  Matches prettier
+  ([grid_template_line_names_newline](../tests/fixtures/css/declarations/grid_template_line_names_newline/))
 
 ### Easing Functions
 

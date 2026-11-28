@@ -1202,7 +1202,7 @@ own: a `declare namespace`/`module` name must be on the keyword's line (tsc's
 and `abstract` must reach its `class` on one line. tsv and acorn reject **every**
 spelling of those, and so does prettier wherever the leftover is not a statement
 (`declare namespace⏎N {}`, `declare module⏎M {}`, `declare module⏎'a' {}` — tsc throws
-`Unexpected keyword or identifier`), so those are ordinary `input_invalid_*` cases (the first two pinned in `declare/line_break/`; the string-named block is not yet).
+`Unexpected keyword or identifier`), so those are ordinary `input_invalid_*` cases, all three pinned in `declare/line_break/`.
 
 ⚠️ Where the leftover *is* ASI-terminable, prettier prints it and the gap joins this
 section rather than leaving it: `declare module⏎'a';` becomes `declare;` `module;`

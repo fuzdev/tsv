@@ -1,0 +1,633 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 658,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " the directive before a parenthesized nested-union member freezes the whole member,",
+			"start": 20,
+			"end": 105
+		},
+		{
+			"type": "Line",
+			"value": " its paren layout as written",
+			"start": 107,
+			"end": 137
+		},
+		{
+			"type": "Line",
+			"value": " foo",
+			"start": 157,
+			"end": 163
+		},
+		{
+			"type": "Line",
+			"value": " bar",
+			"start": 184,
+			"end": 190
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 211,
+			"end": 229
+		},
+		{
+			"type": "Line",
+			"value": " b",
+			"start": 262,
+			"end": 266
+		},
+		{
+			"type": "Line",
+			"value": " baz",
+			"start": 295,
+			"end": 301
+		},
+		{
+			"type": "Line",
+			"value": " a directive inside the parens applies to the inner list: only the inner member after",
+			"start": 323,
+			"end": 410
+		},
+		{
+			"type": "Line",
+			"value": " it freezes, and the later inner members reformat",
+			"start": 412,
+			"end": 463
+		},
+		{
+			"type": "Line",
+			"value": " foo",
+			"start": 483,
+			"end": 489
+		},
+		{
+			"type": "Line",
+			"value": " bar",
+			"start": 510,
+			"end": 516
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 545,
+			"end": 563
+		},
+		{
+			"type": "Line",
+			"value": " b",
+			"start": 592,
+			"end": 596
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 657,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 648,
+			"body": [
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 139,
+					"end": 320,
+					"exportKind": "type",
+					"declaration": {
+						"type": "TSTypeAliasDeclaration",
+						"start": 146,
+						"end": 320,
+						"id": {
+							"type": "Identifier",
+							"start": 151,
+							"end": 152,
+							"name": "a"
+						},
+						"typeAnnotation": {
+							"type": "TSUnionType",
+							"start": 166,
+							"end": 319,
+							"types": [
+								{
+									"type": "TSParenthesizedType",
+									"start": 168,
+									"end": 181,
+									"typeAnnotation": {
+										"type": "TSIntersectionType",
+										"start": 169,
+										"end": 180,
+										"types": [
+											{
+												"type": "TSTypeReference",
+												"start": 169,
+												"end": 173,
+												"typeName": {
+													"type": "Identifier",
+													"start": 169,
+													"end": 173,
+													"name": "foo1"
+												}
+											},
+											{
+												"type": "TSTypeReference",
+												"start": 176,
+												"end": 180,
+												"typeName": {
+													"type": "Identifier",
+													"start": 176,
+													"end": 180,
+													"name": "foo2"
+												}
+											}
+										]
+									}
+								},
+								{
+									"type": "TSParenthesizedType",
+									"start": 195,
+									"end": 208,
+									"typeAnnotation": {
+										"type": "TSIntersectionType",
+										"start": 196,
+										"end": 207,
+										"types": [
+											{
+												"type": "TSTypeReference",
+												"start": 196,
+												"end": 200,
+												"typeName": {
+													"type": "Identifier",
+													"start": 196,
+													"end": 200,
+													"name": "bar1"
+												}
+											},
+											{
+												"type": "TSTypeReference",
+												"start": 203,
+												"end": 207,
+												"typeName": {
+													"type": "Identifier",
+													"start": 203,
+													"end": 207,
+													"name": "bar2"
+												}
+											}
+										]
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " bar",
+											"start": 184,
+											"end": 190
+										}
+									]
+								},
+								{
+									"type": "TSParenthesizedType",
+									"start": 234,
+									"end": 292,
+									"typeAnnotation": {
+										"type": "TSUnionType",
+										"start": 240,
+										"end": 288,
+										"types": [
+											{
+												"type": "TSIntersectionType",
+												"start": 242,
+												"end": 257,
+												"types": [
+													{
+														"type": "TSTypeReference",
+														"start": 242,
+														"end": 255,
+														"typeName": {
+															"type": "Identifier",
+															"start": 242,
+															"end": 255,
+															"name": "aaaaaaaaaaaaa"
+														}
+													},
+													{
+														"type": "TSLiteralType",
+														"start": 256,
+														"end": 257,
+														"literal": {
+															"type": "Literal",
+															"start": 256,
+															"end": 257,
+															"value": 1,
+															"raw": "1"
+														}
+													}
+												]
+											},
+											{
+												"type": "TSIntersectionType",
+												"start": 273,
+												"end": 288,
+												"types": [
+													{
+														"type": "TSTypeReference",
+														"start": 273,
+														"end": 286,
+														"typeName": {
+															"type": "Identifier",
+															"start": 273,
+															"end": 286,
+															"name": "bbbbbbbbbbbbb"
+														}
+													},
+													{
+														"type": "TSLiteralType",
+														"start": 287,
+														"end": 288,
+														"literal": {
+															"type": "Literal",
+															"start": 287,
+															"end": 288,
+															"value": 2,
+															"raw": "2"
+														}
+													}
+												],
+												"leadingComments": [
+													{
+														"type": "Line",
+														"value": " b",
+														"start": 262,
+														"end": 266
+													}
+												]
+											}
+										]
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " prettier-ignore",
+											"start": 211,
+											"end": 229
+										}
+									]
+								},
+								{
+									"type": "TSParenthesizedType",
+									"start": 306,
+									"end": 319,
+									"typeAnnotation": {
+										"type": "TSIntersectionType",
+										"start": 307,
+										"end": 318,
+										"types": [
+											{
+												"type": "TSTypeReference",
+												"start": 307,
+												"end": 311,
+												"typeName": {
+													"type": "Identifier",
+													"start": 307,
+													"end": 311,
+													"name": "baz1"
+												}
+											},
+											{
+												"type": "TSTypeReference",
+												"start": 314,
+												"end": 318,
+												"typeName": {
+													"type": "Identifier",
+													"start": 314,
+													"end": 318,
+													"name": "baz2"
+												}
+											}
+										]
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " baz",
+											"start": 295,
+											"end": 301
+										}
+									]
+								}
+							],
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " foo",
+									"start": 157,
+									"end": 163
+								}
+							]
+						}
+					},
+					"specifiers": [],
+					"source": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the directive before a parenthesized nested-union member freezes the whole member,",
+							"start": 20,
+							"end": 105
+						},
+						{
+							"type": "Line",
+							"value": " its paren layout as written",
+							"start": 107,
+							"end": 137
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 465,
+					"end": 647,
+					"exportKind": "type",
+					"declaration": {
+						"type": "TSTypeAliasDeclaration",
+						"start": 472,
+						"end": 647,
+						"id": {
+							"type": "Identifier",
+							"start": 477,
+							"end": 478,
+							"name": "b"
+						},
+						"typeAnnotation": {
+							"type": "TSUnionType",
+							"start": 492,
+							"end": 646,
+							"types": [
+								{
+									"type": "TSParenthesizedType",
+									"start": 494,
+									"end": 507,
+									"typeAnnotation": {
+										"type": "TSIntersectionType",
+										"start": 495,
+										"end": 506,
+										"types": [
+											{
+												"type": "TSTypeReference",
+												"start": 495,
+												"end": 499,
+												"typeName": {
+													"type": "Identifier",
+													"start": 495,
+													"end": 499,
+													"name": "foo1"
+												}
+											},
+											{
+												"type": "TSTypeReference",
+												"start": 502,
+												"end": 506,
+												"typeName": {
+													"type": "Identifier",
+													"start": 502,
+													"end": 506,
+													"name": "foo2"
+												}
+											}
+										]
+									}
+								},
+								{
+									"type": "TSParenthesizedType",
+									"start": 521,
+									"end": 534,
+									"typeAnnotation": {
+										"type": "TSIntersectionType",
+										"start": 522,
+										"end": 533,
+										"types": [
+											{
+												"type": "TSTypeReference",
+												"start": 522,
+												"end": 526,
+												"typeName": {
+													"type": "Identifier",
+													"start": 522,
+													"end": 526,
+													"name": "bar1"
+												}
+											},
+											{
+												"type": "TSTypeReference",
+												"start": 529,
+												"end": 533,
+												"typeName": {
+													"type": "Identifier",
+													"start": 529,
+													"end": 533,
+													"name": "bar2"
+												}
+											}
+										]
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " bar",
+											"start": 510,
+											"end": 516
+										}
+									]
+								},
+								{
+									"type": "TSParenthesizedType",
+									"start": 539,
+									"end": 628,
+									"typeAnnotation": {
+										"type": "TSUnionType",
+										"start": 568,
+										"end": 622,
+										"types": [
+											{
+												"type": "TSParenthesizedType",
+												"start": 570,
+												"end": 587,
+												"typeAnnotation": {
+													"type": "TSIntersectionType",
+													"start": 571,
+													"end": 586,
+													"types": [
+														{
+															"type": "TSTypeReference",
+															"start": 571,
+															"end": 584,
+															"typeName": {
+																"type": "Identifier",
+																"start": 571,
+																"end": 584,
+																"name": "aaaaaaaaaaaaa"
+															}
+														},
+														{
+															"type": "TSLiteralType",
+															"start": 585,
+															"end": 586,
+															"literal": {
+																"type": "Literal",
+																"start": 585,
+																"end": 586,
+																"value": 1,
+																"raw": "1"
+															}
+														}
+													]
+												}
+											},
+											{
+												"type": "TSParenthesizedType",
+												"start": 603,
+												"end": 622,
+												"typeAnnotation": {
+													"type": "TSIntersectionType",
+													"start": 604,
+													"end": 621,
+													"types": [
+														{
+															"type": "TSTypeReference",
+															"start": 604,
+															"end": 617,
+															"typeName": {
+																"type": "Identifier",
+																"start": 604,
+																"end": 617,
+																"name": "bbbbbbbbbbbbb"
+															}
+														},
+														{
+															"type": "TSLiteralType",
+															"start": 620,
+															"end": 621,
+															"literal": {
+																"type": "Literal",
+																"start": 620,
+																"end": 621,
+																"value": 2,
+																"raw": "2"
+															}
+														}
+													]
+												},
+												"leadingComments": [
+													{
+														"type": "Line",
+														"value": " b",
+														"start": 592,
+														"end": 596
+													}
+												]
+											}
+										],
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " prettier-ignore",
+												"start": 545,
+												"end": 563
+											}
+										]
+									}
+								},
+								{
+									"type": "TSParenthesizedType",
+									"start": 633,
+									"end": 646,
+									"typeAnnotation": {
+										"type": "TSIntersectionType",
+										"start": 634,
+										"end": 645,
+										"types": [
+											{
+												"type": "TSTypeReference",
+												"start": 634,
+												"end": 638,
+												"typeName": {
+													"type": "Identifier",
+													"start": 634,
+													"end": 638,
+													"name": "baz1"
+												}
+											},
+											{
+												"type": "TSTypeReference",
+												"start": 641,
+												"end": 645,
+												"typeName": {
+													"type": "Identifier",
+													"start": 641,
+													"end": 645,
+													"name": "baz2"
+												}
+											}
+										]
+									}
+								}
+							],
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " foo",
+									"start": 483,
+									"end": 489
+								}
+							]
+						}
+					},
+					"specifiers": [],
+					"source": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a directive inside the parens applies to the inner list: only the inner member after",
+							"start": 323,
+							"end": 410
+						},
+						{
+							"type": "Line",
+							"value": " it freezes, and the later inner members reformat",
+							"start": 412,
+							"end": 463
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -1,0 +1,455 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1436,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 135,
+				"data": "\n\tThe line after a frozen node's bytes fills from the column where they end, and wraps at the\n\tprint width like any other line.\n"
+			},
+			{
+				"type": "Text",
+				"start": 135,
+				"end": 137,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 137,
+				"end": 218,
+				"data": " a space after the frozen element: the line ends at exactly 100 and stays "
+			},
+			{
+				"type": "Text",
+				"start": 218,
+				"end": 219,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 219,
+				"end": 385,
+				"name": "div",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 224,
+							"end": 231,
+							"raw": "\n\ttext1",
+							"data": "\n\ttext1"
+						},
+						{
+							"type": "Comment",
+							"start": 231,
+							"end": 255,
+							"data": " prettier-ignore "
+						},
+						{
+							"type": "RegularElement",
+							"start": 255,
+							"end": 290,
+							"name": "b",
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 260,
+									"end": 277,
+									"name": "data-attr",
+									"value": [
+										{
+											"start": 271,
+											"end": 276,
+											"type": "Text",
+											"raw": "value",
+											"data": "value"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 279,
+										"end": 286,
+										"raw": "inline1",
+										"data": "inline1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 290,
+							"end": 379,
+							"raw": " text2 word00 word01 word02 word03 word04 word05 word06 word07 word08 word09 zzzzzzz end\n",
+							"data": " text2 word00 word01 word02 word03 word04 word05 word06 word07 word08 word09 zzzzzzz end\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 385,
+				"end": 387,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 387,
+				"end": 479,
+				"data": " a space after the frozen element: the line would end at 101, so the last word wraps "
+			},
+			{
+				"type": "Text",
+				"start": 479,
+				"end": 480,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 480,
+				"end": 648,
+				"name": "div",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 485,
+							"end": 492,
+							"raw": "\n\ttext1",
+							"data": "\n\ttext1"
+						},
+						{
+							"type": "Comment",
+							"start": 492,
+							"end": 516,
+							"data": " prettier-ignore "
+						},
+						{
+							"type": "RegularElement",
+							"start": 516,
+							"end": 551,
+							"name": "b",
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 521,
+									"end": 538,
+									"name": "data-attr",
+									"value": [
+										{
+											"start": 532,
+											"end": 537,
+											"type": "Text",
+											"raw": "value",
+											"data": "value"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 540,
+										"end": 547,
+										"raw": "inline1",
+										"data": "inline1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 551,
+							"end": 642,
+							"raw": " text2 word00 word01 word02 word03 word04 word05 word06 word07 word08 word09 zzzzzzzz\n\tend\n",
+							"data": " text2 word00 word01 word02 word03 word04 word05 word06 word07 word08 word09 zzzzzzzz\n\tend\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 648,
+				"end": 650,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 650,
+				"end": 749,
+				"data": " glued to an unindented last frozen line: the line would end at 101, so the last word wraps "
+			},
+			{
+				"type": "Text",
+				"start": 749,
+				"end": 750,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 750,
+				"end": 918,
+				"name": "div",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 755,
+							"end": 762,
+							"raw": "\n\ttext1",
+							"data": "\n\ttext1"
+						},
+						{
+							"type": "Comment",
+							"start": 762,
+							"end": 786,
+							"data": " prettier-ignore "
+						},
+						{
+							"type": "RegularElement",
+							"start": 786,
+							"end": 821,
+							"name": "b",
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 791,
+									"end": 808,
+									"name": "data-attr",
+									"value": [
+										{
+											"start": 802,
+											"end": 807,
+											"type": "Text",
+											"raw": "value",
+											"data": "value"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 810,
+										"end": 817,
+										"raw": "inline1",
+										"data": "inline1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 821,
+							"end": 912,
+							"raw": "text2 word00 word01 word02 word03 word04 word05 word06 word07 word08 word09 zzzzzzzzz\n\tend\n",
+							"data": "text2 word00 word01 word02 word03 word04 word05 word06 word07 word08 word09 zzzzzzzzz\n\tend\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 918,
+				"end": 920,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 920,
+				"end": 1004,
+				"data": " an indented last frozen line, glued: the line ends at exactly 100 and stays "
+			},
+			{
+				"type": "Text",
+				"start": 1004,
+				"end": 1005,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1005,
+				"end": 1170,
+				"name": "div",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1010,
+							"end": 1017,
+							"raw": "\n\ttext1",
+							"data": "\n\ttext1"
+						},
+						{
+							"type": "Comment",
+							"start": 1017,
+							"end": 1041,
+							"data": " prettier-ignore "
+						},
+						{
+							"type": "RegularElement",
+							"start": 1041,
+							"end": 1077,
+							"name": "b",
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 1046,
+									"end": 1063,
+									"name": "data-attr",
+									"value": [
+										{
+											"start": 1057,
+											"end": 1062,
+											"type": "Text",
+											"raw": "value",
+											"data": "value"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1066,
+										"end": 1073,
+										"raw": "inline1",
+										"data": "inline1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1077,
+							"end": 1164,
+							"raw": "text2 word00 word01 word02 word03 word04 word05 word06 word07 word08 word09 zzzzzz end\n",
+							"data": "text2 word00 word01 word02 word03 word04 word05 word06 word07 word08 word09 zzzzzz end\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1170,
+				"end": 1172,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1172,
+				"end": 1267,
+				"data": " an indented last frozen line, glued: the line would end at 101, so the last word wraps "
+			},
+			{
+				"type": "Text",
+				"start": 1267,
+				"end": 1268,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1268,
+				"end": 1435,
+				"name": "div",
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1273,
+							"end": 1280,
+							"raw": "\n\ttext1",
+							"data": "\n\ttext1"
+						},
+						{
+							"type": "Comment",
+							"start": 1280,
+							"end": 1304,
+							"data": " prettier-ignore "
+						},
+						{
+							"type": "RegularElement",
+							"start": 1304,
+							"end": 1340,
+							"name": "b",
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 1309,
+									"end": 1326,
+									"name": "data-attr",
+									"value": [
+										{
+											"start": 1320,
+											"end": 1325,
+											"type": "Text",
+											"raw": "value",
+											"data": "value"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1329,
+										"end": 1336,
+										"raw": "inline1",
+										"data": "inline1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1340,
+							"end": 1429,
+							"raw": "text2 word00 word01 word02 word03 word04 word05 word06 word07 word08 word09 zzzzzzz\n\tend\n",
+							"data": "text2 word00 word01 word02 word03 word04 word05 word06 word07 word08 word09 zzzzzzz\n\tend\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
