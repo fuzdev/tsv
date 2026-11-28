@@ -399,3 +399,94 @@ mod quoted_run_end_tests {
         }
     }
 }
+
+#[cfg(test)]
+mod table_run_end_tests {
+    use super::{TABLE_RUN_CHUNK, is_value_separator, table_run_end};
+
+    /// The tables [`table_run_end`]'s callers walk: a group's interior, the fast scan's, the
+    /// comma split's and the whitespace split's.
+    const TABLES: [[bool; 256]; 4] = [
+        value_skip_table!(|b| false),
+        value_skip_table!(|b| is_value_separator(b)),
+        value_skip_table!(|b| b == b','),
+        value_skip_table!(|b| b.is_ascii_whitespace()),
+    ];
+
+    /// The byte-at-a-time walk the chunked one must agree with.
+    fn reference(bytes: &[u8], from: usize, table: &[bool; 256]) -> usize {
+        let mut i = from;
+        while i < bytes.len() && table[usize::from(bytes[i])] {
+            i += 1;
+        }
+        i
+    }
+
+    /// [`table_run_end`] walks a chunk at a time and then a byte at a time; either way it
+    /// must stop where a byte-at-a-time walk does. Two grids per table. The geometry grid: a
+    /// run of every length up to three chunks and one past, entered from every offset up to a
+    /// chunk and one past, ended by end of input or by a stopping byte followed by input of
+    /// every length up to a chunk. The class grid: every byte value at every position of a
+    /// two-chunk-and-one run, entered from either side of a chunk boundary.
+    #[test]
+    fn runs_end_where_the_table_ends() {
+        const CHUNK: usize = TABLE_RUN_CHUNK;
+        let mut graded = 0usize;
+        let mut chunk_stops = 0usize;
+        let mut tail_stops = 0usize;
+        let mut grade = |bytes: &[u8], from: usize, table: &[bool; 256]| {
+            let want = reference(bytes, from, table);
+            assert_eq!(
+                table_run_end(bytes, from, table),
+                want,
+                "{bytes:?} from {from}"
+            );
+            // A stop inside a whole in-bounds chunk returns from the chunked loop.
+            if want < bytes.len() && from + ((want - from) / CHUNK + 1) * CHUNK <= bytes.len() {
+                chunk_stops += 1;
+            } else {
+                tail_stops += 1;
+            }
+            graded += 1;
+        };
+        for table in &TABLES {
+            assert!(
+                table[usize::from(b'a')],
+                "`a` is run content in every table"
+            );
+            let stop = (0..=255u8)
+                .find(|&b| !table[usize::from(b)])
+                .expect("a byte every table stops at");
+            let mut bytes = Vec::new();
+            for from in 0..=CHUNK + 1 {
+                for run in 0..=3 * CHUNK + 1 {
+                    for tail in std::iter::once(None).chain((0..=CHUNK).map(Some)) {
+                        bytes.clear();
+                        bytes.resize(from, stop);
+                        bytes.resize(from + run, b'a');
+                        if let Some(tail) = tail {
+                            bytes.push(stop);
+                            bytes.resize(bytes.len() + tail, b'a');
+                        }
+                        grade(&bytes, from, table);
+                    }
+                }
+            }
+            for byte in 0..=255u8 {
+                for at in 0..=2 * CHUNK {
+                    bytes.clear();
+                    bytes.resize(2 * CHUNK + 1, b'a');
+                    bytes[at] = byte;
+                    for from in [0, 1, CHUNK - 1, CHUNK, CHUNK + 1] {
+                        grade(&bytes, from, table);
+                    }
+                }
+            }
+        }
+        assert!(graded > 100_000, "{graded}");
+        assert!(
+            chunk_stops > 0 && tail_stops > 0,
+            "{chunk_stops} / {tail_stops}"
+        );
+    }
+}
