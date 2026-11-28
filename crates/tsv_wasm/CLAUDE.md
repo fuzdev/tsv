@@ -14,6 +14,17 @@ WebAssembly bindings for `tsv`. Three npm packages from one Rust crate via the `
 Package shape, version-of-truth rule, and the `npm run release` / `build:npm:*` commands:
 [../../CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
 
+## Package Naming
+
+Every npm name tsv publishes is kebab-case (`@fuzdev/tsv`, `@fuzdev/tsv-wasm`,
+`@fuzdev/tsv-format-wasm`, `@fuzdev/tsv-parse-wasm`, `@fuzdev/tsv-<triple>`) — one spelling
+with the `tsv-<triple>` release assets and the `fuzdev.tsv-format` VS Code extension (vsce
+forbids `_`), and the `-wasm` convention of tsv's Rust-tooling peers. It is the rule for every
+`@fuzdev` WASM or native-delivery package (`@fuzdev/blake3-wasm` too). Rust crates (`tsv_wasm`,
+`tsv_napi`) and the rest of the `@fuzdev` libraries stay snake_case; crate-derived file names
+inside a package (`tsv_wasm.js`, `tsv_wasm_bg.wasm`, `tsv_napi.node`) are internal and follow
+the crate.
+
 ## The npm Facade: Options & Typed Returns
 
 The raw exports are **flat** — `parse_tape_<lang>(source, source_type?)`,
@@ -26,7 +37,11 @@ package by `scripts/patch_npm_package.ts` — and into the native `@fuzdev/tsv` 
 one set of error texts by construction rather than by a parity test. Each package entry
 (`index.js`, `browser.js`, `parse.js`, `parse_browser.js`, the napi loader's `index.js` and
 `parse.js`) is a thin adapter: it hands `create_format_api` / `create_parse_api` its engine's
-functions and re-exports the result by name.
+functions and re-exports the result by name. The wasm entries' export list is extracted
+from the generated JS (`scripts/patch_npm_package.ts`), so a language a new `lang_bindings!`
+arm adds flows through without an edit here — its declarations do not: a new language also
+needs one in `npm/facade_format.d.ts` / `npm/facade_parse.d.ts`, and `patch_npm_package.ts`
+fails the build without it.
 
 Every export takes `(source, options?)` with an acorn-style bag:
 `parse_<lang>(source, {locations?, sourceType?})`, `format_<lang>(source, {sourceType?})`.
@@ -350,7 +365,7 @@ families.** The facade forwards it unset, and the raw format exports hand that t
 `parse_format!` → `parse_ast_for_format!` → `tsv_ts::__private::parse_folded_into` →
 `tsv_ts::__private::parse_with_goal_or_fallback_into`:
 the module grammar, retried as a script only if that parse *fails* (which error is reported
-when both fail: [../../CLAUDE.md §Strictness](../../CLAUDE.md#strictness-module-strict-script-by-directive)).
+when both fail: [conformance_test262.md §An unset goal is a fallback](../../docs/conformance_test262.md#an-unset-goal-is-a-fallback)).
 That is what lets `format_typescript(source)` with no bag
 — an editor's whole call, and `npm/cli.js`'s path mode — format a legacy sloppy
 script (`with`, a leading-zero literal or escape, `await` as a name). A **set** value

@@ -1532,8 +1532,8 @@ gates over every file.**
   tsc's `.errors.txt` baselines, both required to call a file well-formed — which keeps the filter
   tool-neutral the way test262's own metadata does for that entry. Unlike test262 it is NOT
   goal-tagged — tsc's module-vs-script reading is semantic and never gates syntax, so handing it to
-  parsers that take `sourceType` as a grammar switch costs tsv 640 files it and tsc both accept to
-  win back 25. Full rules, the measurement, and why the two validity readings must AGREE:
+  parsers that take `sourceType` as a grammar switch costs tsv far more files it and tsc both accept
+  than it wins back. Full rules, the measurement, and why the two validity readings must AGREE:
   `harvest_ts_repo.ts`.
 
   **Prettier-suite validity filter (conformance view only).** Prettier's
@@ -1614,8 +1614,8 @@ gates over every file.**
     by construction, not new code). The working trees are where new syntax shows up before any
     snapshot refresh does, and a content-loss or panic finding is a bug wherever it occurs — but a
     file the snapshot already holds byte-for-byte has already been swept, so the tier is a diff
-    (measured a day after vendoring: the whole trees were 3,102 files for 22 that differed, 455 of
-    the rest fixtures the manifest excludes — an 81% surcharge per leg).
+    (measured a day after vendoring: the whole trees were thousands of files for about two dozen that
+    differed, many of the rest fixtures the manifest excludes — nearly doubling each leg).
   - `TIERS_BY_VIEW.robustness` still declares `benched` + `gated` + `live`: the
     tiers contribute only what lies outside the root (the cache) and the diff, and the `live` seat
     is what makes the loader refuse the view whole and `corpus_present_dirs_for_tiers` refuse it as
