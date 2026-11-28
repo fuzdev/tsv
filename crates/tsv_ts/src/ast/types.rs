@@ -852,3 +852,222 @@ pub struct TSTypeQuery {
     pub type_arguments: Option<TSTypeParameterInstantiation>,
     pub span: Span,
 }
+
+#[cfg(test)]
+mod payload_span_tests {
+    use super::*;
+    use crate::ast::{AstView, StatementKind};
+
+    /// How many of each stored variant the walk met, so a source set that stops reaching one
+    /// fails rather than passing over nothing.
+    #[derive(Default, Debug)]
+    struct Met {
+        function: usize,
+        constructor: usize,
+        import: usize,
+        infer: usize,
+        query_import: usize,
+    }
+
+    /// Walks the type at `id` and every type it holds, asserting each stored variant's inline
+    /// span is its payload row's. A function or constructor type's parameters are not walked:
+    /// they are patterns, and every source here keeps the types it grades out of them.
+    fn walk(view: AstView<'_>, id: TyId, source: &str, met: &mut Met) {
+        let ty = view.ty(id);
+        let agrees = |inline: Span, payload: Span| {
+            assert_eq!(
+                inline,
+                payload,
+                "{ty:?}: inline span {:?} vs payload span {:?} in {source:?}",
+                inline.extract(source),
+                payload.extract(source)
+            );
+        };
+        match *ty {
+            TSType::Function(span, f) => {
+                let f = view.fn_type(f);
+                agrees(span, f.span);
+                met.function += 1;
+                walk_params(view, f.type_parameters, source, met);
+                walk(view, f.return_type.type_annotation, source, met);
+            }
+            TSType::Constructor(span, c) => {
+                let c = view.ctor_type(c);
+                agrees(span, c.span);
+                met.constructor += 1;
+                walk_params(view, c.type_parameters, source, met);
+                walk(view, c.return_type.type_annotation, source, met);
+            }
+            TSType::Import(span, i) => {
+                let i = view.import_type(i);
+                agrees(span, i.span);
+                met.import += 1;
+                walk_args(view, i.type_arguments, source, met);
+            }
+            TSType::Infer(span, i) => {
+                let i = view.infer_type(i);
+                agrees(span, i.span);
+                met.infer += 1;
+                walk_opt(view, i.type_parameter.constraint, source, met);
+            }
+            TSType::TypeQuery(q) => {
+                if let TSTypeQueryExprName::Import(span, i) = q.expr_name {
+                    let i = view.import_type(i);
+                    agrees(span, i.span);
+                    met.query_import += 1;
+                    walk_args(view, i.type_arguments, source, met);
+                }
+                walk_args(view, q.type_arguments, source, met);
+            }
+            TSType::Keyword(_) | TSType::ThisType(_) => {}
+            TSType::Literal(TSLiteralType::TemplateLiteral(t)) => {
+                walk_list(view, t.types, source, met);
+            }
+            TSType::Literal(_) => {}
+            TSType::Array(a) => walk(view, a.element_type, source, met),
+            TSType::Union(TSUnionType { types, .. })
+            | TSType::Intersection(TSIntersectionType { types, .. }) => {
+                walk_list(view, types, source, met);
+            }
+            TSType::TypeReference(r) => walk_args(view, r.type_arguments, source, met),
+            TSType::TypeLiteral(t) => {
+                for member in view.type_members(t.members) {
+                    let annotation = match member {
+                        TSTypeElement::PropertySignature(p) => p.type_annotation,
+                        TSTypeElement::MethodSignature(m) => m.return_type,
+                        TSTypeElement::CallSignature(c) => c.return_type,
+                        TSTypeElement::ConstructSignature(c) => c.return_type,
+                        TSTypeElement::IndexSignature(i) => i.type_annotation,
+                    };
+                    walk_opt(view, annotation.map(|a| a.type_annotation), source, met);
+                }
+            }
+            TSType::Tuple(t) => walk_list(view, t.element_types, source, met),
+            TSType::Parenthesized(TSParenthesizedType {
+                type_annotation, ..
+            })
+            | TSType::TypeOperator(TSTypeOperator {
+                type_annotation, ..
+            })
+            | TSType::Rest(TSRestType {
+                type_annotation, ..
+            })
+            | TSType::Optional(TSOptionalType {
+                type_annotation, ..
+            }) => walk(view, type_annotation, source, met),
+            TSType::TypePredicate(p) => walk_opt(view, p.type_annotation, source, met),
+            TSType::Conditional(c) => {
+                for id in [c.check_type, c.extends_type, c.true_type, c.false_type] {
+                    walk(view, id, source, met);
+                }
+            }
+            TSType::Mapped(m) => {
+                walk(view, m.type_parameter.constraint, source, met);
+                walk_opt(view, m.name_type, source, met);
+                walk_opt(view, m.type_annotation, source, met);
+            }
+            TSType::IndexedAccess(i) => {
+                walk(view, i.object_type, source, met);
+                walk(view, i.index_type, source, met);
+            }
+            TSType::NamedTupleMember(m) => walk(view, m.element_type, source, met),
+        }
+    }
+
+    fn walk_opt(view: AstView<'_>, id: Option<TyId>, source: &str, met: &mut Met) {
+        if let Some(id) = id {
+            walk(view, id, source, met);
+        }
+    }
+
+    fn walk_list(view: AstView<'_>, list: Run<TyId>, source: &str, met: &mut Met) {
+        for &id in view.ty_list(list) {
+            walk(view, id, source, met);
+        }
+    }
+
+    fn walk_args(
+        view: AstView<'_>,
+        args: Option<TSTypeParameterInstantiation>,
+        source: &str,
+        met: &mut Met,
+    ) {
+        if let Some(args) = args {
+            walk_list(view, args.params, source, met);
+        }
+    }
+
+    fn walk_params(
+        view: AstView<'_>,
+        params: Option<TSTypeParameterDeclaration>,
+        source: &str,
+        met: &mut Met,
+    ) {
+        for param in params.map_or(&[][..], |p| view.type_params(p.params)) {
+            walk_opt(view, param.constraint, source, met);
+            walk_opt(view, param.default, source, met);
+        }
+    }
+
+    /// `TSFunctionType`, `TSConstructorType`, `TSImportType` and `TSInferType` are stored by
+    /// id with their span inline beside it (as is a `typeof import(…)`'s import type), and
+    /// the two are written from one value at the push. Graded over the positions below
+    /// (parameter and type-parameter positions are not walked): alone, nested in each
+    /// composite, as a return type, generic, spread over lines and around comments, so a span
+    /// the parser widens or narrows after the push (or a path that pushes the row from another
+    /// value) fails here.
+    #[test]
+    fn stored_type_variants_carry_their_payload_span() {
+        const SOURCES: &[&str] = &[
+            "type A = () => void;",
+            "type A = <T, U extends T = T>(a: T, ...b: U[]) => T;",
+            "type A = (a: unknown) => asserts a is string;",
+            "type A = (this: Window) => () => (() => void);",
+            "type A = (\n\t/* c */ a: string // d\n) =>\n\tvoid;",
+            "type A = | (() => void) | ((a: string) => number)[];",
+            "type A = { f: () => void; g(): new () => B; (): typeof import('m') };",
+            "type A = new () => B;",
+            "type A = abstract new <T>(...a: T[]) => T;",
+            "type A = new (a: string) => new () => B;",
+            "type A = [new () => B, x?: () => void, ...(() => C)[]];",
+            "type A = import('m');",
+            "type A = import('m').B.C<import('n')>;",
+            "type A = import('m', { with: { 'resolution-mode': 'import' } }).B;",
+            "type A = import(/* c */ 'm' /* d */);",
+            "type A = typeof import('m');",
+            "type A = typeof import('m').B<import('n').C>;",
+            "type A = keyof typeof import('m');",
+            "type A<T> = T extends infer U ? U : never;",
+            "type A<T> = T extends (infer U extends string)[] ? U : never;",
+            "type A<T> = T extends [infer H, ...infer R] ? [H, R] : never;",
+            "type A<T> = T extends (...a: any[]) => infer R ? R : never;",
+            "type A<T> = T extends { a: infer U; b: infer V extends U } ? `${U}` : never;",
+            "type A<T> = T extends Promise<infer U> | Array<infer U> ? U : T;",
+            "type A<T> = { [K in keyof T]: T[K] extends () => infer R ? R : new () => T[K] };",
+            "type A<T = () => void, U extends new () => T = new () => T> = T | U;",
+            "type A = B<() => void, typeof import('m'), import('n')>;",
+        ];
+        let mut met = Met::default();
+        for source in SOURCES {
+            let parsed =
+                crate::__private::parse(source).unwrap_or_else(|e| panic!("{source:?}: {e}"));
+            let view = parsed.view();
+            for &id in view.stmt_list(parsed.program.body) {
+                let StatementKind::TSTypeAliasDeclaration(alias) = view.stmt(id).kind else {
+                    panic!("{source:?}: a type alias");
+                };
+                let alias = view.type_alias(alias);
+                walk_params(view, alias.type_parameters, source, &mut met);
+                walk(view, alias.type_annotation, source, &mut met);
+            }
+        }
+        assert!(
+            met.function > 0
+                && met.constructor > 0
+                && met.import > 0
+                && met.infer > 0
+                && met.query_import > 0,
+            "a stored variant the sources never reached: {met:?}"
+        );
+    }
+}

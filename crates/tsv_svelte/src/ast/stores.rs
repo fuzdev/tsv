@@ -962,6 +962,7 @@ mod tests {
 mod one_shot_tests {
     use tsv_lang::doc::arena::parked_doc_arena_capacity;
     use tsv_lang::store::ONE_SHOT_PARK_CAP_BYTES;
+    use tsv_ts::ast::AstStores;
 
     /// One free-function call, its output (or error) as text.
     type Call = fn(&str) -> String;
@@ -1142,5 +1143,61 @@ mod one_shot_tests {
             crate::__private::parked_own_capacity().is_some(),
             "the cold call parks again"
         );
+    }
+
+    /// What a fresh TypeScript half of `source_len` bytes reserves, as the slot measures it:
+    /// `AstStores::for_source`'s stores parked and read back, then taken out again.
+    fn reserved_for(source_len: usize) -> usize {
+        tsv_ts::__private::park_stores(Box::new(AstStores::for_source(source_len)));
+        let reserved = tsv_ts::__private::parked_stores_capacity().expect("parked");
+        drop(tsv_ts::__private::take_stores());
+        reserved
+    }
+
+    /// A free function finding the TypeScript slot empty takes a half reserved for the WHOLE
+    /// document's length (`tsv_ts::__private::take_stores_sized`), which bounds its scripts and
+    /// template expressions; one finding a parked half takes that half as it is, reserving
+    /// nothing more. Graded on documents with no TypeScript in them, so the half the call parks
+    /// holds exactly what its take reserved. Each free function runs on a thread of its own,
+    /// whose slots start empty.
+    #[test]
+    fn a_one_shot_call_reserves_the_typescript_half_for_the_document() {
+        type Entry = (&'static str, fn(&str) -> bool);
+        let calls: &[Entry] = &[
+            ("format", |s| crate::format(s).is_ok()),
+            ("parse_imports", |s| crate::parse_imports(s).is_ok()),
+            #[cfg(feature = "json")]
+            ("parse_to_json", |s| crate::parse_to_json(s).is_ok()),
+        ];
+        for &(name, call) in calls {
+            std::thread::spawn(move || {
+                let (small, large) = ("<p>x</p>\n".repeat(1024), "<p>x</p>\n".repeat(2048));
+                assert_eq!(tsv_ts::__private::parked_stores_capacity(), None);
+                let reserved = reserved_for(small.len());
+                assert!(
+                    reserved > reserved_for(0),
+                    "{name}: a document this long reserves rows"
+                );
+                assert!(
+                    reserved_for(large.len()) > reserved,
+                    "{name}: a longer document reserves more"
+                );
+                // each `reserved_for` takes its stores back out, so the slot is empty here
+                assert!(call(&small), "{name}: the small document parses");
+                assert_eq!(
+                    tsv_ts::__private::parked_stores_capacity(),
+                    Some(reserved),
+                    "{name}: an empty slot's half is reserved for the document's length"
+                );
+                assert!(call(&large), "{name}: the large document parses");
+                assert_eq!(
+                    tsv_ts::__private::parked_stores_capacity(),
+                    Some(reserved),
+                    "{name}: a parked half is taken as it is"
+                );
+            })
+            .join()
+            .expect("the thread's assertions hold");
+        }
     }
 }
