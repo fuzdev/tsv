@@ -18,8 +18,9 @@ Things the published numbers measure that aren't quite what they look like.
   Per-file compute is single-threaded for every impl: tsv (FFI, N-API + WASM) pulls in
   no threading crate (`rayon`/`num_cpus`/`threadpool`/`crossbeam` absent from
   every `Cargo.toml`; the workspace's `tokio` is dev/debug-only, outside the
-  shipped `tsv_ffi`/`tsv_napi`/`tsv_wasm` chain); prettier, `svelte/compiler`, and
-  `oxc-parser.parseSync` are single-threaded JS. The lone nuance is `oxfmt`,
+  shipped `tsv_ffi`/`tsv_napi`/`tsv_wasm` chain); prettier and `svelte/compiler` are
+  single-threaded JS, and `oxc-parser.parseSync` a synchronous native N-API call, one
+  parse on one thread. The lone nuance is `oxfmt`,
   whose programmatic `format` is an async napi call that may run the native work
   off the JS thread (its `tinypool` dep is CLI-only — `dist/cli.js` — not in the
   `format()` path); still one thread of compute per file, each call awaited before

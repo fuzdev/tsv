@@ -377,14 +377,14 @@ The sibling hole, a dropped `{#snippet s()}` plus `export { s }` from a module s
 
 `dropped_fragments_are_walked` pins the expression halves; `dropped_fragment_refuses_presence_read_nodes` pins both presence axes **and** the must-not-over-refuse set beside them.
 
-**A third open hole, and it is a different shape from the two above.**
+**A second open hole, and a different shape from the table's row.**
 `{#await p}x{:then v}y{:catch e}<svelte:boundary bogus={1}>z</svelte:boundary>{/await}`
 compiles; the oracle rejects it with `svelte_boundary_invalid_attribute`. The
 attribute-name check against the closed `onerror`/`failed`/`pending` set lives in
 `blocks.rs::guard_boundary_attributes`, reached only from `emit_boundary` — and an
 emitter never runs on a dropped region.
 
-Unlike the two rows above, this is **not** a whole-component validation: it reads
+Unlike the table's row, this is **not** a whole-component validation: it reads
 one node's own attribute list and nothing else, so it fires in isolation and needs
 no emitted partner. That makes it the same class as `attribute_duplicate`, which the
 whole-document walk in `validate.rs` hosts for exactly this reason — a rule whose inputs
@@ -410,7 +410,7 @@ Marking an element emission never reaches is safe: `element_scope` is a span loo
 
 ### The wider validation surface
 
-The row above is the dropped-region slice of a **general** hole: tsv's compiler
+The `{$$slots.x}` row and the boundary-attribute hole above are the dropped-region slice of a **general** hole: tsv's compiler
 implements the oracle's *emission*, not its *analysis*, so a component the oracle's
 analyzer rejects can still compile. Each row below is an over-acceptance with a
 standalone repro, none of them dropped-region-specific:
@@ -639,9 +639,10 @@ substitution would be visible there. Parity and refused counts both unmoved.
 
 #### Snippet declaration and export
 
-**Closed.** Five pinned over-acceptances, from two oracle sites, all ported into
-`validate.rs` — three from `phases/2-analyze/visitors/SnippetBlock.js` and two from
-the single `if`/`else` in `analyze_component` (`phases/2-analyze/index.js`).
+**Closed.** The pinned over-acceptances below, from three oracle sites, all ported into
+`validate.rs` — three rules from `phases/2-analyze/visitors/SnippetBlock.js`, one from
+`Scope.declare` (`phases/scope.js`), and two from the single `if`/`else` in
+`analyze_component` (`phases/2-analyze/index.js`).
 
 The three `SnippetBlock` rules are **mutually exclusive per snippet**, and the reason
 is worth stating because it is what lets them share one walk: `declaration_duplicate`
@@ -730,7 +731,7 @@ and its `binding.blocker` arm is the async/top-level-`await` machinery
 (`calculate_blockers` in `index.js`), unreachable in a component tsv compiles at all since top-level
 `await` refuses upstream.
 
-Corpus cost: **zero**, measured the substitution-immune way — none of the five new
+Corpus cost: **zero**, measured the substitution-immune way — none of these
 buckets appears in a corpus run's `refusal_reasons`, which holds only oracle-ACCEPTED
 files, so a bucket substitution would be visible there.
 
@@ -1091,7 +1092,7 @@ A **static** component invocation compiles to `Name($$renderer, props)` (`shared
 - **Refused**: `bind: directive on <{name}> component` — the oracle emits a `do…while` settle loop.
 - **Refused**: `directive on <{name}> component` — a non-`bind:` directive (`use:`/`transition:`/…; mostly oracle-rejected input).
 - **Supported**: carried script comments alongside a component invocation — the component call's prop values are template-region borrows, so no comment window sweeps a script comment (see [Comment placement classes](#comment-placement-classes)).
-- **Mismatch (open)**: the compiled default export's **name collides with an imported component** — a component whose module imports `Input` (flowbite-svelte's `Input` component, used across its own files) is named `Input` by tsv where the oracle deduplicates it to `Input_1`. The largest open mismatch class by file count.
+- **Mismatch (open)**: the compiled default export's **name collides with an imported component** — a component whose module imports `Input` (flowbite-svelte's `Input` component, used across its own files) is named `Input` by tsv where the oracle deduplicates it to `Input_1`.
 
 ### Attributes
 

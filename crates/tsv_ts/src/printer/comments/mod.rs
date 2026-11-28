@@ -1660,7 +1660,8 @@ impl<'a> Printer<'a> {
     /// the ENCLOSING construct's break, so the suffix flushes inside it instead of escaping,
     /// and that is [`tsv_lang::doc::arena::DocArena::flush_break`]: emitted after the run, it
     /// arms only a line opportunity reached past it, leaving this construct's own lines to
-    /// width. See [`comments.md`](../../../../docs/comments.md) §A STATIC FLATTENER.
+    /// width. See [`comments.md`](../../../../docs/comments.md) §Trailing and dangling runs
+    /// (its "A STATIC FLATTENER…" paragraph).
     #[inline]
     pub(crate) fn obligated_break(&self, obligated: bool, ordinary: DocId) -> DocId {
         if obligated {

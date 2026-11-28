@@ -1055,7 +1055,7 @@ contextual_keywords/async_await_as_identifiers/
 
 ### Combining Fixture Patterns
 
-Combine multiple patterns when testing edge cases with both parser and formatter quirks (e.g., CSS comments where both Svelte and Prettier have quirks).
+Combine multiple patterns when an edge case needs more than one kind of record (e.g., a CSS comment where prettier's output, its stable variants and tsv-only authorings all need records).
 
 **Example:** `css/tokens/comments/in_property_value_before_colon_prettier_divergence/` combines `output_prettier.*`, `prettier_variant_*` and `unformatted_ours_*` - see [Prettier Variant System](#example-css-comment-whitespace) above.
 

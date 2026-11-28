@@ -440,7 +440,7 @@ both need the canonical parser, so they are conformance-tier at best. Standing f
   an `@import`'s value gaps. The one known printer position that drops the run: the
   stylesheet's trailing whitespace, ratcheted in
   [css_boundary_whitespace.rs](../tests/css_boundary_whitespace.rs). See
-  [conformance_svelte.md §Boundary whitespace](./conformance_svelte.md).
+  [conformance_svelte.md §CSS Parser Corrections (corpus-enforced)](./conformance_svelte.md#css-parser-corrections-corpus-enforced).
 
 ## Blank-Line Injection Audit (`blanks:audit`)
 

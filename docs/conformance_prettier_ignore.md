@@ -1177,7 +1177,7 @@ tsv diverges at the places below:
   tsv's floor, so tsv keeps the author's line and freezes below it. The brackets stay
   parent-owned (a slice swallowing the `]` emits a property that no longer parses) and parens
   the key requires ride outside the slice. Both spellings behave alike, which is what makes the
-  ordinary-comment layout fix below part of this rule —
+  ordinary-comment layout fix above part of this rule —
   [computed key head](../tests/fixtures/typescript/expressions/objects/computed_key_prettier_ignore_head_prettier_divergence/),
   and its ordinary-comment face
   [computed key own-line block](../tests/fixtures/typescript/expressions/objects/computed_key_own_line_block_comment_prettier_divergence/)
@@ -1272,8 +1272,10 @@ Those heads relocate an ordinary own-line comment — a labeled statement's trai
 and declarator lists, an **honored directive keeps its own line** instead: the trailing
 placement is inert under the floor, so following the relocation would lose the freeze on tsv's
 own second pass. The four declaration heads answer both questions on one pair of seams —
-`Printer::gap_frozen_span` resolves the slice, `Printer::build_header_pre_body_doc` places the
-run and picks the pre-`{` separator.
+`Printer::gap_frozen_span` resolves the slice and `Printer::pre_body_gap` places the run and
+decides the break; `Printer::build_header_pre_body_doc` wraps it with a plain space for
+`interface`/`enum`/`namespace` and an ungrouped class header, while a grouped class header
+picks its own group-relative separator.
 
 Prettier agrees at the list positions and at the `if` heads — including the freeze's SCOPE
 there, which the fixtures' `unformatted_spaces` variants pin by perturbing the head outside the

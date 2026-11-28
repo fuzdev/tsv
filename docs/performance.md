@@ -2973,7 +2973,7 @@ compiles it as neither: it emits a `setne` per target, a `test` to fold them, an
 own step — **about thirteen instructions per byte, one branch**. It does not vectorize
 either, because the escape arm makes the stride data-dependent, so the "the compiler
 auto-vectorizes this" comment such loops attract is worth checking against `objdump` before
-it is believed. **Audited across the repo's seven such claims** (count `pcmpeqb` / `pmovmskb`
+it is believed. **Audited across the repo's vectorization claims** (count `pcmpeqb` / `pmovmskb`
 / `psadbw` per symbol in the profiling build, which keeps the symbols the release binary
 folds away): `printing::visual_width` does
 vectorize (and so did the doc arena's tab count, until the width measure stopped counting —
@@ -3059,7 +3059,7 @@ the lever, which is the next section.
 
 ### A skip table is a THROUGHPUT shape: for a one-byte test, two compares beat it
 
-The three sections above rank a compare chain (~13 instructions a byte), a 256-entry skip
+The sections above rank a compare chain (~13 instructions a byte), a 256-entry skip
 table (6) and a SWAR word loop (1.4). All three answer a question about a **run**. The other
 end of the ladder — what tests a **single** byte — ranks the other way, because the table's
 cost there is not its instruction count but a **dependent L1 load on the branch's critical
@@ -3250,7 +3250,7 @@ form, which looks like the obviously cleaner spelling — gave back **0.077 poin
 lever on the TypeScript cell. And folding the module's six hand-written word-loop copies onto
 one closure-parameterized walker cost **+0.17%** on the CSS cell, where only two of those
 copies run, and gave back the whole win on the TypeScript one — the extraction lesson of
-§A slice's scan is bounded by the slice, a third time. The copies stay, each with its own
+§A slice's scan is bounded by the slice, again. The copies stay, each with its own
 compile-time class proof; a refactor that touches a hot function's spelling is a rung here,
 never tidying.
 

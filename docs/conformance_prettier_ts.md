@@ -362,8 +362,8 @@ call's `(`, a plain template's backtick, an operator, and an optional member's o
 optional generic call's `?`. A hop that could put a
 type SEPARATOR there instead (`,`, `|`, `&`) is unreachable without the operand ROOT taking
 a pair first, since each binds looser than `<` and a sequence self-parenthesizes. The one
-token in that list whose answer is a
-tsv position rather than a grammar fact is the non-null `!` — tsc's `JSDocNonNullableType`,
+spine hop that list leaves out, because its answer is a
+tsv position rather than a grammar fact, is the non-null `!` — tsc's `JSDocNonNullableType`,
 which acorn-typescript and so tsv's own parse decline; a parse that admitted it after a `)`
 would put the non-null hop in the walk.
 
@@ -380,8 +380,8 @@ load-bearing on every shell whose content tsc abandons; it stays load-bearing on
 families tsv still refuses — a group whose content spells a parameter list (`(a = b)`,
 `(a ? b : q)`, `(a, b)`, `(a: T)`), and one tsc's error recovery carries to the `>`
 (`(a << b)`) — and it is what makes grading the `(` head's body sound in the first place.
-Finally, a non-null `!`
-**does** open one, prefix and postfix: `T!` is tsc's `JSDocNonNullableType`, so
+A non-null `!`
+**does** open a type-argument region, prefix and postfix: `T!` is tsc's `JSDocNonNullableType`, so
 `a < b! >⏎c` is an instantiation plus a statement where acorn-typescript — and so tsv's own
 parse — reads the comparison chain the flat line is. tsv follows acorn when it parses, and
 when it decides what its own output will mean it takes the widest reading among the parsers
