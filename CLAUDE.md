@@ -110,8 +110,9 @@ npm run doctor           # one-pass setup check (runtimes, pins + checkout align
 #                          oracle checkouts, corpus, build artifacts). Exit 1 only on MISLEADING state (pin drift, skew,
 #                          stale deps) or a broken core; absences warn (--strict promotes them)
 npm run typecheck        # cargo check
-npm run typecheck:features # each binding crate under each single feature + the language crates without `locations` —
-#                          the per-package builds `cargo check --workspace` and clippy's `--all-features` both miss; in `check`
+npm run typecheck:features # each binding crate under each single feature + the language crates without `locations`,
+#                          without `json` and under `locations` alone, test targets included — the per-package builds
+#                          `cargo check --workspace` and clippy's `--all-features` both miss; in `check`
 npm run typecheck:wasm32 # `tsv_wasm` for wasm32 under each published package's features — the one leg off the host target;
 #                          in `check`
 npm run typecheck:release # every workspace target, tests included, under the default and all features, with debug assertions OFF
@@ -567,7 +568,7 @@ Worked example + full design: ./docs/architecture.md §Two-AST Design.
 **Key Rules**:
 
 - Raw strings NEVER duplicated in the internal AST (extract via `source[span.range()]`)
-- The internal AST is NEVER the wire output — the writer hand-emits the wire JSON; `serde_json` is the writer substrate's test oracle (`tsv_lang`'s hand string escaper and its `zmij`-backed `f64` emitter are graded byte-for-byte against it) and reads bytes back into a `Value` in test and dev code only (`tsv_debug`'s fixture gate and audits, the root tests, the binding crates' and `tsv_svelte`'s unit tests); no crate meant for publishing has it as a normal or build dependency
+- The internal AST is NEVER the wire output — the writer hand-emits the wire JSON; `serde_json` is the writer substrate's test oracle (`tsv_lang`'s hand string escaper and its `zmij`-backed `f64` emitter are graded byte-for-byte against it) and reads bytes back into a `Value` in test and dev code only (`tsv_debug`'s fixture gate and audits, the root tests, `tsv_ffi`'s and `tsv_svelte`'s unit tests); no crate meant for publishing has it as a normal or build dependency
 
 ### Position Types: u32 vs usize
 
@@ -599,7 +600,7 @@ Comments live **separately from AST nodes**, in a flat `Comment` list at the roo
 The shipped language/foundation crates' external deps (`tsv_cli` adds only `argh`; dev tooling adds `tokio`, `futures-util`, `serde` with `derive`, `similar`, `tempfile` and `thiserror`; `tsv_wasm` adds `wasm-bindgen`/`js-sys`):
 
 - `zmij` — the wire writer's non-integral `f64` digits (`tsv_lang`'s `json` feature): the shortest round-trip formatter `serde_json` itself calls, called directly so the bytes stay `serde_json`'s (graded by `f64_matches_serde_json`) with no `serde_json` in the published graph
-- `serde_json` — **never a normal or build dependency of a crate meant for publishing** (every crate with a `[package.metadata.docs.rs]` table; `npm run deps:audit` gates it), because the workspace entry's `preserve_order` / `float_roundtrip` / `arbitrary_precision` features would unify into a consumer's own `serde_json` and change its deserialization. It is the dev-dependency oracle of `tsv_lang`'s writer and `tsv_html`'s entity-table generator, the dev-dependency oracle and reader of `tsv_svelte`'s and `tsv_napi`'s unit tests, and a normal dependency of the unpublished `tsv_ffi`, `tsv_debug` and the root test package; the one unbounded-depth reader, `tsv_debug::json`, enables `unbounded_depth`. `serde` itself is a dev-tooling dep, out of every published library crate's normal graph (`tsv_cli` reaches it through `argh` → `argh_shared`, which carries no `serde_json`)
+- `serde_json` — **never a normal or build dependency of a crate meant for publishing** (every crate with a `[package.metadata.docs.rs]` table; `npm run deps:audit` gates it), because the workspace entry's `preserve_order` / `float_roundtrip` / `arbitrary_precision` features would unify into a consumer's own `serde_json` and change its deserialization. It is the dev-dependency oracle of `tsv_lang`'s writer and `tsv_html`'s entity-table generator, the dev-dependency oracle and reader of `tsv_svelte`'s unit tests, and a normal dependency of the unpublished `tsv_ffi`, `tsv_debug` and the root test package; the one unbounded-depth reader, `tsv_debug::json`, enables `unbounded_depth`. `serde` itself is a dev-tooling dep, out of every published library crate's normal graph (`tsv_cli` reaches it through `argh` → `argh_shared`, which carries no `serde_json`)
 - `smallvec` — stack-allocated vectors (printers + `tsv_check`)
 - `unicode-ident` / `unicode-segmentation` / `unicode-width` — XID identifiers, grapheme clustering, display width (CJK, zero-width)
 - `bumpalo` — no parse takes it (every tree — TypeScript, CSS, Svelte — lives in its own stores); what remains is the dev tooling (`tsv_debug`'s census interner and the old-generation arms of its `perf:ab` drivers)

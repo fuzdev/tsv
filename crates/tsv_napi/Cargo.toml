@@ -33,11 +33,6 @@ napi-derive = { workspace = true }
 [build-dependencies]
 napi-build = { workspace = true }
 
-[dev-dependencies]
-# Test-only: the in-crate tests parse the returned JSON AST to assert its root
-# type. The bindings themselves never touch serde_json — the parse path returns
-# the already-serialized string from `__private::convert_ast_json_string`.
-serde_json.workspace = true
 
 [features]
 # Mirrors tsv_ffi / tsv_wasm: `format` exports the formatters, `parse` exports

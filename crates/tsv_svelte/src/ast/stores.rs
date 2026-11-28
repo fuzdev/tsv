@@ -367,11 +367,15 @@ mod tests {
     const DOCUMENT: &str =
         "<script>let x = [1, 2];</script>\n<p>{x}</p>\n<style>p { color: red; }</style>\n";
 
-    /// The wire and the formatted output of `source`, or its error, through `stores`.
+    /// The wire and the formatted output of `source`, or its error, through `stores` — the wire
+    /// empty without the `json` feature, which leaves the formatted output to compare.
     fn outputs(source: &str, stores: &mut SvelteStores) -> Result<(Vec<u8>, String), String> {
         let root = crate::__private::parse_into(source, stores).map_err(|e| format!("{e:#}"))?;
         let parsed = crate::__private::parsed_ref(&root, stores);
+        #[cfg(feature = "json")]
         let wire = crate::__private::convert_ast_json_bytes(parsed, source);
+        #[cfg(not(feature = "json"))]
+        let wire = Vec::new();
         let formatted = crate::__private::format_ast(parsed, source);
         Ok((wire, formatted))
     }
@@ -970,6 +974,7 @@ mod one_shot_tests {
     fn ts_format(source: &str) -> String {
         format!("{:?}", tsv_ts::format(source))
     }
+    #[cfg(feature = "json")]
     fn ts_json(source: &str) -> String {
         format!("{:?}", tsv_ts::parse_to_json(source))
     }
@@ -988,12 +993,14 @@ mod one_shot_tests {
     fn css_format(source: &str) -> String {
         format!("{:?}", tsv_css::format(source))
     }
+    #[cfg(feature = "json")]
     fn css_json(source: &str) -> String {
         format!("{:?}", tsv_css::parse_to_json(source))
     }
     fn svelte_format(source: &str) -> String {
         format!("{:?}", crate::format(source))
     }
+    #[cfg(feature = "json")]
     fn svelte_json(source: &str) -> String {
         format!("{:?}", crate::parse_to_json(source))
     }
@@ -1025,11 +1032,14 @@ mod one_shot_tests {
             (css_format, "a{color:red}".into()),
             (ts_strip, "let y: T = 1".into()),
             (ts_format, "let  z".into()),
+            #[cfg(feature = "json")]
             (
                 svelte_json,
                 format!("{script}<p>{{x}}</p><style>p{{top:0}}</style>"),
             ),
+            #[cfg(feature = "json")]
             (ts_json, "let a = b;".into()),
+            #[cfg(feature = "json")]
             (css_json, "a{}".into()),
             (
                 svelte_imports,
@@ -1047,6 +1057,7 @@ mod one_shot_tests {
             (svelte_format, "<p  class=\"a\">y</p>".into()),
             (ts_strip, big_ts),
             (css_format, "b{top:0}".into()),
+            #[cfg(feature = "json")]
             (svelte_json, big_svelte),
             (ts_format, "let  w".into()),
             // errors leave the slots usable

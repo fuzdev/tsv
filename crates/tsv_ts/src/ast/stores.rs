@@ -1828,6 +1828,7 @@ mod one_shot_tests {
     }
 
     #[test]
+    #[cfg(feature = "json")]
     fn a_nested_call_takes_fresh_stores_and_leaves_the_outer_ones_alone() {
         let source = "let a = [1, 2];";
         let outer_json = with_one_shot_stores(source.len(), |outer| {
@@ -1866,6 +1867,7 @@ mod one_shot_tests {
     }
 
     #[test]
+    #[cfg(feature = "json")]
     fn a_call_from_a_thread_local_destructor_runs_on_fresh_stores() {
         type Outputs = (String, String, String);
         struct CallsOnDrop(std::sync::mpsc::Sender<Outputs>);

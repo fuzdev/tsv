@@ -714,9 +714,12 @@ mod tests {
     type FfiFn = unsafe extern "C" fn(*const u8, usize, u32, *mut usize, *mut u32) -> *mut u8;
 
     const MODULE: u32 = SOURCE_TYPE_MODULE;
+    #[cfg(feature = "parse")]
     const SCRIPT: u32 = SOURCE_TYPE_SCRIPT;
+    #[cfg(feature = "parse")]
     const UNSPECIFIED: u32 = SOURCE_TYPE_UNSPECIFIED;
     /// Not a code at all — the "unknown" probe, kept one past the last real one.
+    #[cfg(feature = "parse")]
     const UNKNOWN: u32 = SOURCE_TYPE_UNSPECIFIED + 1;
 
     /// Drive an FFI entry point end to end at `goal`: pass the bytes, read the
@@ -791,11 +794,13 @@ mod tests {
     }
 
     /// The failure path at Module goal: asserts [`TSV_STATUS_ERROR`], returns the message.
+    #[cfg(feature = "parse")]
     fn call_err(f: FfiFn, source: &str) -> String {
         call_err_goal(f, source, MODULE)
     }
 
     /// The failure path at an explicit goal.
+    #[cfg(feature = "parse")]
     fn call_err_goal(f: FfiFn, source: &str, goal: u32) -> String {
         let (status, out) = call_raw(f, source.as_bytes(), goal);
         assert_eq!(status, TSV_STATUS_ERROR, "expected an error, got: {out}");
@@ -811,11 +816,13 @@ mod tests {
     // --- format: happy path (one per language exercises the macro expansion) ---
 
     #[test]
+    #[cfg(feature = "format")]
     fn format_typescript_normalizes() {
         assert_eq!(call(tsv_format_typescript, "const   x=1"), "const x = 1;\n");
     }
 
     #[test]
+    #[cfg(feature = "format")]
     fn format_css_normalizes() {
         assert_eq!(
             call(tsv_format_css, "a{color:red}"),
@@ -824,6 +831,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "format")]
     fn format_svelte_normalizes() {
         assert_eq!(
             call(tsv_format_svelte, "<div   >x</div   >"),
@@ -834,6 +842,7 @@ mod tests {
     // --- parse: returns a JSON AST keyed by `type`, no error ---
 
     #[test]
+    #[cfg(feature = "parse")]
     fn parse_returns_json_ast() {
         // Annotate the array type so the fn items coerce to `FfiFn` (no casts).
         let cases: [(&str, FfiFn, &str); 3] = [
@@ -865,6 +874,7 @@ mod tests {
     /// [`call_raw`] for a tape export: the payload's bytes, freed by `tsv_free_tape`, with
     /// the pointer's alignment checked — the word allocation is what lets a host view it.
     #[expect(unsafe_code, reason = "drives a raw C ABI export and frees its buffer")]
+    #[cfg(feature = "parse")]
     fn call_tape_raw(f: FfiFn, bytes: &[u8], goal: u32) -> (u32, Vec<u8>) {
         let mut out_len: usize = 0;
         let mut out_status: u32 = u32::MAX;
@@ -893,6 +903,7 @@ mod tests {
 
     /// The tape a language's own wire writer writes for `source` into a sink of its own — what
     /// the tape export must hand back byte for byte.
+    #[cfg(feature = "parse")]
     fn writer_tape(label: &str, source: &str) -> Vec<u8> {
         let mut sink = tsv_arena::tape::TapeSink::new();
         match label {
@@ -916,6 +927,7 @@ mod tests {
     /// `lang_bindings!` invocation would write another language's), and its every error is the
     /// JSON export's own. The tape itself is graded against the transcoder by the tape gates.
     #[test]
+    #[cfg(feature = "parse")]
     fn parse_tape_is_the_writers_tape_and_its_errors() {
         let cases: [(&str, FfiFn, FfiFn, &str, &str); 3] = [
             (
@@ -977,6 +989,7 @@ mod tests {
     }
 
     /// [`call_err_goal`] over raw bytes.
+    #[cfg(feature = "parse")]
     fn call_err_bytes(f: FfiFn, bytes: &[u8], goal: u32) -> String {
         let (status, out) = call_raw(f, bytes, goal);
         assert_eq!(status, TSV_STATUS_ERROR, "expected an error, got: {out}");
@@ -986,6 +999,7 @@ mod tests {
     // --- parse_internal: empty payload on success, error status on failure ---
 
     #[test]
+    #[cfg(feature = "parse")]
     fn parse_internal_empty_on_success() {
         assert_eq!(call(tsv_parse_internal_typescript, "const x = 1;\n"), "");
         assert_eq!(call(tsv_parse_internal_svelte, "<div>x</div>\n"), "");
@@ -993,6 +1007,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "parse")]
     fn parse_internal_reports_errors() {
         // Cover the error arm of the internal-parse exports for all three
         // languages (success arm is covered above for all three). The empty
@@ -1014,6 +1029,7 @@ mod tests {
     // --- the status word is the verdict, not the payload's text ---
 
     #[test]
+    #[cfg(feature = "format")]
     fn success_status_survives_an_error_shaped_payload() {
         // A successful format whose output carries the error envelope's text
         // verbatim. The verdict must still be OK, because it comes from
@@ -1037,6 +1053,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "format")]
     fn no_format_output_can_open_the_error_envelope() {
         // Why the retired sniff was sound, and why soundness on those terms was
         // the reason to retire it.
@@ -1059,6 +1076,7 @@ mod tests {
     // --- the goal axis: script accepts `await` as an identifier, module rejects ---
 
     #[test]
+    #[cfg(all(feature = "format", feature = "parse"))]
     fn typescript_goal_switches_await() {
         // `await` is an ordinary identifier at Script goal, reserved at Module goal.
         let src = "var await = 1;\n";
@@ -1080,6 +1098,7 @@ mod tests {
     ///
     /// Returned as a fresh array per language rather than one flat table because
     /// each export takes its own source.
+    #[cfg(all(feature = "format", feature = "parse"))]
     fn goalless_exports(language: &str) -> [(&'static str, FfiFn); 3] {
         assert!(language == "svelte" || language == "css", "{language}");
         if language == "svelte" {
@@ -1098,6 +1117,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(all(feature = "format", feature = "parse"))]
     fn unknown_goal_code_is_rejected() {
         // Never a silent Script (or Module) default — and the refusal is the
         // CODE's, not the language's, so a goalless language owes it too (its own
@@ -1149,6 +1169,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(all(feature = "format", feature = "parse"))]
     fn the_unspecified_code_is_format_only_and_falls_back() {
         // Code 2 says the caller named no source type. Only a formatter has an
         // answer for that — the module grammar, retried as a script — so the parse
@@ -1193,6 +1214,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(all(feature = "format", feature = "parse"))]
     fn goalless_languages_reject_a_script_goal() {
         // Svelte hard-wires Module and CSS has no goal, so `1` asks for something
         // that cannot be honored — the caller is told rather than silently served
@@ -1230,6 +1252,7 @@ mod tests {
     /// a held borrow guard would have been released too.)
     #[test]
     #[expect(unsafe_code, reason = "drives the raw helper and frees its buffer")]
+    #[cfg(feature = "format")]
     fn a_panicking_call_reports_and_leaves_the_thread_usable() {
         let source = "const   x=1";
         let mut out_len: usize = 0;
@@ -1266,6 +1289,7 @@ mod tests {
     // --- multibyte sources survive the UTF-8 / char-offset marshalling boundary ---
 
     #[test]
+    #[cfg(all(feature = "format", feature = "parse"))]
     fn parse_and_format_preserve_multibyte_source() {
         let src = "const x = '€🦀';\n";
         call(tsv_parse_typescript, src);
@@ -1281,6 +1305,7 @@ mod tests {
     // --- error path: invalid syntax surfaces as an error status (and still frees) ---
 
     #[test]
+    #[cfg(all(feature = "format", feature = "parse"))]
     fn invalid_syntax_reports_an_error() {
         let cases: [(&str, FfiFn, FfiFn, &str); 3] = [
             (
@@ -1309,6 +1334,7 @@ mod tests {
     /// the input that tells the two texts apart: folded, it is a line break the document
     /// does not count.
     #[test]
+    #[cfg(all(feature = "format", feature = "parse"))]
     fn format_error_reports_the_sources_own_point() {
         let src = "<p>a\rb</p>\n{a +}";
         let format_err = call_err(tsv_format_svelte, src);
@@ -1319,6 +1345,7 @@ mod tests {
     // --- invalid UTF-8 is reported, not a crash (module safety contract) ---
 
     #[test]
+    #[cfg(feature = "format")]
     fn invalid_utf8_returns_error() {
         // 0xFF is never valid in UTF-8.
         let (status, out) = call_raw(tsv_format_typescript, &[b'a', 0xFF, b'b'], MODULE);
@@ -1333,6 +1360,7 @@ mod tests {
     // --- empty input formats to empty output and round-trips through free ---
 
     #[test]
+    #[cfg(all(feature = "format", feature = "parse"))]
     fn empty_input_is_handled() {
         // Format of empty input is empty for every language.
         assert_eq!(call(tsv_format_typescript, ""), "");
@@ -1349,6 +1377,7 @@ mod tests {
 
     #[test]
     #[expect(unsafe_code, reason = "drives a raw C ABI export and frees its buffer")]
+    #[cfg(feature = "format")]
     fn null_source_pointer_is_handled() {
         let mut out_len: usize = 0;
         let mut out_status: u32 = u32::MAX;

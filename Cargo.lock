@@ -677,7 +677,6 @@ dependencies = [
  "napi",
  "napi-build",
  "napi-derive",
- "serde_json",
  "tsv_arena",
  "tsv_css",
  "tsv_discover",

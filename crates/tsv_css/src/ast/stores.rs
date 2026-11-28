@@ -778,15 +778,19 @@ mod one_shot_tests {
             parked_stores_capacity().is_some(),
             "the cold call parks again"
         );
-        let _ = crate::parse_to_json(&big).unwrap();
-        assert_eq!(
-            parked_stores_capacity(),
-            None,
-            "the parse path drops them too"
-        );
+        #[cfg(feature = "json")]
+        {
+            let _ = crate::parse_to_json(&big).unwrap();
+            assert_eq!(
+                parked_stores_capacity(),
+                None,
+                "the parse path drops them too"
+            );
+        }
     }
 
     #[test]
+    #[cfg(feature = "json")]
     fn a_nested_call_takes_fresh_stores_and_leaves_the_outer_ones_alone() {
         let source = "a { color: red; }";
         let outer_json = with_one_shot_stores(|outer| {

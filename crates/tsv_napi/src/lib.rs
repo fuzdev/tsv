@@ -143,7 +143,7 @@ impl Failure {
 
     /// The text a caller reads: a plain error's own, a returned failure's message and
     /// frame as the native CLI prints them.
-    #[cfg(test)]
+    #[cfg(all(test, feature = "parse"))]
     fn message(&self) -> String {
         match self {
             Failure::Plain(message) => message.clone(),
@@ -918,14 +918,16 @@ mod tests {
     use super::*;
 
     /// Signature shared by every `format` engine half and the JSON wire references below.
+    #[cfg(any(feature = "format", feature = "parse"))]
     type StringFn = fn(&str, Option<String>) -> Result<String, Failure>;
 
     /// The span-only JSON wire of a parse, read at the source type as a parse export reads
     /// one — the product of the C FFI's and the CLI's parse, which no export of this addon
     /// emits — the reference a parse failure and a source-type refusal of every export here is
-    /// graded against.
+    /// graded against. The `parse` feature's alone: it brings every language's `json` layer.
     macro_rules! json_wire {
         ($name:ident, $goalness:ident, $lang:ident) => {
+            #[cfg(feature = "parse")]
             fn $name(source: &str, source_type: Option<String>) -> Result<String, Failure> {
                 let goal = napi_source_type(source_type, goal_allowed!($goalness), Family::Parse)?;
                 tsv_arena::parse_convert!(
@@ -943,15 +945,18 @@ mod tests {
     json_wire!(css_json, nogoal, tsv_css);
     json_wire!(svelte_json, nogoal, tsv_svelte);
     /// Signature shared by every `parse_internal` engine half.
+    #[cfg(feature = "parse")]
     type UnitFn = fn(&str, Option<String>) -> Result<(), Failure>;
 
     /// Call at the default (Module) goal, i.e. with the `source_type` argument omitted —
     /// the shape every non-TypeScript caller uses.
+    #[cfg(any(feature = "format", feature = "parse"))]
     fn at_default(f: StringFn, source: &str) -> Result<String, Failure> {
         f(source, None)
     }
 
     /// Call at an explicit goal.
+    #[cfg(feature = "parse")]
     fn at_goal(f: StringFn, source: &str, goal: &str) -> Result<String, Failure> {
         f(source, Some(goal.to_owned()))
     }
@@ -959,6 +964,7 @@ mod tests {
     // --- format: normalizes, every language (exact output) ---
 
     #[test]
+    #[cfg(feature = "format")]
     fn format_normalizes_per_language() {
         let cases: [(&str, StringFn, &str, &str); 3] = [
             (
@@ -988,6 +994,7 @@ mod tests {
     // --- the goal axis: script accepts `await` as identifier, module rejects ---
 
     #[test]
+    #[cfg(all(feature = "format", feature = "parse"))]
     fn typescript_goal_switches_await() {
         use typescript_engine::{format, parse_internal, parse_tape};
         // `await` is an ordinary identifier at Script goal, reserved at Module goal.
@@ -1012,6 +1019,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(all(feature = "format", feature = "parse"))]
     fn goalless_languages_reject_a_goal_argument() {
         // Svelte hard-wires Module and CSS has no goal, so a `sourceType` argument asks
         // for something that cannot be honored — the caller is told rather than
@@ -1099,6 +1107,7 @@ mod tests {
     // --- parse_internal: parses without converting (Ok, no JSON), every language ---
 
     #[test]
+    #[cfg(feature = "parse")]
     fn parse_internal_ok_per_language() {
         let cases: [(&str, UnitFn, &str); 3] = [
             (
@@ -1117,6 +1126,7 @@ mod tests {
     // --- errors: a parse failure carries its message and its point ---
 
     #[test]
+    #[cfg(all(feature = "format", feature = "parse"))]
     fn invalid_syntax_errors_per_language() {
         // Parse and format both fail a source that does not parse with a returned
         // `Failure` (`{ok: false, error}` across the boundary), its message and frame the
@@ -1190,10 +1200,12 @@ mod tests {
     // --- parse_tape: the language writer's tape, and its failures exactly ---
 
     /// Signature shared by every `parse_tape` engine half.
+    #[cfg(feature = "parse")]
     type TapeFn = fn(&str, Option<String>) -> Result<Vec<u32>, Failure>;
 
     /// The tape the language's own wire writer writes for `source` into a sink of its own, on
     /// stores of its own — what the export must hand back word for word.
+    #[cfg(feature = "parse")]
     fn writer_tape(label: &str, source: &str) -> Result<Vec<u32>, Failure> {
         let mut sink = tsv_arena::tape::TapeSink::new();
         match label {
@@ -1219,6 +1231,7 @@ mod tests {
     /// own: a parse failure, a refused source type, as the JSON wire's parse reports them. The
     /// tape itself is graded against the transcoder by the tape gates.
     #[test]
+    #[cfg(feature = "parse")]
     fn parse_tape_is_the_writers_tape_and_its_failures() {
         let cases: [(&str, StringFn, TapeFn, &str, &str); 3] = [
             (
@@ -1284,11 +1297,13 @@ mod tests {
 
     /// A point as `(offset, line, column)` — `WirePoint` is `#[non_exhaustive]`, so a test
     /// outside `tsv_lang` compares its fields rather than building one.
+    #[cfg(all(feature = "parse", any(feature = "format", feature = "strip")))]
     fn point(point: WirePoint) -> (u32, u32, u32) {
         (point.offset, point.line, point.column)
     }
 
     /// The start of a returned failure's span, for the tests that read only the point.
+    #[cfg(all(feature = "format", feature = "parse"))]
     fn failure_start(failure: &Failure) -> Option<(u32, u32, u32)> {
         match failure {
             Failure::Returned { report, .. } => Some(point(report.start)),
@@ -1300,6 +1315,7 @@ mod tests {
     /// CR-folded text's the formatter parses: the same point the parse of the same source
     /// reports, past a CRLF and an astral character.
     #[test]
+    #[cfg(all(feature = "format", feature = "parse"))]
     fn format_failure_point_is_the_sources() {
         let src = "const a = '\u{1D49C}';\r\nconst = ;\r\n";
         let parse_err = at_default(typescript_json, src).unwrap_err();
@@ -1314,6 +1330,7 @@ mod tests {
     /// comment) is returned as a refusal, never as a parse failure — the parse of the same
     /// bytes succeeds — over a span covering the CR.
     #[test]
+    #[cfg(all(feature = "format", feature = "parse"))]
     fn format_refusal_carries_its_span() {
         let src = "<p>a</p>\n<div // c\rclass=\"x\"\n>hi</div>\n";
         assert!(at_default(svelte_json, src).is_ok());
@@ -1341,6 +1358,7 @@ mod tests {
     // --- the type strip: the code, a parse failure, a refusal with its span ---
 
     #[test]
+    #[cfg(all(feature = "strip", feature = "parse"))]
     fn strip_typescript_engine_outcomes() {
         assert_eq!(
             strip_typescript_engine("let x: T = 1;\n", None),
@@ -1373,6 +1391,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(all(feature = "imports", feature = "parse"))]
     fn parse_imports_engines_outcomes() {
         assert_eq!(
             parse_imports_typescript_engine("import a from 'a';\n", None),
@@ -1450,6 +1469,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(all(feature = "strip", feature = "parse"))]
     fn strip_typescript_engine_reads_the_source_type_as_format_does() {
         let sloppy = "with (o as any) {}\n";
         // unset: the module grammar, retried as a script
@@ -1477,6 +1497,7 @@ mod tests {
     // --- the per-thread arenas are reset+reused across calls (warm-path soundness) ---
 
     #[test]
+    #[cfg(all(feature = "format", feature = "parse"))]
     fn repeated_calls_reuse_arenas() {
         // This crate's distinctive risk: `with_doc_arena` and the language
         // crates' parked stores keep one set per thread and reset it at the
@@ -1496,6 +1517,7 @@ mod tests {
     // --- the per-thread stores are taken and parked across calls (warm-path soundness) ---
 
     #[test]
+    #[cfg(all(feature = "format", feature = "parse"))]
     fn warm_stores_answer_as_the_one_shot_functions_do() {
         // Every engine half parses into stores `tsv_arena`'s macros take out of the
         // thread's slots and park rewound: TypeScript's, CSS's, and for a Svelte document
@@ -1626,6 +1648,7 @@ mod tests {
     // --- multibyte source survives the JS-string marshalling + char-offset boundary ---
 
     #[test]
+    #[cfg(all(feature = "format", feature = "parse"))]
     fn parse_and_format_preserve_multibyte_source() {
         // napi-rs marshals JS strings in/out and the AST carries char offsets;
         // this is the same boundary risk tsv_ffi's same-named test guards.
