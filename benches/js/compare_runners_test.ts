@@ -132,9 +132,6 @@ const UNRUNNABLE_KEPT: Record<string, string[]> = {
 	'benches/js/bench_preflight.ts': ['deno task ts-repo:over-acceptance'],
 	// says what `deno task` would run if `deno.json` had the name
 	'scripts/roots/publish_deps_test.ts': ['deno task release'],
-	// the header of every committed `audit_signature.txt`, which only a regeneration of those
-	// fixture files rewrites: the emitter and the files change together
-	'crates/tsv_debug/src/fixtures/audit_signature.rs': ['deno task fixtures:update:formatted'],
 	// the website's script, run in its own checkout
 	'CLAUDE.md': ['npm run update-benchmarks'],
 	'benches/js/CLAUDE.md': ['npm run update-benchmarks'],

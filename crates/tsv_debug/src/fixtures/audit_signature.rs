@@ -130,7 +130,7 @@ impl ChainAnchor {
         match self {
             Self::OutputPrettier => concat!(
                 "# Auto-generated prettier chain signature. Do not edit manually.\n",
-                "# Regenerate: deno task fixtures:update:formatted <pattern>\n",
+                "# Regenerate: npm run fixtures:update:formatted -- <pattern>\n",
                 "#\n",
                 "# Each %%PASS=N%% section is exactly prettier^N(output_prettier.<ext>).\n",
                 "# This file exists when prettier is non-idempotent on output_prettier.* — it pins\n",
@@ -140,7 +140,7 @@ impl ChainAnchor {
             ),
             Self::UnformattedOurs => concat!(
                 "# Auto-generated prettier chain signature. Do not edit manually.\n",
-                "# Regenerate: deno task fixtures:update:formatted <pattern>\n",
+                "# Regenerate: npm run fixtures:update:formatted -- <pattern>\n",
                 "#\n",
                 "# Each %%PASS=N%% section is exactly prettier^N(unformatted_ours_<suffix>.<ext>),\n",
                 "# the same-suffix source beside this file. It exists when prettier's output from\n",
