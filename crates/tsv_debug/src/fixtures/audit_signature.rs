@@ -49,7 +49,8 @@
 //!
 //! - Pass content must end with `\n`. Prettier output always does, so this holds in practice;
 //!   round-trip preservation of trailing blank lines relies on it (`strip_trailing_blank`
-//!   undoes exactly one separator newline added by `serialize`).
+//!   undoes exactly the one separator newline `serialize` adds after each non-final section;
+//!   the final section, which gets none, is read as written).
 //! - Pass content must not contain `%%PASS=` at column 0. The parser uses that prefix as a
 //!   section delimiter. Implausible for valid Svelte/TS/CSS/JS content but worth stating;
 //!   a future hostile fixture would trip parsing.
@@ -403,8 +404,10 @@ impl AuditSignature {
             }
             // Lines outside any section that aren't header comments are dropped (whitespace).
         }
+        // The final section is taken as written: `serialize` adds no separator after it, so
+        // a fixed point that itself ends in a blank line keeps it.
         if let Some(last) = current.take() {
-            passes.push(strip_trailing_blank(&last));
+            passes.push(last);
         }
 
         if passes.is_empty() {
@@ -414,7 +417,8 @@ impl AuditSignature {
     }
 }
 
-/// Strip a single trailing blank line added by `serialize` between non-final sections.
+/// Strip the single trailing blank line `serialize` adds after a non-final section — asked
+/// only at the header that ends one, never of the final section, which has none.
 fn strip_trailing_blank(s: &str) -> String {
     if let Some(stripped) = s.strip_suffix("\n\n") {
         format!("{stripped}\n")
@@ -479,6 +483,31 @@ mod tests {
         };
         let parsed = AuditSignature::parse(&sig.serialize(ChainAnchor::UnformattedOurs)).unwrap();
         assert_eq!(parsed, sig);
+    }
+
+    #[test]
+    fn roundtrip_preserves_trailing_blank_lines_in_the_final_pass() {
+        // The fixed point gets no separator, so a blank line ending it is content, not one
+        // to strip: under both anchors, alone and after an earlier pass.
+        for passes in [
+            vec!["b\n\n"],
+            vec!["a\n", "b\n\n"],
+            vec!["a\n\n", "b\n\n\n"],
+        ] {
+            let sig = AuditSignature {
+                passes: passes.into_iter().map(str::to_string).collect(),
+            };
+            for anchor in [ChainAnchor::OutputPrettier, ChainAnchor::UnformattedOurs] {
+                let serialized = sig.serialize(anchor);
+                let parsed = AuditSignature::parse(&serialized).unwrap();
+                assert_eq!(parsed, sig, "{anchor:?}");
+                assert_eq!(
+                    parsed.non_canonical(&serialized, anchor),
+                    None,
+                    "{anchor:?}"
+                );
+            }
+        }
     }
 
     /// The three ways an output is already expressed without a chain pin. The updater
